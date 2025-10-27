@@ -1,0 +1,1 @@
+"# ElectionGuard Voting Platform" 
