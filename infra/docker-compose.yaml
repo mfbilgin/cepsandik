@@ -1,0 +1,120 @@
+version: "3.9"
+
+services:
+  # 🧩 USER-SERVICE DATABASE
+  postgres_user:
+    image: postgres:16
+    container_name: eg_postgres_user
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user_service
+      POSTGRES_PASSWORD: user_pass
+      POSTGRES_DB: userdb
+    ports:
+      - "5433:5432"   # local erişim için
+    volumes:
+      - pgdata_user:/var/lib/postgresql/data
+    networks:
+      - election-net
+
+  # 🧩 COMMUNITY-SERVICE DATABASE
+  postgres_community:
+    image: postgres:16
+    container_name: eg_postgres_community
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: community_service
+      POSTGRES_PASSWORD: comm_pass
+      POSTGRES_DB: communitydb
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata_community:/var/lib/postgresql/data
+    networks:
+      - election-net
+
+  # 🧩 ELECTION-SERVICE DATABASE
+  postgres_election:
+    image: postgres:16
+    container_name: eg_postgres_election
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: election_service
+      POSTGRES_PASSWORD: election_pass
+      POSTGRES_DB: electiondb
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata_election:/var/lib/postgresql/data
+    networks:
+      - election-net
+
+  # 🧩 VOTE-SERVICE DATABASE
+  postgres_vote:
+    image: postgres:16
+    container_name: eg_postgres_vote
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vote_service
+      POSTGRES_PASSWORD: vote_pass
+      POSTGRES_DB: votedb
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata_vote:/var/lib/postgresql/data
+    networks:
+      - election-net
+
+  # ⚡ REDIS
+  redis:
+    image: redis:7
+    container_name: eg_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - election-net
+
+  # 📨 RABBITMQ (Asenkron mesajlaşma)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: eg_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: eg_admin
+      RABBITMQ_DEFAULT_PASS: eg_pass
+    ports:
+      - "5672:5672"   # mesaj kuyruğu
+      - "15672:15672" # yönetim paneli
+    networks:
+      - election-net
+
+  # 🌐 NGINX GATEWAY
+  gateway:
+    image: nginx:1.27
+    container_name: eg_gateway
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - postgres_user
+      - postgres_community
+      - postgres_election
+      - postgres_vote
+      - redis
+      - rabbitmq
+    networks:
+      - election-net
+
+networks:
+  election-net:
+    driver: bridge
+
+volumes:
+  pgdata_user:
+  pgdata_community:
+  pgdata_election:
+  pgdata_vote:
