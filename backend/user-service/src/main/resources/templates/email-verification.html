@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-posta Doğrulama - CepSandık</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8F9FA;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation"
+                    style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #FFFFFF; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td
+                            style="background-color: #213448; padding: 40px 40px 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                            <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 600;">
+                                📦 CepSandık
+                            </h1>
+                            <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.85); font-size: 14px;">
+                                Güvenli Oylama Platformu
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 20px; color: #213448; font-size: 22px; font-weight: 600;">
+                                Merhaba <span th:text="${firstName}">Kullanıcı</span>! 👋
+                            </h2>
+
+                            <p style="margin: 0 0 25px; color: #72767D; font-size: 16px; line-height: 1.6;">
+                                CepSandık'a hoş geldiniz! Hesabınızı aktifleştirmek için lütfen e-posta adresinizi
+                                doğrulayın.
+                            </p>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0 30px;">
+                                        <a th:href="${verificationUrl}"
+                                            style="display: inline-block; padding: 16px 40px; background-color: #213448; color: #FFFFFF; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 15px rgba(33, 52, 72, 0.3);">
+                                            E-postamı Doğrula ✓
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 15px; color: #72767D; font-size: 14px; line-height: 1.6;">
+                                Buton çalışmıyorsa, aşağıdaki linki tarayıcınıza yapıştırabilirsiniz:
+                            </p>
+
+                            <p
+                                style="margin: 0 0 25px; padding: 15px; background-color: #F8F9FA; border-radius: 6px; word-break: break-all;">
+                                <a th:href="${verificationUrl}" th:text="${verificationUrl}"
+                                    style="color: #213448; text-decoration: none; font-size: 13px;">
+                                    https://cepsandik.com/verify?token=...
+                                </a>
+                            </p>
+
+                            <!-- Warning Box -->
+                            <table role="presentation"
+                                style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                                <tr>
+                                    <td
+                                        style="padding: 15px; background-color: #FFF8E6; border-left: 4px solid #F59E0B; border-radius: 4px;">
+                                        <p style="margin: 0; color: #92400E; font-size: 14px;">
+                                            ⏰ <strong>Önemli:</strong> Bu link <span
+                                                th:text="${expirationHours}">24</span> saat içinde geçerliliğini
+                                            yitirecektir.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td
+                            style="padding: 30px 40px; background-color: #F8F9FA; border-radius: 0 0 12px 12px; text-align: center;">
+                            <p style="margin: 0 0 10px; color: #72767D; font-size: 13px;">
+                                Bu işlemi siz yapmadıysanız, bu e-postayı dikkate almayın.
+                            </p>
+                            <p style="margin: 0; color: #A0A4A8; font-size: 12px;">
+                                © 2025 CepSandık. Tüm hakları saklıdır.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

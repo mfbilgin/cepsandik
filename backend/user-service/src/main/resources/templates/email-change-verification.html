@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Email Adresinizi Doğrulayın - CepSandık</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8F9FA;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+                    style="max-width: 600px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                    <!-- Header -->
+                    <tr>
+                        <td
+                            style="background-color: #213448; padding: 32px 40px; border-radius: 16px 16px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">
+                                ✉️ Yeni Email Doğrulama
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 18px; color: #2C2E33; margin: 0 0 24px 0;">
+                                Merhaba <strong th:text="${firstName}">Kullanıcı</strong>,
+                            </p>
+
+                            <p style="font-size: 16px; color: #72767D; line-height: 1.6; margin: 0 0 24px 0;">
+                                CepSandık hesabınız için yeni email adresi olarak bu adresi (<strong
+                                    th:text="${newEmail}">yeni@email.com</strong>) belirlediniz.
+                            </p>
+
+                            <p style="font-size: 16px; color: #72767D; line-height: 1.6; margin: 0 0 32px 0;">
+                                Email değişikliğini tamamlamak için aşağıdaki butona tıklayın:
+                            </p>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0"
+                                style="margin: 0 auto 32px auto;">
+                                <tr>
+                                    <td style="border-radius: 12px; background-color: #213448;">
+                                        <a th:href="${confirmUrl}"
+                                            style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 12px;">
+                                            Email Değişikliğini Onayla
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Security Notice -->
+                            <div
+                                style="background: #FFF3CD; border-left: 4px solid #FFC107; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
+                                <p style="margin: 0; color: #856404; font-size: 14px;">
+                                    <strong>⚠️ Uyarı:</strong> Bu bağlantı <strong
+                                        th:text="${expirationHours}">2</strong> saat içinde geçerliliğini yitirecektir.
+                                </p>
+                            </div>
+
+                            <p style="font-size: 14px; color: #72767D; line-height: 1.6; margin: 0;">
+                                Bu değişikliği siz yapmadıysanız, bu emaili görmezden gelebilirsiniz. Email adresiniz
+                                değişmeyecektir.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td
+                            style="padding: 24px 40px; background-color: #F8F9FA; border-radius: 0 0 16px 16px; text-align: center;">
+                            <p style="color: #72767D; font-size: 14px; margin: 0;">
+                                © 2026 CepSandık. Tüm hakları saklıdır.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

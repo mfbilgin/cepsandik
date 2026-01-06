@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Değişikliği Bildirimi - CepSandık</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8F9FA;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #213448; padding: 32px 40px; border-radius: 16px 16px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">
+                                ⚠️ Email Değişikliği Bildirimi
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 18px; color: #2C2E33; margin: 0 0 24px 0;">
+                                Merhaba <strong th:text="${firstName}">Kullanıcı</strong>,
+                            </p>
+                            
+                            <div style="background: #FFF3CD; border-left: 4px solid #FFC107; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
+                                <p style="margin: 0; color: #856404; font-size: 15px;">
+                                    <strong>⚠️ Dikkat:</strong> Hesabınızın email adresi değiştirilmek üzere.
+                                </p>
+                            </div>
+                            
+                            <p style="font-size: 16px; color: #72767D; line-height: 1.6; margin: 0 0 16px 0;">
+                                CepSandık hesabınız için email adresi değişikliği talep edildi:
+                            </p>
+                            
+                            <table style="width: 100%; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 12px 16px; background: #F8F9FA; border-radius: 8px;">
+                                        <p style="margin: 0 0 8px 0; color: #72767D; font-size: 14px;">Mevcut Email:</p>
+                                        <p style="margin: 0; color: #2C2E33; font-size: 16px; font-weight: 600;" th:text="${oldEmail}">eski@email.com</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 4px;"></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; background: #F8F9FA; border-radius: 8px;">
+                                        <p style="margin: 0 0 8px 0; color: #72767D; font-size: 14px;">Yeni Email:</p>
+                                        <p style="margin: 0; color: #213448; font-size: 16px; font-weight: 600;" th:text="${newEmail}">yeni@email.com</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="font-size: 15px; color: #72767D; line-height: 1.6; margin: 0 0 24px 0;">
+                                Bu değişikliği <strong>siz yapmadıysanız</strong>, lütfen hemen parolanızı değiştirin ve bizimle iletişime geçin.
+                            </p>
+                            
+                            <div style="background: #F8F9FA; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
+                                <p style="margin: 0; color: #72767D; font-size: 14px;">
+                                    📧 Yeni email adresine bir doğrulama bağlantısı gönderildi. Değişiklik ancak bu bağlantı tıklandığında tamamlanacaktır.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 24px 40px; background-color: #F8F9FA; border-radius: 0 0 16px 16px; text-align: center;">
+                            <p style="color: #72767D; font-size: 14px; margin: 0;">
+                                © 2026 CepSandık. Tüm hakları saklıdır.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
