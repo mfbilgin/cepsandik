@@ -27,13 +27,6 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(MessageConstants.REGISTER_SUCCESS, res));
     }
 
-    @Operation(summary = "Kullanıcının e-posta adresini doğrular")
-    @GetMapping("/verify/{token}")
-    public ResponseEntity<ApiResponse<String>> verify(@PathVariable String token) {
-        String msg = auth.verifyEmail(token);
-        return ResponseEntity.ok(ApiResponse.ok(MessageConstants.EMAIL_VERIFIED, msg));
-    }
-
     @Operation(summary = "E-posta doğrulama linkini tekrar gönderir")
     @PostMapping("/resend-verification")
     public ResponseEntity<ApiResponse<Void>> resendVerification(
