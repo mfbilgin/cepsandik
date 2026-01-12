@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-posta Doğrulandı - CepSandık</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #213448 0%, #1a2a3a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: #FFFFFF;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            padding: 40px 30px;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+
+        .header h1 {
+            color: #FFFFFF;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .content h2 {
+            color: #213448;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+
+        .content p {
+            color: #6B7280;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #213448 0%, #1a2a3a 100%);
+            color: #FFFFFF;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(33, 52, 72, 0.4);
+        }
+
+        .footer {
+            padding: 20px 30px;
+            background: #F9FAFB;
+            border-top: 1px solid #E5E7EB;
+        }
+
+        .footer p {
+            color: #9CA3AF;
+            font-size: 13px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .brand span {
+            font-size: 20px;
+        }
+
+        .brand-name {
+            color: #FFFFFF;
+            font-weight: 600;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="success-icon">✓</div>
+            <div class="brand">
+                <span>📦</span>
+                <span class="brand-name">CepSandık</span>
+            </div>
+            <h1>E-posta Doğrulandı!</h1>
+        </div>
+
+        <div class="content">
+            <h2>Tebrikler! 🎉</h2>
+            <p>
+                E-posta adresiniz başarıyla doğrulandı. Artık CepSandık'ın tüm özelliklerini 
+                kullanabilir ve güvenli oylamalara katılabilirsiniz.
+            </p>
+            <a href="cepsandik://verified" class="cta-button">
+                Uygulamaya Dön
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 CepSandık. Tüm hakları saklıdır.</p>
+        </div>
+    </div>
+</body>
+
+</html>
