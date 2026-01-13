@@ -19,7 +19,7 @@ public class CommunityController {
 
     private final CommunityService communityService;
 
-    @PostMapping
+    @PostMapping({ "", "/" })
     public ResponseEntity<ApiResponse<CommunityResponse>> createCommunity(
             @Valid @RequestBody CreateCommunityRequest request,
             @RequestHeader("X-User-Id") String userId) {
