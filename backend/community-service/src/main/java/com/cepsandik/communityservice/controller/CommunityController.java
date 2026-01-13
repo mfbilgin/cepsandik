@@ -29,7 +29,7 @@ public class CommunityController {
                 .body(ApiResponse.success("Topluluk başarıyla oluşturuldu", response));
     }
 
-    @GetMapping
+    @GetMapping({ "", "/" })
     public ResponseEntity<ApiResponse<PageResponse<CommunityResponse>>> getMyCommunities(
             @RequestHeader("X-User-Id") String userId,
             @RequestParam(defaultValue = "0") int page,
