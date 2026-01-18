@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
@@ -50,8 +49,8 @@ class InvitationServiceTest {
     @Mock
     private CommunityService communityService;
 
-    @Spy
-    private InvitationMapper invitationMapper = new InvitationMapper();
+    @Mock
+    private InvitationMapper invitationMapper;
 
     @InjectMocks
     private InvitationService invitationService;
@@ -105,6 +104,13 @@ class InvitationServiceTest {
         request.setMaxUses(10);
         request.setExpiresInHours(24);
 
+        InvitationResponse mockInvitationResponse = InvitationResponse.builder()
+                .id(1L)
+                .code("NEWCODE1")
+                .invitationLink("https://cepsandik.com/join/NEWCODE1")
+                .maxUses(10)
+                .build();
+
         when(communityRepository.findByIdAndIsDeletedFalse(1L)).thenReturn(Optional.of(testCommunity));
         when(memberRepository.findByCommunityIdAndUserId(1L, ownerId)).thenReturn(Optional.of(testOwner));
         when(codeGenerator.generateInvitationCode()).thenReturn("NEWCODE1");
@@ -115,6 +121,7 @@ class InvitationServiceTest {
             inv.setCreatedAt(LocalDateTime.now());
             return inv;
         });
+        when(invitationMapper.toResponse(any(CommunityInvitation.class))).thenReturn(mockInvitationResponse);
 
         // When
         InvitationResponse response = invitationService.createInvitation(1L, request, ownerId);
@@ -122,6 +129,7 @@ class InvitationServiceTest {
         // Then
         assertNotNull(response);
         assertEquals("NEWCODE1", response.getCode());
+        assertEquals("https://cepsandik.com/join/NEWCODE1", response.getInvitationLink());
         assertEquals(10, response.getMaxUses());
         verify(invitationRepository).save(any(CommunityInvitation.class));
     }
