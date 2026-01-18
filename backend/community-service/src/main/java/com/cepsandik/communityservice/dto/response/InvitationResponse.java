@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class InvitationResponse {
     private Long id;
     private String code;
+    private String invitationLink;
     private Integer maxUses;
     private Integer currentUses;
     private LocalDateTime expiresAt;
