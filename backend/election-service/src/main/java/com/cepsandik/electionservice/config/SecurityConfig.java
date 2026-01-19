@@ -1,5 +1,7 @@
 package com.cepsandik.electionservice.config;
 
+import com.cepsandik.electionservice.security.InternalJwtFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -7,10 +9,14 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final InternalJwtFilter internalJwtFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -25,7 +31,9 @@ public class SecurityConfig {
                         // Tüm API istekleri gateway üzerinden gelecek, internal JWT kontrolü yapılacak
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()
-                );
+                )
+                // Internal JWT filter eklenmeli
+                .addFilterBefore(internalJwtFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
     }
