@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [user-service, community-service]
+        service: [user-service, community-service, election-service]
     
     permissions:
       contents: read

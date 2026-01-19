@@ -23,6 +23,7 @@ services:
     depends_on:
       - user-service
       - community-service
+      - election-service
     networks:
       - cepsandik-net
 
@@ -61,6 +62,22 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/communitydb
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
+    depends_on:
+      - postgres
+    networks:
+      - cepsandik-net
+
+  # 🗳️ Election Service
+  election-service:
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-election-service:latest
+    container_name: cepsandik_election_service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/electiondb
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
