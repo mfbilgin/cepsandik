@@ -97,6 +97,7 @@ jobs:
           password: ${{ secrets.DROPLET_PASSWORD }}
           script: |
             cd /opt/cepsandik
+            git pull origin main
             docker compose pull
             docker compose up -d --remove-orphans
             docker system prune -f

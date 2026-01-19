@@ -1,15 +1,9 @@
 version: "3.8"
 
-# ==========================================
-# CepSandık Production Docker Compose
-# ==========================================
-# Digital Ocean Droplet'ta çalıştırılacak konfigürasyon
-
 services:
-  # 🌐 OpenResty Gateway (SSL + Auth)
   gateway:
     image: ghcr.io/${GITHUB_OWNER}/cepsandik-gateway:latest
-    container_name: cepsandik_gateway
+    container_name: gateway
     restart: unless-stopped
     ports:
       - "80:80"
@@ -25,72 +19,108 @@ services:
       - community-service
       - election-service
     networks:
-      - cepsandik-net
+      - app-net
+    mem_limit: 256m
 
-  # 👤 User Service
   user-service:
     image: ghcr.io/${GITHUB_OWNER}/cepsandik-user-service:latest
-    container_name: cepsandik_user_service
+    container_name: user-service
     restart: unless-stopped
+    mem_limit: 450m
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DATABASE_URL: jdbc:postgresql://postgres:5432/userdb
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
-      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
-      FRONTEND_URL: ${FRONTEND_URL}
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx350m
+
+      # Database
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+
+      # Redis
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+
+      # RabbitMQ
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+
+      # Security Mapping
+      - APP_JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - APP_JWT_ACCESS_TTL_SECONDS=${JWT_TTL_SECONDS}
+
+      # Mail
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+
+      # AWS S3 (Correct mapping for application.properties)
+      - AWS_S3_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_S3_SECRET_KEY=${AWS_SECRET_KEY}
+      - AWS_S3_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_BUCKET}
+
+      # Application Logic
+      - APP_FRONTEND_URL=${FRONTEND_URL}
     depends_on:
-      - postgres
+      - db
       - redis
       - rabbitmq
     networks:
-      - cepsandik-net
+      - app-net
 
-  # 🏘️ Community Service
   community-service:
     image: ghcr.io/${GITHUB_OWNER}/cepsandik-community-service:latest
-    container_name: cepsandik_community_service
+    container_name: community-service
     restart: unless-stopped
+    mem_limit: 400m
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DATABASE_URL: jdbc:postgresql://postgres:5432/communitydb
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
-    depends_on:
-      - postgres
-    networks:
-      - cepsandik-net
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
 
-  # 🗳️ Election Service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/communitydb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+
+      # Custom Properties
+      - JWT_INTERNAL_SECRET=${INTERNAL_JWT_SECRET}
+      - APP_INVITATION_LINK_BASE=${INVITATION_LINK_BASE}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-net
+
   election-service:
     image: ghcr.io/${GITHUB_OWNER}/cepsandik-election-service:latest
-    container_name: cepsandik_election_service
+    container_name: election-service
     restart: unless-stopped
+    mem_limit: 400m
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DATABASE_URL: jdbc:postgresql://postgres:5432/electiondb
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
-    depends_on:
-      - postgres
-    networks:
-      - cepsandik-net
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
 
-  # 🐘 PostgreSQL
-  postgres:
-    image: postgres:16-alpine
-    container_name: cepsandik_postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/electiondb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+
+      - JWT_INTERNAL_SECRET=${INTERNAL_JWT_SECRET}
+    depends_on:
+      - db
+    networks:
+      - app-net
+
+  db:
+    image: postgres:15-alpine
+    container_name: db
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
@@ -98,51 +128,51 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - cepsandik-net
+      - app-net
 
-  # ⚡ Redis
   redis:
     image: redis:7-alpine
-    container_name: cepsandik_redis
+    container_name: redis
     restart: unless-stopped
+    mem_limit: 128m
     volumes:
       - redis_data:/data
     networks:
-      - cepsandik-net
+      - app-net
 
-  # 📨 RabbitMQ
   rabbitmq:
     image: rabbitmq:3-alpine
-    container_name: cepsandik_rabbitmq
+    container_name: rabbitmq
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - cepsandik-net
+      - app-net
 
-  # 💾 Database Backup Service
   backup:
     build:
       context: ./backup
       dockerfile: Dockerfile
-    container_name: cepsandik_backup
+    container_name: backup
     restart: unless-stopped
+    mem_limit: 128m
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
       PGPASSWORD: ${DATABASE_PASSWORD}
-      BACKUP_ON_START: "false" # İlk başlangıçta yedekleme yapma
+      BACKUP_ON_START: "false"
     volumes:
       - backup_data:/backups
     depends_on:
-      - postgres
+      - db
     networks:
-      - cepsandik-net
+      - app-net
 
 networks:
-  cepsandik-net:
+  app-net:
     driver: bridge
 
 volumes:
@@ -150,5 +180,3 @@ volumes:
   redis_data:
   rabbitmq_data:
   backup_data:
-
-
