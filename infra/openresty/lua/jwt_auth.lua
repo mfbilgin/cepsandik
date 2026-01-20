@@ -3,8 +3,8 @@ local jwt = require "resty.jwt"
 local cjson = require "cjson"
 
 -- Configuration
-local JWT_SECRET = os.getenv("JWT_SECRET") or "94010e81e0b61f9869c0232025086fbc83a2d60975231b86fa714a8a29b2a76d"
-local INTERNAL_SECRET = os.getenv("INTERNAL_JWT_SECRET") or "95d597309c7a8d06c95bab3136b53274e61dbbfcb1d1ca0fb9a24dff342d63ed"
+local JWT_SECRET = os.getenv("JWT_SECRET") or ""
+local INTERNAL_SECRET = os.getenv("INTERNAL_JWT_SECRET") or ""
 local INTERNAL_TOKEN_TTL = 30 -- 30 seconds
 
 local function validate_client_jwt(auth_header)

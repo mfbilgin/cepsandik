@@ -1,0 +1,363 @@
+version: "3.8"
+
+services:
+  # ============================================
+  # API Gateway (OpenResty - Nginx + Lua)
+  # ============================================
+  gateway:
+    build:
+      context: ./openresty
+      dockerfile: Dockerfile
+    container_name: cepsandik-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+    volumes:
+      # SSL certificates from Certbot
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      # Nginx logs
+      - ./logs/nginx:/usr/local/openresty/nginx/logs
+      # Nginx Configuration
+      - ./openresty/conf/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+    depends_on:
+      - user-service
+      - community-service
+      - election-service
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:80" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # Certbot (SSL Certificate Management)
+  # ============================================
+  certbot:
+    image: certbot/certbot:latest
+    container_name: cepsandik-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - app-network
+
+  # ============================================
+  # User Service (Authentication & User Management)
+  # ============================================
+  user-service:
+    build:
+      context: ../backend/user-service
+      dockerfile: Dockerfile
+    container_name: cepsandik-user-service
+    restart: unless-stopped
+    environment:
+      # Spring Profile
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx512m
+
+      # Database
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+
+      # JPA/Hibernate
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=false
+      - SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL=true
+      - SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_TIME_ZONE=UTC
+      - SPRING_JPA_OPEN_IN_VIEW=false
+
+      # Redis Cache
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # RabbitMQ
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+
+      # JWT Configuration
+      - APP_JWT_SECRET=${JWT_SECRET}
+      - APP_JWT_ACCESS_TTL_SECONDS=${JWT_TTL_SECONDS}
+
+      # Email Configuration (AWS SES SMTP)
+      - SPRING_MAIL_HOST=${MAIL_HOST}
+      - SPRING_MAIL_PORT=${MAIL_PORT}
+      - SPRING_MAIL_USERNAME=${MAIL_USERNAME}
+      - SPRING_MAIL_PASSWORD=${MAIL_PASSWORD}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=${MAIL_SMTP_AUTH}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=${MAIL_SMTP_STARTTLS_ENABLE}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=${MAIL_SMTP_CONNECTION_TIMEOUT}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=${MAIL_SMTP_TIMEOUT}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=${MAIL_SMTP_WRITE_TIMEOUT}
+      - APP_MAIL_FROM=${MAIL_FROM}
+      - APP_MAIL_FROM_NAME=${MAIL_FROM_NAME}
+
+      # AWS S3 Configuration
+      - AWS_S3_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_S3_SECRET_KEY=${AWS_SECRET_KEY}
+      - AWS_S3_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_BUCKET}
+
+      # Application Configuration
+      - APP_FRONTEND_URL=${FRONTEND_URL}
+
+      # Actuator
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=never
+      - MANAGEMENT_INFO_ENV_ENABLED=true
+
+      # Character Encoding
+      - SPRING_MANDATORY_FILE_ENCODING=UTF-8
+      - SERVER_SERVLET_ENCODING_CHARSET=UTF-8
+      - SERVER_SERVLET_ENCODING_FORCE=true
+      - SERVER_SERVLET_ENCODING_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ============================================
+  # Community Service
+  # ============================================
+  community-service:
+    build:
+      context: ../backend/community-service
+      dockerfile: Dockerfile
+    container_name: cepsandik-community-service
+    restart: unless-stopped
+    environment:
+      # Spring Profile
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
+
+      # Database
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/communitydb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+
+      # JPA/Hibernate
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=false
+      - SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL=true
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+
+      # Internal JWT (for gateway communication)
+      - JWT_INTERNAL_SECRET=${INTERNAL_JWT_SECRET}
+
+      # Application Configuration
+      - APP_INVITATION_LINK_BASE=${INVITATION_LINK_BASE}
+
+      # Actuator
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+
+      # Logging
+      - LOGGING_LEVEL_COM_CEPSANDIK_COMMUNITYSERVICE=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=INFO
+      - LOGGING_LEVEL_ORG_HIBERNATE=WARN
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8083/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ============================================
+  # Election Service
+  # ============================================
+  election-service:
+    build:
+      context: ../backend/election-service
+      dockerfile: Dockerfile
+    container_name: cepsandik-election-service
+    restart: unless-stopped
+    environment:
+      # Spring Profile
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
+
+      # Database
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/electiondb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+
+      # JPA/Hibernate
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+      - SPRING_JPA_SHOW_SQL=false
+      - SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL=true
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+
+      # Flyway Database Migrations
+      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_FLYWAY_LOCATIONS=classpath:db/migration
+      - SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
+
+      # Internal JWT (for gateway communication)
+      - JWT_INTERNAL_SECRET=${INTERNAL_JWT_SECRET}
+
+      # Access Code Configuration
+      - APP_ACCESS_CODE_LENGTH=${ACCESS_CODE_LENGTH}
+      - APP_ACCESS_CODE_CHARACTERS=${ACCESS_CODE_CHARACTERS}
+
+      # Actuator
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=when-authorized
+
+      # Logging
+      - LOGGING_LEVEL_COM_CEPSANDIK_ELECTIONSERVICE=INFO
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: cepsandik-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: cepsandik-redis
+    restart: unless-stopped
+    command: >
+      sh -c '
+        if [ -n "${REDIS_PASSWORD}" ]; then
+          redis-server --requirepass ${REDIS_PASSWORD}
+        else
+          redis-server
+        fi
+      '
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ============================================
+  # RabbitMQ Message Broker
+  # ============================================
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    container_name: cepsandik-rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ============================================
+  # Database Backup Service
+  # ============================================
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: cepsandik-backup
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - PGPASSWORD=${DATABASE_PASSWORD}
+      - BACKUP_ON_START=false
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    mem_limit: 100m
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  app-network:
+    driver: bridge
+    name: cepsandik-network
+
+# ============================================
+# Persistent Volumes
+# ============================================
+volumes:
+  postgres_data:
+    name: cepsandik-postgres-data
+  redis_data:
+    name: cepsandik-redis-data
+  rabbitmq_data:
+    name: cepsandik-rabbitmq-data
+  backup_data:
+    name: cepsandik-backup-data

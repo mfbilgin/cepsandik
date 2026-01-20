@@ -1,0 +1,26 @@
+# Production Environment File
+.env
+
+# SSL Certificates (Let's Encrypt)
+certbot/
+
+# Logs
+logs/
+*.log
+
+# Backup Data
+backup_data/
+
+# Docker volumes (managed externally)
+postgres_data/
+redis_data/
+rabbitmq_data/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
