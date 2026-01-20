@@ -14,8 +14,8 @@ jobs:
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
-          key: ${{ secrets.DROPLET_SSH_KEY }}
-          # password: ${{ secrets.DROPLET_PASSWORD }} # Key based auth is preferred if available
+          # key: ${{ secrets.DROPLET_SSH_KEY }}
+          password: ${{ secrets.DROPLET_PASSWORD }}
           script: |
             # Stop if any command fails
             set -e
