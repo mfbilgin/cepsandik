@@ -19,6 +19,7 @@ RUN cd /tmp && \
 # Copy configuration and scripts
 COPY conf/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY lua/ /usr/local/openresty/nginx/lua/
+COPY html/ /usr/share/nginx/html/
 
 # Create log directory
 RUN mkdir -p /usr/local/openresty/nginx/logs
