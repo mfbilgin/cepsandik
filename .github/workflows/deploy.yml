@@ -16,6 +16,8 @@ jobs:
           username: ${{ secrets.DROPLET_USERNAME }}
           # key: ${{ secrets.DROPLET_SSH_KEY }}
           password: ${{ secrets.DROPLET_PASSWORD }}
+          timeout: 30m
+          command_timeout: 30m
           script: |
             # Stop if any command fails
             set -e
