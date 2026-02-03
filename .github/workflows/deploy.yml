@@ -24,7 +24,8 @@ jobs:
             
             # 1. Update Codebase
             cd /opt/cepsandik
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             
             # 2. Deploy Infrastructure
             cd infra
