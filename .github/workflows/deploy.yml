@@ -5,39 +5,99 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/cepsandik
+
 jobs:
+  # ===== Job 1: Docker image build & push =====
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - name: gateway
+            context: ./infra/openresty
+            dockerfile: ./infra/openresty/Dockerfile
+          - name: user-service
+            context: ./backend/user-service
+            dockerfile: ./backend/user-service/Dockerfile
+          - name: community-service
+            context: ./backend/community-service
+            dockerfile: ./backend/community-service/Dockerfile
+          - name: election-service
+            context: ./backend/election-service
+            dockerfile: ./backend/election-service/Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:latest
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+
+  # ===== Job 2: Deploy to Droplet =====
   deploy:
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - name: Deploy to Digital Ocean Droplet
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          CR_PAT: ${{ secrets.CR_PAT }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
-          # key: ${{ secrets.DROPLET_SSH_KEY }}
           password: ${{ secrets.DROPLET_PASSWORD }}
-          timeout: 30m
-          command_timeout: 30m
+          timeout: 10m
+          command_timeout: 10m
+          envs: CR_PAT,GITHUB_OWNER
           script: |
-            # Stop if any command fails
             set -e
-            
+
             echo "🚀 Starting deployment..."
-            
-            # 1. Update Codebase
+
+            # 1. Update codebase (for docker-compose.prod.yaml & config changes)
             cd /opt/cepsandik
             git fetch origin main
             git reset --hard origin/main
-            
-            # 2. Deploy Infrastructure
+
+            # 2. Login to GHCR
+            echo "$CR_PAT" | docker login ghcr.io -u "$GITHUB_OWNER" --password-stdin
+
+            # 3. Ensure required directories exist
             cd infra
-            
-            # 3. Reload/Rebuild Services
-            # --build ensures we pick up code changes since we use local Dockerfiles
-            docker compose up -d --build --remove-orphans
-            
-            # 4. Clean up unused images
+            mkdir -p certbot/conf certbot/www logs/nginx
+
+            # 4. Pull pre-built images & deploy
+            export GITHUB_OWNER="$GITHUB_OWNER"
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+
+            # 5. Clean up
             docker system prune -f
-            
+
             echo "✅ Deployment completed successfully!"
-          
+
