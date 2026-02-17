@@ -16,47 +16,53 @@ import java.util.Optional;
 @Repository
 public interface ElectionRepository extends JpaRepository<Election, Long> {
 
-    Optional<Election> findByIdAndIsDeletedFalse(Long id);
+       Optional<Election> findByIdAndIsDeletedFalse(Long id);
 
-    Page<Election> findByCommunityIdAndIsDeletedFalse(Long communityId, Pageable pageable);
+       Page<Election> findByCommunityIdAndIsDeletedFalse(Long communityId, Pageable pageable);
 
-    Page<Election> findByCommunityIdAndStatusAndIsDeletedFalse(
-            Long communityId, ElectionStatus status, Pageable pageable);
+       Page<Election> findByCommunityIdAndStatusAndIsDeletedFalse(
+                     Long communityId, ElectionStatus status, Pageable pageable);
 
-    List<Election> findByCreatedByAndIsDeletedFalse(String userId);
+       List<Election> findByCreatedByAndIsDeletedFalse(String userId);
 
-    /** Başlaması gereken seçimleri bul (SCHEDULED → ACTIVE) */
-    @Query("SELECT e FROM Election e WHERE e.status = 'SCHEDULED' " +
-           "AND e.startTime <= :now AND e.isDeleted = false")
-    List<Election> findElectionsToStart(@Param("now") LocalDateTime now);
+       /** Başlaması gereken seçimleri bul (SCHEDULED → ACTIVE) */
+       @Query("SELECT e FROM Election e WHERE e.status = 'SCHEDULED' " +
+                     "AND e.startTime <= :now AND e.isDeleted = false")
+       List<Election> findElectionsToStart(@Param("now") LocalDateTime now);
 
-    /** Bitmesi gereken seçimleri bul (ACTIVE → CLOSED) */
-    @Query("SELECT e FROM Election e WHERE e.status = 'ACTIVE' " +
-           "AND e.endTime <= :now AND e.isDeleted = false")
-    List<Election> findElectionsToEnd(@Param("now") LocalDateTime now);
+       /** Bitmesi gereken seçimleri bul (ACTIVE → CLOSED) */
+       @Query("SELECT e FROM Election e WHERE e.status = 'ACTIVE' " +
+                     "AND e.endTime <= :now AND e.isDeleted = false")
+       List<Election> findElectionsToEnd(@Param("now") LocalDateTime now);
 
-    /** Topluluk bazlı aktif seçimleri getir */
-    @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
-           "AND e.status = 'ACTIVE' AND e.isDeleted = false")
-    List<Election> findActiveElectionsByCommunityId(@Param("communityId") Long communityId);
+       /** Topluluk bazlı aktif seçimleri getir */
+       @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
+                     "AND e.status = 'ACTIVE' AND e.isDeleted = false")
+       List<Election> findActiveElectionsByCommunityId(@Param("communityId") Long communityId);
 
-    /** Kullanıcının oluşturduğu seçim sayısı */
-    long countByCreatedByAndIsDeletedFalse(String userId);
+       /** Kullanıcının oluşturduğu seçim sayısı */
+       long countByCreatedByAndIsDeletedFalse(String userId);
 
-    /** Kullanıcının oluşturduğu aktif/scheduled seçimler */
-    @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
-           "AND e.status IN ('ACTIVE', 'SCHEDULED') AND e.isDeleted = false " +
-           "ORDER BY e.startTime ASC")
-    List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId);
+       /** Kullanıcının oluşturduğu aktif/scheduled seçimler */
+       @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
+                     "AND e.status IN ('ACTIVE', 'SCHEDULED') AND e.isDeleted = false " +
+                     "ORDER BY e.startTime ASC")
+       List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId);
 
-    /** Kullanıcının oluşturduğu kapanmış seçimler */
-    @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
-           "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false " +
-           "ORDER BY e.endTime DESC")
-    List<Election> findClosedByCreatedBy(@Param("userId") String userId);
+       /** Kullanıcının oluşturduğu kapanmış seçimler */
+       @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
+                     "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false " +
+                     "ORDER BY e.endTime DESC")
+       List<Election> findClosedByCreatedBy(@Param("userId") String userId);
 
-    /** Topluluk bazlı arşivlenmiş seçimler (CLOSED + ARCHIVED) */
-    @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
-           "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false")
-    Page<Election> findArchivedByCommunityId(@Param("communityId") Long communityId, Pageable pageable);
+       /** Topluluk bazlı arşivlenmiş seçimler (CLOSED + ARCHIVED) */
+       @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
+                     "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false")
+       Page<Election> findArchivedByCommunityId(@Param("communityId") Long communityId, Pageable pageable);
+
+       /** Bitiş zamanı yaklaşan aktif seçimler (hatırlatma bildirimi için) */
+       @Query("SELECT e FROM Election e WHERE e.status = 'ACTIVE' " +
+                     "AND e.endTime > :now AND e.endTime <= :threshold AND e.isDeleted = false")
+       List<Election> findElectionsNearingEnd(@Param("now") LocalDateTime now,
+                     @Param("threshold") LocalDateTime threshold);
 }

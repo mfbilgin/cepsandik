@@ -111,8 +111,18 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
 
       - JWT_INTERNAL_SECRET=${INTERNAL_JWT_SECRET}
+
+      # RabbitMQ (Bildirim sistemi)
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+
+      # Community Service (internal communication)
+      - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
     depends_on:
       - db
+      - rabbitmq
     networks:
       - app-net
 

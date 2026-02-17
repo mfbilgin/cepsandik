@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seçim Başladı - CepSandık</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8F9FA;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation"
+                    style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #FFFFFF; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td
+                            style="background-color: #213448; padding: 40px 40px 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                            <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 600;">
+                                📦 CepSandık
+                            </h1>
+                            <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.85); font-size: 14px;">
+                                Güvenli Oylama Platformu
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 20px; color: #213448; font-size: 22px; font-weight: 600;">
+                                Merhaba <span th:text="${firstName}">Kullanıcı</span>! 🗳️
+                            </h2>
+
+                            <p style="margin: 0 0 25px; color: #72767D; font-size: 16px; line-height: 1.6;">
+                                Topluluğunuzda yeni bir seçim başladı! Oyunuzu kullanmak için uygulamayı açın.
+                            </p>
+
+                            <!-- Election Info Box -->
+                            <table role="presentation"
+                                style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+                                <tr>
+                                    <td
+                                        style="padding: 20px; background-color: #E8F5E9; border-left: 4px solid #4CAF50; border-radius: 4px;">
+                                        <p style="margin: 0 0 5px; color: #1B5E20; font-size: 13px; font-weight: 600; text-transform: uppercase;">
+                                            📋 Seçim Başlığı
+                                        </p>
+                                        <p style="margin: 0; color: #2E7D32; font-size: 18px; font-weight: 600;"
+                                            th:text="${electionTitle}">
+                                            Örnek Seçim
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 15px; color: #72767D; font-size: 14px; line-height: 1.6;">
+                                Oyunuzu zamanında kullanmayı unutmayın. Her oy çok değerli! 🎉
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td
+                            style="padding: 30px 40px; background-color: #F8F9FA; border-radius: 0 0 12px 12px; text-align: center;">
+                            <p style="margin: 0 0 10px; color: #72767D; font-size: 13px;">
+                                Bu bildirim, topluluğunuzdaki bir seçim hakkında size otomatik olarak gönderilmiştir.
+                            </p>
+                            <p style="margin: 0; color: #A0A4A8; font-size: 12px;">
+                                © 2025 CepSandık. Tüm hakları saklıdır.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

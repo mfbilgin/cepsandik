@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.cepsandik.electionservice.client.CommunityServiceClient;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,6 +29,8 @@ public class ResultService {
     private final VoteRepository voteRepository;
     private final VoteTokenRepository voteTokenRepository;
     private final ElectionResultRepository electionResultRepository;
+    private final ElectionNotificationProducer notificationProducer;
+    private final CommunityServiceClient communityServiceClient;
 
     /**
      * Seçim sonuçlarını hesaplar ve kaydeder.
@@ -169,6 +173,20 @@ public class ResultService {
 
         log.info("Sonuçlar yayınlandı, seçim arşivlendi - Election: {}", electionId);
 
+        // Topluluk üyelerine bildirim gönder
+        try {
+            List<String> memberUserIds = communityServiceClient
+                    .getMemberUserIds(election.getCommunityId());
+            if (!memberUserIds.isEmpty()) {
+                notificationProducer.notifyResultsPublished(
+                        election.getId(), election.getTitle(),
+                        election.getCommunityId(), memberUserIds);
+            }
+        } catch (Exception e) {
+            log.error("Sonuç yayınlama bildirimi gönderilemedi: electionId={}, hata={}",
+                    electionId, e.getMessage());
+        }
+
         List<ElectionResult> results = electionResultRepository.findByElectionIdOrderByRankAsc(electionId);
         long totalVotes = voteRepository.countByElectionId(electionId);
         long totalTokens = voteTokenRepository.countByElectionId(electionId);
@@ -179,7 +197,7 @@ public class ResultService {
     // ==================== Helper ====================
 
     private ElectionResultResponse buildResultResponse(Election election, List<ElectionResult> results,
-                                                        long totalVotes, long totalTokens) {
+            long totalVotes, long totalTokens) {
         List<CandidateResultResponse> candidateResults = results.stream()
                 .map(r -> CandidateResultResponse.builder()
                         .candidateId(r.getCandidate().getId())

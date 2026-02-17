@@ -35,5 +35,8 @@ public interface VoteTokenRepository extends JpaRepository<VoteToken, Long> {
 
     /** Belirli bir seçimde kullanılmış token sayısı (oy kullanan) */
     long countByElectionIdAndIsUsedTrue(Long electionId);
-}
 
+    /** Belirli bir seçimde oy kullanmış kullanıcıların ID'leri */
+    @Query("SELECT vt.userId FROM VoteToken vt WHERE vt.election.id = :electionId AND vt.isUsed = true")
+    List<String> findVotedUserIdsByElectionId(@Param("electionId") Long electionId);
+}

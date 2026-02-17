@@ -230,6 +230,15 @@ services:
       - APP_ACCESS_CODE_LENGTH=${ACCESS_CODE_LENGTH}
       - APP_ACCESS_CODE_CHARACTERS=${ACCESS_CODE_CHARACTERS}
 
+      # RabbitMQ (Bildirim sistemi)
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+
+      # Community Service (internal communication)
+      - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
+
       # Actuator
       - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
       - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=when-authorized
@@ -239,6 +248,8 @@ services:
       - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=INFO
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - app-network
