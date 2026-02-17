@@ -188,6 +188,8 @@ networks:
 
 volumes:
   postgres_data:
+    external: true
+    name: cepsandik-postgres-data
   redis_data:
   rabbitmq_data:
   backup_data:
