@@ -185,4 +185,28 @@ public class ElectionController {
         electionService.deactivateAccessCode(id, codeId, userId);
         return ResponseEntity.ok(ApiResponse.success("Erişim kodu deaktive edildi"));
     }
+
+    // ==================== PREVIEW & ARCHIVE ====================
+
+    @Operation(summary = "Seçim önizleme – yayınlamadan önce tüm bilgileri ve eksikleri gösterir")
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<ApiResponse<ElectionPreviewResponse>> previewElection(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId) {
+
+        ElectionPreviewResponse response = electionService.previewElection(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Topluluk bazlı arşivlenmiş seçimleri listeler")
+    @GetMapping("/communities/{communityId}/archived")
+    public ResponseEntity<ApiResponse<PageResponse<ElectionResponse>>> getArchivedElections(
+            @PathVariable Long communityId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        PageResponse<ElectionResponse> response = electionService.getArchivedElections(communityId, page, size);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }
+

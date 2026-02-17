@@ -54,4 +54,9 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
            "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false " +
            "ORDER BY e.endTime DESC")
     List<Election> findClosedByCreatedBy(@Param("userId") String userId);
+
+    /** Topluluk bazlı arşivlenmiş seçimler (CLOSED + ARCHIVED) */
+    @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
+           "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false")
+    Page<Election> findArchivedByCommunityId(@Param("communityId") Long communityId, Pageable pageable);
 }

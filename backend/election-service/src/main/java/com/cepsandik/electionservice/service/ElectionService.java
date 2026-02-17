@@ -356,6 +356,75 @@ public class ElectionService {
         log.info("Erişim kodu deaktive edildi: electionId={}, codeId={}", electionId, codeId);
     }
 
+    // ==================== ARCHIVE & PREVIEW ====================
+
+    /**
+     * Topluluk bazlı arşivlenmiş seçimleri listeler (CLOSED + ARCHIVED).
+     */
+    public PageResponse<ElectionResponse> getArchivedElections(Long communityId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("endTime").descending());
+        Page<Election> electionPage = electionRepository.findArchivedByCommunityId(communityId, pageable);
+        return buildPageResponse(electionPage);
+    }
+
+    /**
+     * Seçim önizleme – yayınlamadan önce tüm bilgileri ve eksikleri gösterir.
+     */
+    @Transactional(readOnly = true)
+    public ElectionPreviewResponse previewElection(Long id, String userId) {
+        Election election = findElectionOrThrow(id);
+        checkOwnership(election, userId);
+
+        long candidateCount = candidateRepository.countByElectionIdAndIsDeletedFalse(id);
+        long accessCodeCount = accessCodeRepository.countByElectionIdAndIsActiveTrue(id);
+        List<CandidateResponse> candidates = candidateRepository
+                .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(id).stream()
+                .map(electionMapper::toCandidateResponse)
+                .toList();
+
+        // Yayınlama gereksinimleri kontrolü
+        List<String> warnings = new java.util.ArrayList<>();
+        boolean readyToPublish = true;
+
+        if (candidateCount < 2) {
+            warnings.add("En az 2 aday gereklidir (mevcut: " + candidateCount + ")");
+            readyToPublish = false;
+        }
+        if (election.getStartTime() == null) {
+            warnings.add("Başlangıç zamanı belirtilmelidir");
+            readyToPublish = false;
+        }
+        if (election.getEndTime() == null) {
+            warnings.add("Bitiş zamanı belirtilmelidir");
+            readyToPublish = false;
+        }
+        if (election.getStartTime() != null && election.getStartTime().isBefore(LocalDateTime.now())) {
+            warnings.add("Başlangıç zamanı geçmiş, güncellenmesi gerekebilir");
+        }
+        if (election.getTitle() == null || election.getTitle().isBlank()) {
+            warnings.add("Seçim başlığı boş olamaz");
+            readyToPublish = false;
+        }
+
+        return ElectionPreviewResponse.builder()
+                .electionId(election.getId())
+                .title(election.getTitle())
+                .description(election.getDescription())
+                .status(election.getStatus())
+                .type(election.getType())
+                .participantType(election.getParticipantType())
+                .startTime(election.getStartTime())
+                .endTime(election.getEndTime())
+                .anonymousVoting(election.getAnonymousVoting())
+                .resultsPublic(election.getResultsPublic())
+                .candidateCount((int) candidateCount)
+                .accessCodeCount((int) accessCodeCount)
+                .candidates(candidates)
+                .readyToPublish(readyToPublish)
+                .warnings(warnings)
+                .build();
+    }
+
     // ==================== HELPER METHODS ====================
 
     private Election findElectionOrThrow(Long id) {
