@@ -42,4 +42,16 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
 
     /** Kullanıcının oluşturduğu seçim sayısı */
     long countByCreatedByAndIsDeletedFalse(String userId);
+
+    /** Kullanıcının oluşturduğu aktif/scheduled seçimler */
+    @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
+           "AND e.status IN ('ACTIVE', 'SCHEDULED') AND e.isDeleted = false " +
+           "ORDER BY e.startTime ASC")
+    List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId);
+
+    /** Kullanıcının oluşturduğu kapanmış seçimler */
+    @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
+           "AND e.status IN ('CLOSED', 'ARCHIVED') AND e.isDeleted = false " +
+           "ORDER BY e.endTime DESC")
+    List<Election> findClosedByCreatedBy(@Param("userId") String userId);
 }
