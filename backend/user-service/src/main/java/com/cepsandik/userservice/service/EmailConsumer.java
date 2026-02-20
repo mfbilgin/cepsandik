@@ -41,7 +41,7 @@ public class EmailConsumer {
         } catch (Exception e) {
             log.error("E-posta işlenirken hata: to={}, type={}, error={}",
                     message.to(), message.type(), e.getMessage());
-            throw e; // DLQ'ya gitmesi için exception'ı fırlat
+            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException(e); // DLQ'ya gitmesi için exception'ı fırlat
         }
     }
 }

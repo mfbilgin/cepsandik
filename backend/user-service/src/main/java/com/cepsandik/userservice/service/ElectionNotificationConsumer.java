@@ -94,7 +94,7 @@ public class ElectionNotificationConsumer {
         } catch (Exception e) {
             log.error("Seçim bildirimi işlenirken hata: type={}, electionId={}, hata={}",
                     message.getType(), message.getElectionId(), e.getMessage());
-            throw e; // DLQ'ya gitmesi için
+            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException(e); // DLQ'ya gitmesi için
         }
     }
 
