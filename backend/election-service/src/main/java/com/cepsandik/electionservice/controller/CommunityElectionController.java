@@ -11,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/communities/{communityId}/elections")
+@RequestMapping("/api/v1/elections/community/{communityId}")
 @RequiredArgsConstructor
 @Tag(name = "Community Elections", description = "Topluluk seçimleri API'leri")
 public class CommunityElectionController {

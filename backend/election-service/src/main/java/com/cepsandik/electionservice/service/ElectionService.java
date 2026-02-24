@@ -52,17 +52,19 @@ public class ElectionService {
         Election election = electionMapper.toEntity(request, userId);
         Election saved = electionRepository.save(election);
 
-        log.info("Seçim oluşturuldu: id={}, title={}, createdBy={}", 
+        log.info("Seçim oluşturuldu: id={}, title={}, createdBy={}",
                 saved.getId(), saved.getTitle(), userId);
 
         return electionMapper.toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public ElectionResponse getElectionById(Long id) {
         Election election = findElectionOrThrow(id);
         return electionMapper.toDetailedResponse(election);
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<ElectionResponse> getElectionsByCommunity(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedFalse(communityId, pageable);
@@ -239,14 +241,14 @@ public class ElectionService {
 
         Candidate saved = candidateRepository.save(candidate);
 
-        log.info("Aday eklendi: electionId={}, candidateId={}, name={}", 
+        log.info("Aday eklendi: electionId={}, candidateId={}, name={}",
                 electionId, saved.getId(), saved.getName());
 
         return electionMapper.toCandidateResponse(saved);
     }
 
     @Transactional
-    public CandidateResponse updateCandidate(Long electionId, Long candidateId, 
+    public CandidateResponse updateCandidate(Long electionId, Long candidateId,
             CreateCandidateRequest request, String userId) {
         Election election = findElectionOrThrow(electionId);
         checkOwnership(election, userId);
@@ -361,6 +363,7 @@ public class ElectionService {
     /**
      * Topluluk bazlı arşivlenmiş seçimleri listeler (CLOSED + ARCHIVED).
      */
+    @Transactional(readOnly = true)
     public PageResponse<ElectionResponse> getArchivedElections(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("endTime").descending());
         Page<Election> electionPage = electionRepository.findArchivedByCommunityId(communityId, pageable);
