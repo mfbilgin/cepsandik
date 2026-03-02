@@ -30,7 +30,7 @@ public class MemberService {
     private final MemberMapper memberMapper;
 
     public PageResponse<MemberResponse> getMembers(Long communityId, String userId, int page, int size) {
-        validateMembership(communityId, userId);
+        validateAdminOrOwner(communityId, userId);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("joinedAt").descending());
         Page<CommunityMember> memberPage = memberRepository.findByCommunityIdAndStatus(

@@ -47,4 +47,7 @@ public class Community {
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 
+    @Column(name = "name_change_count", nullable = false)
+    private Integer nameChangeCount = 0;
+
 }

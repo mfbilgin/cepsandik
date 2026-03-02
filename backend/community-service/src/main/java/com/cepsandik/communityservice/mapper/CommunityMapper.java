@@ -29,6 +29,7 @@ public class CommunityMapper {
                 .ownerId(community.getOwnerId())
                 .memberCount(memberCount)
                 .userRole(userRole)
+                .nameChangeCount(community.getNameChangeCount())
                 .createdAt(community.getCreatedAt())
                 .updatedAt(community.getUpdatedAt())
                 .build();

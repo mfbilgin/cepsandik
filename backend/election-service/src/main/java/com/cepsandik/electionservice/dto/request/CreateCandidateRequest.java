@@ -1,5 +1,6 @@
 package com.cepsandik.electionservice.dto.request;
 
+import com.cepsandik.electionservice.enums.CandidateType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -21,4 +22,10 @@ public class CreateCandidateRequest {
     private String imageUrl;
 
     private Integer displayOrder;
+
+    /** Aday tipi: PERSON / TEXT_OPTION / IMAGE_OPTION */
+    private CandidateType candidateType = CandidateType.PERSON;
+
+    /** PERSON type için topluluk üyesinin userId'si */
+    private String memberUserId;
 }

@@ -26,3 +26,7 @@ infra/.env
 secrets/
 
 design/
+
+req_spec.txt
+MOBILE_UI*
+mobile/

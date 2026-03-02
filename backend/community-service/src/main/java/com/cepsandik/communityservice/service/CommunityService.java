@@ -119,7 +119,8 @@ public class CommunityService {
         }
 
         // Sadece dolu alanları güncelle
-        if (request.getName() != null) {
+        if (request.getName() != null && !request.getName().equals(community.getName())) {
+            community.setNameChangeCount(community.getNameChangeCount() + 1);
             community.setName(request.getName());
         }
         if (request.getDescription() != null) {

@@ -1,5 +1,6 @@
 package com.cepsandik.electionservice.dto.response;
 
+import com.cepsandik.electionservice.enums.CandidateType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,5 +19,7 @@ public class CandidateResponse {
     private String description;
     private String imageUrl;
     private Integer displayOrder;
+    private CandidateType candidateType;
+    private String memberUserId;
     private LocalDateTime createdAt;
 }
