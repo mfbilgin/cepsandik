@@ -21,6 +21,7 @@ public class CommunityResponse {
     private String ownerId;
     private Long memberCount;
     private MemberRole userRole; // Current user's role
+    private Integer nameChangeCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
