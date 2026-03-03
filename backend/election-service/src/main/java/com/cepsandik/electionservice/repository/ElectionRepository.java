@@ -18,6 +18,12 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
 
        Optional<Election> findByIdAndIsDeletedFalse(Long id);
 
+       @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
+                     "AND e.isDeleted = false " +
+                     "AND (e.endTime IS NULL OR e.endTime > :now OR e.status IN ('CLOSED', 'ARCHIVED'))")
+       Page<Election> findByCommunityIdAndIsDeletedActive(@Param("communityId") Long communityId,
+                     @Param("now") LocalDateTime now, Pageable pageable);
+
        Page<Election> findByCommunityIdAndIsDeletedFalse(Long communityId, Pageable pageable);
 
        Page<Election> findByCommunityIdAndStatusAndIsDeletedFalse(

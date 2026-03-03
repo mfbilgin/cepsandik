@@ -67,7 +67,8 @@ public class ElectionService {
     @Transactional(readOnly = true)
     public PageResponse<ElectionResponse> getElectionsByCommunity(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedFalse(communityId, pageable);
+        Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedActive(communityId,
+                LocalDateTime.now(), pageable);
 
         return buildPageResponse(electionPage);
     }
