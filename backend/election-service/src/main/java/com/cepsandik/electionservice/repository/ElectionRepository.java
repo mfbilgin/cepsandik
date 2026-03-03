@@ -46,8 +46,9 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
        /** Kullanıcının oluşturduğu aktif/scheduled seçimler */
        @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
                      "AND e.status IN ('ACTIVE', 'SCHEDULED') AND e.isDeleted = false " +
+                     "AND (e.endTime IS NULL OR e.endTime > :now) " +
                      "ORDER BY e.startTime ASC")
-       List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId);
+       List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
        /** Kullanıcının oluşturduğu kapanmış seçimler */
        @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +

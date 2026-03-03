@@ -28,15 +28,16 @@ public class MyElectionsService {
     /**
      * Kullanıcının dahil olduğu aktif seçimleri listeler.
      * Kaynaklar:
-     *  1) Kullanıcının oluşturduğu aktif/scheduled seçimler
-     *  2) Kullanıcının vote token aldığı aktif seçimler
+     * 1) Kullanıcının oluşturduğu aktif/scheduled seçimler
+     * 2) Kullanıcının vote token aldığı aktif seçimler
      */
     @Transactional(readOnly = true)
     public List<MyElectionResponse> getMyActiveElections(String userId) {
         Map<Long, MyElectionResponse> resultMap = new LinkedHashMap<>();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
 
         // 1) Kullanıcının oluşturduğu aktif/scheduled seçimler
-        List<Election> ownedElections = electionRepository.findActiveOrScheduledByCreatedBy(userId);
+        List<Election> ownedElections = electionRepository.findActiveOrScheduledByCreatedBy(userId, now);
         for (Election election : ownedElections) {
             resultMap.put(election.getId(), mapToResponse(election, userId, true));
         }
@@ -46,6 +47,10 @@ public class MyElectionsService {
         for (VoteToken token : unusedTokens) {
             Election election = token.getElection();
             if (!election.getIsDeleted() && election.isActive() && !resultMap.containsKey(election.getId())) {
+                // Zaman kontrolü: Bitiş zamanı geçmişse gösterme
+                if (election.getEndTime() != null && election.getEndTime().isBefore(now)) {
+                    continue;
+                }
                 resultMap.put(election.getId(), mapToResponse(election, userId, false));
             }
         }
@@ -55,6 +60,10 @@ public class MyElectionsService {
         for (VoteToken token : usedTokens) {
             Election election = token.getElection();
             if (!election.getIsDeleted() && election.isActive() && !resultMap.containsKey(election.getId())) {
+                // Zaman kontrolü: Bitiş zamanı geçmişse gösterme
+                if (election.getEndTime() != null && election.getEndTime().isBefore(now)) {
+                    continue;
+                }
                 MyElectionResponse response = mapToResponse(election, userId, false);
                 response.setHasVoted(true);
                 response.setVotedAt(token.getUsedAt());
