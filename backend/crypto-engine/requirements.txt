@@ -1,0 +1,19 @@
+# Crypto-Engine Dependencies
+
+# gRPC
+grpcio==1.62.1
+grpcio-tools==1.62.1
+grpcio-health-checking==1.62.1
+
+# ElectionGuard (mandatory - cryptographic operations)
+electionguard==1.4.0
+
+# RSA key management (transit encryption)
+pycryptodome==3.20.0
+
+# Configuration
+pydantic-settings==2.2.1
+
+# Testing
+pytest==8.1.1
+pytest-asyncio==0.23.5

@@ -16,4 +16,7 @@ public class CastVoteRequest {
 
     @NotNull(message = "Aday ID zorunludur")
     private Long candidateId;
+
+    /** RSA ile şifrelenmiş oy verisi (Crypto-Engine entegrasyonu) */
+    private byte[] rsaEncryptedPayload;
 }

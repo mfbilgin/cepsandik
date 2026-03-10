@@ -1,5 +1,6 @@
 package com.cepsandik.electionservice.service;
 
+import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.config.AccessCodeConfig;
 import com.cepsandik.electionservice.dto.request.CreateAccessCodeRequest;
 import com.cepsandik.electionservice.dto.request.CreateCandidateRequest;
@@ -9,15 +10,19 @@ import com.cepsandik.electionservice.dto.response.*;
 import com.cepsandik.electionservice.entity.AccessCode;
 import com.cepsandik.electionservice.entity.Candidate;
 import com.cepsandik.electionservice.entity.Election;
+import com.cepsandik.electionservice.entity.Vote;
 import com.cepsandik.electionservice.enums.ElectionStatus;
 import com.cepsandik.electionservice.exception.ApiException;
+import com.cepsandik.electionservice.grpc.*;
 import com.cepsandik.electionservice.mapper.AccessCodeMapper;
 import com.cepsandik.electionservice.mapper.ElectionMapper;
 import com.cepsandik.electionservice.repository.AccessCodeRepository;
 import com.cepsandik.electionservice.repository.CandidateRepository;
 import com.cepsandik.electionservice.repository.ElectionRepository;
+import com.cepsandik.electionservice.repository.VoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,9 +41,17 @@ public class ElectionService {
     private final ElectionRepository electionRepository;
     private final CandidateRepository candidateRepository;
     private final AccessCodeRepository accessCodeRepository;
+    private final VoteRepository voteRepository;
     private final ElectionMapper electionMapper;
     private final AccessCodeMapper accessCodeMapper;
     private final AccessCodeConfig accessCodeConfig;
+    private final CryptoEngineClient cryptoEngineClient;
+
+    @Value("${app.guardian.count:3}")
+    private int guardianCount;
+
+    @Value("${app.guardian.quorum:2}")
+    private int guardianQuorum;
 
     // ==================== ELECTION CRUD ====================
 
@@ -172,6 +185,55 @@ public class ElectionService {
             throw ApiException.badRequest("Sadece planlanmış seçimler başlatılabilir");
         }
 
+        // === Crypto-Engine: ElectionGuard Key Ceremony ===
+        try {
+            List<Candidate> candidates = candidateRepository
+                    .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(id);
+
+            // Contest bilgisini hazırla (tek contest = bu seçim)
+            ContestInfo contestInfo = ContestInfo.newBuilder()
+                    .setContestId("contest_" + id)
+                    .addAllSelectionIds(
+                            candidates.stream()
+                                    .map(c -> "candidate_" + c.getId())
+                                    .toList()
+                    )
+                    .setNumberElected(election.getMaxSelections() != null ? election.getMaxSelections() : 1)
+                    .setName(election.getTitle())
+                    .build();
+
+            SetupElectionResponse cryptoResponse = cryptoEngineClient.setupElection(
+                    String.valueOf(id),
+                    guardianCount,
+                    guardianQuorum,
+                    List.of(contestInfo)
+            );
+
+            // Context, manifest ve guardian record'ları PostgreSQL'e kaydet
+            election.setElectionGuardContext(cryptoResponse.getElectionGuardContext());
+            election.setElectionManifest(cryptoResponse.getElectionManifest());
+            election.setElectionPublicKey(cryptoResponse.getJointPublicKey());
+
+            // Guardian record'ları JSON array olarak sakla
+            StringBuilder guardianJson = new StringBuilder("[");
+            for (int i = 0; i < cryptoResponse.getGuardianRecordsCount(); i++) {
+                GuardianRecord gr = cryptoResponse.getGuardianRecords(i);
+                if (i > 0) guardianJson.append(",");
+                guardianJson.append("{\"guardian_id\":\"").append(gr.getGuardianId())
+                        .append("\",\"serialized_guardian\":")
+                        .append(gr.getSerializedGuardian())
+                        .append("}");
+            }
+            guardianJson.append("]");
+            election.setGuardianRecords(guardianJson.toString());
+
+            log.info("ElectionGuard key ceremony tamamlandı: electionId={}", id);
+
+        } catch (Exception e) {
+            log.error("Crypto-Engine SetupElection hatası: electionId={}", id, e);
+            throw ApiException.badRequest("Kriptografik altyapı kurulamadı: " + e.getMessage());
+        }
+
         election.setStatus(ElectionStatus.ACTIVE);
         election.setStartTime(LocalDateTime.now());
         Election saved = electionRepository.save(election);
@@ -188,6 +250,43 @@ public class ElectionService {
 
         if (!election.isActive()) {
             throw ApiException.badRequest("Sadece aktif seçimler sonlandırılabilir");
+        }
+
+        // === Crypto-Engine: Threshold Decryption (Tally) ===
+        try {
+            if (election.getElectionGuardContext() != null) {
+                // Tüm şifreli oyları topla
+                List<Vote> votes = voteRepository.findByElectionId(id);
+                List<String> ciphertextBallots = votes.stream()
+                        .filter(v -> v.getEncryptedBallot() != null)
+                        .map(Vote::getEncryptedBallot)
+                        .toList();
+
+                if (!ciphertextBallots.isEmpty()) {
+                    // Guardian record'ları parse et
+                    List<GuardianRecord> guardianRecordsList = parseGuardianRecords(
+                            election.getGuardianRecords()
+                    );
+
+                    TallyElectionResponse tallyResponse = cryptoEngineClient.tallyElection(
+                            String.valueOf(id),
+                            election.getElectionGuardContext(),
+                            election.getElectionManifest(),
+                            ciphertextBallots,
+                            guardianRecordsList,
+                            guardianQuorum
+                    );
+
+                    log.info("Tally çözümlemesi tamamlandı: electionId={}, contest_count={}",
+                            id, tallyResponse.getResultsCount());
+                } else {
+                    log.info("Seçim sonlandırıldı (şifreli oy yok): id={}", id);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Crypto-Engine TallyElection hatası: electionId={}", id, e);
+            // Tally hatası seçimi sonlandırmayı engellemez
+            log.warn("Tally hatası nedeniyle sonuçlar kriptografik çözümlemesiz kaydedilecek.");
         }
 
         election.setStatus(ElectionStatus.CLOSED);
@@ -440,6 +539,30 @@ public class ElectionService {
         if (!election.getCreatedBy().equals(userId)) {
             throw ApiException.forbidden("Bu işlem için yetkiniz yok");
         }
+    }
+
+    /**
+     * Guardian records JSON string'ini gRPC GuardianRecord listesine parse eder.
+     */
+    private List<GuardianRecord> parseGuardianRecords(String guardianRecordsJson) {
+        List<GuardianRecord> records = new java.util.ArrayList<>();
+        if (guardianRecordsJson == null || guardianRecordsJson.isEmpty()) {
+            return records;
+        }
+        try {
+            // Basit JSON array parse — jackson kullanılabilir
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(guardianRecordsJson);
+            for (com.fasterxml.jackson.databind.JsonNode node : root) {
+                records.add(GuardianRecord.newBuilder()
+                        .setGuardianId(node.get("guardian_id").asText())
+                        .setSerializedGuardian(node.get("serialized_guardian").toString())
+                        .build());
+            }
+        } catch (Exception e) {
+            log.error("Guardian records parse hatası: {}", e.getMessage());
+        }
+        return records;
     }
 
     private PageResponse<ElectionResponse> buildPageResponse(Page<Election> page) {

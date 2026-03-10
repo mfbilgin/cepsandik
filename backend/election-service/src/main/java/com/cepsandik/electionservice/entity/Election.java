@@ -69,7 +69,7 @@ public class Election {
     /** Sonuçların herkese açık olup olmadığı */
     @Column(name = "results_public")
     @Builder.Default
-    private Boolean resultsPublic = false;
+    private Boolean resultsPublic = true;
 
     /** Anonim oylama (kim neye oy verdi gizli) */
     @Column(name = "anonymous_voting")
@@ -80,6 +80,24 @@ public class Election {
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
+
+    // === ElectionGuard Kriptografik Alanlar ===
+
+    /** ElectionGuard CiphertextElectionContext (JSON) */
+    @Column(name = "election_guard_context", columnDefinition = "TEXT")
+    private String electionGuardContext;
+
+    /** ElectionGuard Manifest (JSON) */
+    @Column(name = "election_manifest", columnDefinition = "TEXT")
+    private String electionManifest;
+
+    /** ElGamal joint public key */
+    @Column(name = "election_public_key", columnDefinition = "TEXT")
+    private String electionPublicKey;
+
+    /** Guardian record'ları (JSON array) */
+    @Column(name = "guardian_records", columnDefinition = "TEXT")
+    private String guardianRecords;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -31,6 +31,9 @@ jobs:
           - name: election-service
             context: ./backend/election-service
             dockerfile: ./backend/election-service/Dockerfile
+          - name: crypto-engine
+            context: ./backend/crypto-engine
+            dockerfile: ./backend/crypto-engine/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

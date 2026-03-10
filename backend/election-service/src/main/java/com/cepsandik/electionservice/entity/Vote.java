@@ -34,9 +34,17 @@ public class Vote {
     @Column(name = "vote_token", nullable = false, length = 36)
     private String voteToken;
 
-    /** Şifreli oy verisi (Faz 4 - ElectionGuard entegrasyonunda kullanılacak) */
+    /** Şifreli oy verisi (ElectionGuard CiphertextBallot JSON) */
     @Column(name = "encrypted_ballot", columnDefinition = "TEXT")
     private String encryptedBallot;
+
+    /** ElectionGuard tracking code (doğrulama kodu) */
+    @Column(name = "tracking_code", length = 128)
+    private String trackingCode;
+
+    /** Zero Knowledge Proof (JSON) */
+    @Column(name = "zkp_proof", columnDefinition = "TEXT")
+    private String zkpProof;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

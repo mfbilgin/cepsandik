@@ -1,9 +1,11 @@
 package com.cepsandik.electionservice.service;
 
+import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.dto.request.CastVoteRequest;
 import com.cepsandik.electionservice.dto.response.*;
 import com.cepsandik.electionservice.entity.*;
 import com.cepsandik.electionservice.exception.ApiException;
+import com.cepsandik.electionservice.grpc.EncryptBallotResponse;
 import com.cepsandik.electionservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ public class VoteService {
     private final AccessCodeRepository accessCodeRepository;
     private final VoteTokenRepository voteTokenRepository;
     private final VoteRepository voteRepository;
+    private final CryptoEngineClient cryptoEngineClient;
 
     // ==================== Erişim Kodu Doğrulama ====================
 
@@ -203,6 +206,34 @@ public class VoteService {
                 .candidate(candidate)
                 .voteToken(request.getVoteToken())
                 .build();
+
+        // === Crypto-Engine: ElGamal şifreleme ===
+        if (election.getElectionGuardContext() != null && request.getRsaEncryptedPayload() != null) {
+            try {
+                EncryptBallotResponse cryptoResponse = cryptoEngineClient.encryptBallot(
+                        String.valueOf(electionId),
+                        election.getElectionGuardContext(),
+                        election.getElectionManifest(),
+                        request.getRsaEncryptedPayload(),
+                        request.getVoteToken(),
+                        "ballot-style-1"
+                );
+
+                vote.setEncryptedBallot(cryptoResponse.getCiphertextBallot());
+                vote.setTrackingCode(cryptoResponse.getTrackingCode());
+                vote.setZkpProof(cryptoResponse.getZkpProof());
+
+                log.info("Oy kriptografik olarak şifrelendi: election={}, tracking_code={}",
+                        electionId, cryptoResponse.getTrackingCode().substring(0, Math.min(16, cryptoResponse.getTrackingCode().length())));
+
+            } catch (Exception e) {
+                log.error("Crypto-Engine EncryptBallot hatası: election={}, ballot={}",
+                        electionId, request.getVoteToken(), e);
+                // Kriptografik şifreleme başarısız olursa oyu yine kaydet
+                // ancak şifreli veri olmadan
+                log.warn("Şifreli oy kaydedilemedi, düz oy olarak devam ediliyor.");
+            }
+        }
 
         vote = voteRepository.save(vote);
 

@@ -123,11 +123,39 @@ services:
 
       # Community Service (internal communication)
       - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
+
+      # Crypto-Engine (gRPC — kriptografik işlemler)
+      - APP_CRYPTO_ENGINE_HOST=crypto-engine
+      - APP_CRYPTO_ENGINE_PORT=50051
+      - APP_GUARDIAN_COUNT=3
+      - APP_GUARDIAN_QUORUM=2
     depends_on:
       - db
       - rabbitmq
+      - crypto-engine
     networks:
       - app-net
+
+  crypto-engine:
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-crypto-engine:latest
+    container_name: crypto-engine
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      - CRYPTO_RSA_KEY_SIZE=2048
+      - CRYPTO_GRPC_PORT=50051
+      - CRYPTO_KEY_PATH=/data/keys
+      - CRYPTO_GRPC_MAX_WORKERS=10
+    volumes:
+      - crypto_keys:/data/keys
+    networks:
+      - app-net
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   db:
     image: postgres:15-alpine
@@ -195,3 +223,5 @@ volumes:
   redis_data:
   rabbitmq_data:
   backup_data:
+  crypto_keys:
+    name: cepsandik-crypto-keys
