@@ -6,13 +6,11 @@ grpcio-tools==1.62.1
 grpcio-health-checking==1.62.1
 
 # ElectionGuard (mandatory - cryptographic operations)
+# Not: pydantic==1.9.0'a bağımlı, pydantic v2 kullanan paketler eklenMEMELİ
 electionguard==1.4.0
 
 # RSA key management (transit encryption)
 pycryptodome==3.20.0
-
-# Configuration
-pydantic-settings==2.2.1
 
 # Testing
 pytest==8.1.1

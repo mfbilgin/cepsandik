@@ -1,31 +1,40 @@
 """
 Crypto-Engine konfigürasyon modülü.
 Tüm ayarlar environment variable'lardan okunur.
+Not: pydantic-settings kullanılamaz çünkü electionguard pydantic v1.9.0'a kilitli.
 """
 
-from pydantic_settings import BaseSettings
-from pydantic import Field
+import os
+from dataclasses import dataclass
 
 
-class CryptoConfig(BaseSettings):
+@dataclass
+class CryptoConfig:
     """Crypto-Engine konfigürasyonu (env-based)."""
 
     # gRPC Server
-    grpc_port: int = Field(default=50051, alias="CRYPTO_GRPC_PORT")
-    grpc_max_workers: int = Field(default=10, alias="CRYPTO_GRPC_MAX_WORKERS")
+    grpc_port: int = 50051
+    grpc_max_workers: int = 10
 
     # RSA Key Management
-    rsa_key_size: int = Field(default=2048, alias="CRYPTO_RSA_KEY_SIZE")
-    key_path: str = Field(default="/data/keys", alias="CRYPTO_KEY_PATH")
+    rsa_key_size: int = 2048
+    key_path: str = "/data/keys"
 
     # ElectionGuard Defaults
-    default_guardian_count: int = Field(default=3, alias="CRYPTO_DEFAULT_GUARDIAN_COUNT")
-    default_quorum: int = Field(default=2, alias="CRYPTO_DEFAULT_QUORUM")
+    default_guardian_count: int = 3
+    default_quorum: int = 2
 
-    model_config = {
-        "env_prefix": "",
-        "case_sensitive": True,
-    }
+    @classmethod
+    def from_env(cls) -> "CryptoConfig":
+        """Environment variable'lardan konfigürasyon oluşturur."""
+        return cls(
+            grpc_port=int(os.environ.get("CRYPTO_GRPC_PORT", "50051")),
+            grpc_max_workers=int(os.environ.get("CRYPTO_GRPC_MAX_WORKERS", "10")),
+            rsa_key_size=int(os.environ.get("CRYPTO_RSA_KEY_SIZE", "2048")),
+            key_path=os.environ.get("CRYPTO_KEY_PATH", "/data/keys"),
+            default_guardian_count=int(os.environ.get("CRYPTO_DEFAULT_GUARDIAN_COUNT", "3")),
+            default_quorum=int(os.environ.get("CRYPTO_DEFAULT_QUORUM", "2")),
+        )
 
 
 # Singleton
@@ -36,5 +45,5 @@ def get_config() -> CryptoConfig:
     """Thread-safe config singleton."""
     global _config
     if _config is None:
-        _config = CryptoConfig()
+        _config = CryptoConfig.from_env()
     return _config
