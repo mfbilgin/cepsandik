@@ -6,7 +6,7 @@ Q (quorum) eşik değeriyle threshold şifreleme desteklenir.
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from electionguard.guardian import Guardian
 from electionguard.key_ceremony import CeremonyDetails
@@ -37,7 +37,7 @@ class GuardianCeremony:
         self._q = quorum
         self._guardians: list[Guardian] = []
         self._ceremony_details = CeremonyDetails(number_of_guardians, quorum)
-        self._mediator: KeyCeremonyMediator | None = None
+        self._mediator: Optional[KeyCeremonyMediator] = None
 
     def perform_ceremony(self) -> dict[str, Any]:
         """

@@ -4,7 +4,7 @@
 # =============================================================
 
 # ---------- Stage 1: Proto Derleme ----------
-FROM python:3.11-slim AS proto-builder
+FROM python:3.10-slim AS proto-builder
 
 WORKDIR /build
 
@@ -22,7 +22,7 @@ RUN mkdir -p generated && \
     touch generated/__init__.py
 
 # ---------- Stage 2: Runtime ----------
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 # Sistem bağımlılıkları (ElectionGuard için GMP)
 RUN apt-get update && \

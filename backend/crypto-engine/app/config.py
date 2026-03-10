@@ -36,9 +36,10 @@ class CryptoConfig:
             default_quorum=int(os.environ.get("CRYPTO_DEFAULT_QUORUM", "2")),
         )
 
+from typing import Optional
 
 # Singleton
-_config: CryptoConfig | None = None
+_config: Optional[CryptoConfig] = None
 
 
 def get_config() -> CryptoConfig:

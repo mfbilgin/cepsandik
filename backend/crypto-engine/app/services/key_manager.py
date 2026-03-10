@@ -7,6 +7,7 @@ Konteyner yeniden başlasa bile aynı keypair korunur.
 import os
 import logging
 from pathlib import Path
+from typing import Optional
 
 from Crypto.PublicKey import RSA
 
@@ -18,15 +19,15 @@ logger = logging.getLogger(__name__)
 class KeyManager:
     """RSA keypair yöneticisi — Volume-backed persistence."""
 
-    def __init__(self, key_path: str | None = None, key_size: int | None = None):
+    def __init__(self, key_path: Optional[str] = None, key_size: Optional[int] = None):
         config = get_config()
         self._key_path = Path(key_path or config.key_path)
         self._key_size = key_size or config.rsa_key_size
         self._private_key_file = self._key_path / "rsa_private.pem"
         self._public_key_file = self._key_path / "rsa_public.pem"
 
-        self._private_key: RSA.RsaKey | None = None
-        self._public_key: RSA.RsaKey | None = None
+        self._private_key: Optional[RSA.RsaKey] = None
+        self._public_key: Optional[RSA.RsaKey] = None
 
         self._ensure_keys()
 

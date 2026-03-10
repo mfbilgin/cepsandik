@@ -1,0 +1,504 @@
+{
+  "info": {
+    "name": "CepSandık — Crypto-Engine E2E Test",
+    "description": "ElectionGuard kriptografik altyapı uçtan uca testi.\n\nAkış:\n1. Seçim oluştur (DRAFT)\n2. Aday ekle (x2)\n3. Yayınla (SCHEDULED)\n4. Başlat (ACTIVE) → SetupElection gRPC tetiklenir\n5. Erişim kodu oluştur\n6. Erişim kodu doğrula\n7. Oy token'ı al\n8. Oy kullan → EncryptBallot gRPC tetiklenir\n9. Sonlandır (CLOSED) → TallyElection gRPC tetiklenir\n10. İstatistikleri kontrol et\n\n⚠️ Not: RSA şifreleme (rsaEncryptedPayload) olmadan oy şifreli değil kaydedilir. Tam ElectionGuard şifreleme mobil RSA entegrasyonu gerektirir.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://cepsandik.com",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "Login sonrası alınan JWT access token"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string",
+      "description": "Login sonrası response'dan alınan user ID"
+    },
+    {
+      "key": "electionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "candidateId1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "candidateId2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "voteToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth — Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.accessToken) {",
+              "    pm.collectionVariables.set('authToken', res.data.accessToken);",
+              "    console.log('✅ Auth token kaydedildi');",
+              "}",
+              "if (res.data && res.data.userId) {",
+              "    pm.collectionVariables.set('userId', res.data.userId);",
+              "    console.log('✅ User ID kaydedildi: ' + res.data.userId);",
+              "}",
+              "pm.test('Login başarılı', function() {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@cepsandik.com\",\n  \"password\": \"TestPassword123!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "1. Seçim Oluştur (DRAFT)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.id) {",
+              "    pm.collectionVariables.set('electionId', res.data.id);",
+              "    console.log('✅ Election ID: ' + res.data.id);",
+              "}",
+              "pm.test('Seçim oluşturuldu (DRAFT)', function() {",
+              "    pm.response.to.have.status(201);",
+              "    pm.expect(res.data.status).to.eql('DRAFT');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Crypto-Engine Test Seçimi\",\n  \"description\": \"ElectionGuard E2E testi için oluşturulmuş test seçimi\",\n  \"type\": \"SINGLE_CHOICE\",\n  \"participantType\": \"ACCESS_CODE\",\n  \"maxSelections\": 1,\n  \"startTime\": \"2026-12-01T10:00:00\",\n  \"endTime\": \"2026-12-31T23:59:00\",\n  \"resultsPublic\": true,\n  \"anonymousVoting\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections"]
+        }
+      }
+    },
+    {
+      "name": "2a. Aday 1 Ekle",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.id) {",
+              "    pm.collectionVariables.set('candidateId1', res.data.id);",
+              "    console.log('✅ Candidate 1 ID: ' + res.data.id);",
+              "}",
+              "pm.test('Aday 1 eklendi', function() {",
+              "    pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Aday Alpha\",\n  \"description\": \"Test adayı 1\",\n  \"displayOrder\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/candidates",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "candidates"]
+        }
+      }
+    },
+    {
+      "name": "2b. Aday 2 Ekle",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.id) {",
+              "    pm.collectionVariables.set('candidateId2', res.data.id);",
+              "    console.log('✅ Candidate 2 ID: ' + res.data.id);",
+              "}",
+              "pm.test('Aday 2 eklendi', function() {",
+              "    pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Aday Beta\",\n  \"description\": \"Test adayı 2\",\n  \"displayOrder\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/candidates",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "candidates"]
+        }
+      }
+    },
+    {
+      "name": "3. Seçimi Yayınla (DRAFT → SCHEDULED)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Seçim yayınlandı (SCHEDULED)', function() {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(res.data.status).to.eql('SCHEDULED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/publish",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "publish"]
+        }
+      }
+    },
+    {
+      "name": "4. ⚡ Seçimi Başlat (SCHEDULED → ACTIVE) — SetupElection gRPC",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Seçim başlatıldı (ACTIVE) — ElectionGuard key ceremony yapıldı', function() {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(res.data.status).to.eql('ACTIVE');",
+              "});",
+              "console.log('🔐 Bu adımda Crypto-Engine SetupElection gRPC çağrısı yapıldı.');",
+              "console.log('   → ElectionGuard key ceremony tamamlandı');",
+              "console.log('   → Context + manifest + guardian records PostgreSQL\\'e kaydedildi');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/start",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "start"]
+        }
+      }
+    },
+    {
+      "name": "5. Seçim Detayını Kontrol Et (Crypto alanları)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Seçim detayları alındı', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "console.log('📋 Seçim durumu: ' + res.data.status);",
+              "console.log('📋 Response:', JSON.stringify(res.data, null, 2).substring(0, 500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}"]
+        }
+      }
+    },
+    {
+      "name": "6. Erişim Kodu Oluştur",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.code) {",
+              "    pm.collectionVariables.set('accessCode', res.data.code);",
+              "    console.log('✅ Access Code: ' + res.data.code);",
+              "}",
+              "pm.test('Erişim kodu oluşturuldu', function() {",
+              "    pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maxUses\": 100,\n  \"expiresInHours\": 72\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/access-codes",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "access-codes"]
+        }
+      }
+    },
+    {
+      "name": "7. Erişim Kodunu Doğrula",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Erişim kodu doğrulandı', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "console.log('✅ Erişim kodu geçerli, seçim bilgileri döndü');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"{{accessCode}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/votes/verify-access",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "votes", "verify-access"]
+        }
+      }
+    },
+    {
+      "name": "8. Oy Token'ı Al",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.data && res.data.voteToken) {",
+              "    pm.collectionVariables.set('voteToken', res.data.voteToken);",
+              "    console.log('✅ Vote Token: ' + res.data.voteToken);",
+              "}",
+              "pm.test('Vote token alındı', function() {",
+              "    pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/votes/token",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "votes", "token"]
+        }
+      }
+    },
+    {
+      "name": "9. ⚡ Oy Kullan — (RSA olmadan, şifreleme atlanır)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Oy kaydedildi', function() {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "console.log('🗳️ Oy kaydedildi');",
+              "console.log('⚠️ rsaEncryptedPayload olmadığı için ElGamal şifreleme atlandı.');",
+              "console.log('   Tam E2E şifreleme mobil RSA entegrasyonu gerektirir.');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{authToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"voteToken\": \"{{voteToken}}\",\n  \"candidateId\": {{candidateId1}}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/votes",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "votes"]
+        }
+      }
+    },
+    {
+      "name": "10. ⚡ Seçimi Sonlandır (ACTIVE → CLOSED) — TallyElection gRPC",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Seçim sonlandırıldı (CLOSED)', function() {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(res.data.status).to.eql('CLOSED');",
+              "});",
+              "console.log('🔐 Bu adımda Crypto-Engine TallyElection gRPC çağrısı yapıldı.');",
+              "console.log('   → Threshold decryption ile sonuçlar çözüldü');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/end",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "end"]
+        }
+      }
+    },
+    {
+      "name": "11. Seçim İstatistiklerini Kontrol Et",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('İstatistikler alındı', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "console.log('📊 Seçim sonuçları:', JSON.stringify(res.data, null, 2));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{authToken}}" },
+          { "key": "X-User-Id", "value": "{{userId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/elections/{{electionId}}/votes/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "elections", "{{electionId}}", "votes", "stats"]
+        }
+      }
+    }
+  ]
+}
