@@ -24,12 +24,13 @@ RUN mkdir -p generated && \
 # ---------- Stage 2: Runtime ----------
 FROM python:3.10-slim
 
-# Sistem bağımlılıkları (ElectionGuard için GMP)
+# Sistem bağımlılıkları (ElectionGuard için GMP + git for pip install)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       libgmp-dev \
       libmpfr-dev \
       libmpc-dev \
+      git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
