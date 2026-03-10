@@ -5,6 +5,7 @@ Proto tanımlarındaki tüm RPC'leri karşılar.
 
 import json
 import logging
+from typing import Optional
 
 import grpc
 
@@ -28,10 +29,10 @@ from electionguard.manifest import (
     ElectionType as EGElectionType,
     ReportingUnitType,
     VoteVariationType,
-    ContestDescriptionWithPlaceholders,
 )
-from electionguard.election_builder import ElectionBuilder
 from electionguard.elgamal import ElGamalKeyPair
+from electionguard.group import ElementModP, ElementModQ, int_to_p_unchecked, int_to_q_unchecked
+from electionguard.hash import hash_elems
 
 logger = logging.getLogger(__name__)
 
@@ -83,28 +84,30 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
 
             # 1. ElectionGuard Manifest oluştur
             manifest = self._build_manifest(request)
+            internal_manifest = InternalManifest(manifest)
 
             # 2. Guardian key ceremony
             ceremony = GuardianCeremony(n, q)
             ceremony_result = ceremony.perform_ceremony()
 
-            # 3. ElectionBuilder ile context oluştur
-            builder = ElectionBuilder(
+            # 3. ElectionGuard context'i doğrudan oluştur
+            # (ElectionBuilder kullanmadan — PyPI paketi bu modülü içermiyor)
+            joint_key_hex = ceremony_result["joint_key"]
+            joint_key = int_to_p_unchecked(int(joint_key_hex, 16))
+
+            # CiphertextElectionContext oluştur
+            manifest_hash = manifest.crypto_hash()
+            commitment_hash = hash_elems(joint_key)
+
+            election_context = CiphertextElectionContext(
                 number_of_guardians=n,
                 quorum=q,
-                manifest=manifest,
+                elgamal_public_key=joint_key,
+                commitment_hash=commitment_hash,
+                manifest_hash=manifest_hash,
+                crypto_base_hash=hash_elems(manifest_hash),
+                crypto_extended_base_hash=hash_elems(manifest_hash, commitment_hash),
             )
-
-            # Joint public key'i builder'a ver
-            guardians = ceremony.guardians
-            for guardian in guardians:
-                builder.receive_guardian_public_key(guardian.share_key())
-
-            build_result = builder.build()
-            if build_result is None:
-                raise RuntimeError("ElectionBuilder.build() başarısız")
-
-            internal_manifest, election_context = build_result
 
             # 4. Response hazırla
             guardian_records = [
@@ -155,8 +158,6 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
                 )
                 ballot_data = json.loads(plaintext_bytes.decode("utf-8"))
             else:
-                # RSA şifreleme yoksa (test/geliştirme modu)
-                # Ballot verisi doğrudan ballot_id üzerinden gelebilir
                 logger.warning(
                     "RSA şifreli payload boş — geliştirme modunda çalışılıyor"
                 )
