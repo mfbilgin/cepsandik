@@ -6,8 +6,11 @@ grpcio-tools==1.62.1
 grpcio-health-checking==1.62.1
 
 # ElectionGuard (mandatory - cryptographic operations)
+# PyPI paketi eksik modüller içerdiğinden GitHub'dan yükleniyor
+# Repo: Election-Tech-Initiative (microsoft'tan transfer edildi)
+# Tag: 1.4.0 (v1.4.0 değil!)
 # Not: Python 3.10 gerektirir (dataclass uyumluluk)
-electionguard==1.4.0
+electionguard @ git+https://github.com/Election-Tech-Initiative/electionguard-python.git@1.4.0
 
 # RSA key management (transit encryption)
 pycryptodome==3.20.0
