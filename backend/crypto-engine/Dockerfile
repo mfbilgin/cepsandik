@@ -39,6 +39,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Tanılama: ElectionGuard paket yapısını listele (build log'da görünür)
+RUN python -c "\
+import os, electionguard; \
+pkg = os.path.dirname(electionguard.__file__); \
+mods = sorted([f[:-3] for f in os.listdir(pkg) if f.endswith('.py') and f != '__init__.py']); \
+print('=== ELECTIONGUARD MODULES ==='); \
+[print(f'  {m}') for m in mods]; \
+print(f'=== TOTAL: {len(mods)} modules ==='); \
+print(f'=== VERSION: {electionguard.__version__ if hasattr(electionguard, \"__version__\") else \"unknown\"} ===') \
+"
+
 # Proto generated dosyaları kopyala
 COPY --from=proto-builder /build/generated/ ./generated/
 
