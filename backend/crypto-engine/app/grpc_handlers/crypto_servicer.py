@@ -1,6 +1,9 @@
 """
 gRPC CryptoService handler implementasyonu.
 Proto tanımlarındaki tüm RPC'leri karşılar.
+
+Not: electionguard PyPI paketi election_builder modülü içermez.
+CiphertextElectionContext doğrudan oluşturulur.
 """
 
 import json
@@ -30,7 +33,7 @@ from electionguard.manifest import (
     ReportingUnitType,
     VoteVariationType,
 )
-from electionguard.election_builder import ElectionBuilder
+from electionguard.hash import hash_elems
 
 logger = logging.getLogger(__name__)
 
@@ -87,23 +90,26 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
             ceremony = GuardianCeremony(n, q)
             ceremony_result = ceremony.perform_ceremony()
 
-            # 3. ElectionBuilder ile context oluştur
-            builder = ElectionBuilder(
-                number_of_guardians=n,
-                quorum=q,
-                manifest=manifest,
+            # 3. CiphertextElectionContext'i doğrudan oluştur
+            # (election_builder modülü PyPI paketinde mevcut değil)
+            election_joint_key = ceremony_result["election_joint_key"]
+            manifest_hash = manifest.crypto_hash()
+
+            # ElectionGuard spec'e göre hash zincirleri
+            crypto_base_hash = hash_elems(n, q, manifest_hash)
+            crypto_extended_base_hash = hash_elems(
+                crypto_base_hash, election_joint_key.commitment_hash
             )
 
-            # Joint public key'i builder'a ver
-            guardians = ceremony.guardians
-            for guardian in guardians:
-                builder.receive_guardian_public_key(guardian.share_key())
-
-            build_result = builder.build()
-            if build_result is None:
-                raise RuntimeError("ElectionBuilder.build() başarısız")
-
-            internal_manifest, election_context = build_result
+            election_context = CiphertextElectionContext(
+                number_of_guardians=n,
+                quorum=q,
+                elgamal_public_key=election_joint_key.joint_public_key,
+                commitment_hash=election_joint_key.commitment_hash,
+                manifest_hash=manifest_hash,
+                crypto_base_hash=crypto_base_hash,
+                crypto_extended_base_hash=crypto_extended_base_hash,
+            )
 
             # 4. Response hazırla
             guardian_records = [

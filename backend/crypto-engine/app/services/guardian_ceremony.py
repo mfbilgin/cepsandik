@@ -121,6 +121,7 @@ class GuardianCeremony:
 
         return {
             "joint_key": str(joint_key.joint_public_key),
+            "election_joint_key": joint_key,
             "guardian_records": guardian_records,
             "ceremony_details": {"n": self._n, "q": self._q},
         }
