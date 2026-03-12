@@ -114,7 +114,7 @@ class GuardianCeremony:
         # 7. Guardian state'lerini serileştir
         guardian_records = []
         for guardian in self._guardians:
-            serialized = self._serialize_guardian(guardian)
+            serialized = self._serialize_guardian(guardian, self._n, self._q)
             guardian_records.append({
                 "guardian_id": guardian.id,
                 "serialized_guardian": serialized,
@@ -133,19 +133,18 @@ class GuardianCeremony:
         return self._guardians
 
     @staticmethod
-    def _serialize_guardian(guardian: Guardian) -> str:
+    def _serialize_guardian(guardian: Guardian, n: int, q: int) -> str:
         """
         Guardian state'ini JSON string'e dönüştürür.
         Bu state, tally aşamasında guardian'ı yeniden oluşturmak için kullanılır.
         """
         try:
-            # Guardian'ın export edilebilir state'ini al
             guardian_record = guardian.publish()
             return json.dumps({
                 "guardian_id": guardian.id,
                 "sequence_order": guardian.sequence_order,
-                "number_of_guardians": guardian._ceremony_details.number_of_guardians,
-                "quorum": guardian._ceremony_details.quorum,
+                "number_of_guardians": n,
+                "quorum": q,
                 "guardian_record": {
                     "guardian_id": guardian_record.guardian_id,
                     "sequence_order": guardian_record.sequence_order,
@@ -157,10 +156,9 @@ class GuardianCeremony:
             })
         except Exception as e:
             logger.error("Guardian serileştirme hatası: %s", e)
-            # Fallback: temel bilgileri kaydet
             return json.dumps({
                 "guardian_id": guardian.id,
                 "sequence_order": guardian.sequence_order,
-                "number_of_guardians": guardian._ceremony_details.number_of_guardians,
-                "quorum": guardian._ceremony_details.quorum,
+                "number_of_guardians": n,
+                "quorum": q,
             })
