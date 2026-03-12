@@ -110,6 +110,7 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
                 manifest_hash=manifest_hash,
                 crypto_base_hash=crypto_base_hash,
                 crypto_extended_base_hash=crypto_extended_base_hash,
+                extended_data=None,
             )
 
             # 4. Response hazırla
