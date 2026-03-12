@@ -11,8 +11,10 @@ from electionguard.ballot import CiphertextBallot, SubmittedBallot, BallotBoxSta
 from electionguard.election import CiphertextElectionContext
 from electionguard.manifest import InternalManifest, Manifest
 from electionguard.tally import CiphertextTally
+from electionguard.tally import CiphertextTally
 from electionguard.decryption_mediator import DecryptionMediator
 from electionguard.guardian import Guardian
+from electionguard.serialize import from_raw
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +63,14 @@ class TallyDecryptor:
 
         try:
             # 1. Context ve manifest'i deserialize et
-            context = CiphertextElectionContext.from_json(context_json)
-            manifest = Manifest.from_json(manifest_json)
+            context = from_raw(CiphertextElectionContext, context_json)
+            manifest = from_raw(Manifest, manifest_json)
             internal_manifest = InternalManifest(manifest)
 
             # 2. Ciphertext ballot'ları deserialize et
             submitted_ballots: list[SubmittedBallot] = []
             for ballot_json in ciphertext_ballots_json:
-                ciphertext = CiphertextBallot.from_json(ballot_json)
+                ciphertext = from_raw(CiphertextBallot, ballot_json)
                 # CiphertextBallot'u SubmittedBallot'a dönüştür (CAST durumunda)
                 submitted = SubmittedBallot(
                     object_id=ciphertext.object_id,

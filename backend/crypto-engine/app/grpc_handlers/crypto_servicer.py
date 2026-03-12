@@ -34,6 +34,7 @@ from electionguard.manifest import (
     ReportingUnitType,
     VoteVariationType,
 )
+from electionguard.serialize import to_raw
 from electionguard.hash import hash_elems
 
 logger = logging.getLogger(__name__)
@@ -123,9 +124,9 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
             ]
 
             response = crypto_pb2.SetupElectionResponse(
-                election_guard_context=election_context.to_json(),
+                election_guard_context=to_raw(election_context),
                 joint_public_key=ceremony_result["joint_key"],
-                election_manifest=manifest.to_json(),
+                election_manifest=to_raw(manifest),
                 guardian_records=guardian_records,
             )
 

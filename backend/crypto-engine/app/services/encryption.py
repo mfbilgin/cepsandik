@@ -11,6 +11,7 @@ from electionguard.ballot import PlaintextBallot, PlaintextBallotContest, Plaint
 from electionguard.election import CiphertextElectionContext
 from electionguard.encrypt import EncryptionDevice, EncryptionMediator
 from electionguard.manifest import InternalManifest, Manifest
+from electionguard.serialize import from_raw, to_raw
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +62,8 @@ class BallotEncryptor:
 
         try:
             # 1. Context ve manifest'i deserialize et
-            context = CiphertextElectionContext.from_json(context_json)
-            manifest = Manifest.from_json(manifest_json)
+            context = from_raw(CiphertextElectionContext, context_json)
+            manifest = from_raw(Manifest, manifest_json)
             internal_manifest = InternalManifest(manifest)
 
             # 2. PlaintextBallot oluştur
@@ -79,7 +80,7 @@ class BallotEncryptor:
 
             # 4. Sonuçları hazırla
             result = {
-                "ciphertext_ballot": ciphertext_ballot.to_json(),
+                "ciphertext_ballot": to_raw(ciphertext_ballot),
                 "tracking_code": str(ciphertext_ballot.tracking_hash) if hasattr(ciphertext_ballot, 'tracking_hash') else str(ciphertext_ballot.code),
                 "zkp_proof": json.dumps({
                     "object_id": ciphertext_ballot.object_id,
