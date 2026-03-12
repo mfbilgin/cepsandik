@@ -10,8 +10,6 @@ from typing import Any, Optional
 
 from electionguard.guardian import Guardian
 from electionguard.key_ceremony import CeremonyDetails
-from electionguard.key_ceremony_mediator import KeyCeremonyMediator
-from electionguard.utils import get_optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +35,15 @@ class GuardianCeremony:
         self._q = quorum
         self._guardians: list[Guardian] = []
         self._ceremony_details = CeremonyDetails(number_of_guardians, quorum)
-        self._mediator: Optional[KeyCeremonyMediator] = None
 
     def perform_ceremony(self) -> dict[str, Any]:
         """
-        Tam key ceremony'yi çalıştırır.
+        Tam key ceremony'yi çalıştırır (guardian-to-guardian doğrudan iletişim).
 
         Returns:
             {
                 "joint_key": ElGamal joint public key (hex string),
+                "election_joint_key": ElectionJointKey nesnesi,
                 "guardian_records": [
                     {"guardian_id": str, "serialized_guardian": str (JSON)},
                     ...
@@ -68,49 +66,52 @@ class GuardianCeremony:
             )
             for i in range(self._n)
         ]
+        logger.info("%d guardian oluşturuldu.", len(self._guardians))
 
-        # 2. Mediator ile key ceremony'yi yönet
-        self._mediator = KeyCeremonyMediator(
-            "key_ceremony_mediator",
-            self._ceremony_details,
-        )
-
-        # Adım 1: Attendance — tüm guardian'ları kaydet
+        # 2. Anahtar paylaşımı — her guardian diğerlerinin public key'ini kaydeder
         for guardian in self._guardians:
-            self._mediator.announce(guardian.share_key())
+            for other in self._guardians:
+                if guardian.id != other.id:
+                    guardian.save_guardian_key(other.share_key())
 
-        # Adım 2: Key sharing — her guardian diğerleriyle anahtar paylaşır
-        for guardian in self._guardians:
-            announced_keys = self._mediator.share_announced()
-            for key in get_optional(announced_keys):
-                if key.owner_id != guardian.id:
-                    guardian.save_guardian_key(key)
+        logger.info("Guardian anahtarları paylaşıldı.")
 
-        # Adım 3: Her guardian partial key backup'larını paylaşır
+        # 3. Partial key backup oluşturma
         for guardian in self._guardians:
-            for other_guardian in self._guardians:
-                if guardian.id != other_guardian.id:
-                    backup = guardian.share_key_backup(other_guardian.id)
+            guardian.generate_election_partial_key_backups()
+
+        logger.info("Partial key backup'lar üretildi.")
+
+        # 4. Backup paylaşımı — her guardian backup'ını diğerlerine gönderir
+        for guardian in self._guardians:
+            for other in self._guardians:
+                if guardian.id != other.id:
+                    backup = guardian.share_election_partial_key_backup(other.id)
                     if backup is not None:
-                        self._mediator.receive_backups(backup)
+                        other.save_election_partial_key_backup(backup)
 
-        # Adım 4: Her guardian aldığı backup'ları doğrular
+        logger.info("Backup'lar paylaşıldı ve kaydedildi.")
+
+        # 5. Backup doğrulama
         for guardian in self._guardians:
-            backups = self._mediator.share_backups(guardian.id)
-            if backups is not None:
-                for backup in backups:
-                    verification = guardian.verify_key_backup(backup)
+            for other in self._guardians:
+                if guardian.id != other.id:
+                    verification = guardian.verify_election_partial_key_backup(
+                        other.id
+                    )
                     if verification is not None:
-                        self._mediator.receive_backup_verifications(verification)
+                        other.save_election_partial_key_verification(verification)
 
-        # 5. Joint key'i üret
-        joint_key = self._mediator.publish_joint_key()
+        logger.info("Backup doğrulamaları tamamlandı.")
+
+        # 6. Joint key üretimi
+        joint_key = self._guardians[0].publish_joint_key()
         if joint_key is None:
             raise RuntimeError("Key ceremony başarısız — joint key üretilemedi.")
 
         logger.info("Key ceremony başarılı. Joint key üretildi.")
 
-        # 6. Guardian state'lerini serileştir
+        # 7. Guardian state'lerini serileştir
         guardian_records = []
         for guardian in self._guardians:
             serialized = self._serialize_guardian(guardian)
