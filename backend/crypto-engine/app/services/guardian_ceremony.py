@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Any, Optional
 
+from electionguard.hash import hash_elems
+
 from electionguard.guardian import Guardian
 from electionguard.key_ceremony import CeremonyDetails
 
@@ -105,9 +107,17 @@ class GuardianCeremony:
         logger.info("Backup doğrulamaları tamamlandı.")
 
         # 6. Joint key üretimi
-        joint_key = self._guardians[0].publish_joint_key()
-        if joint_key is None:
+        # Guardian.publish_joint_key() doğrudan ElementModP döner
+        joint_public_key = self._guardians[0].publish_joint_key()
+        if joint_public_key is None:
             raise RuntimeError("Key ceremony başarısız — joint key üretilemedi.")
+
+        # Commitment hash: tüm guardian'ların election commitment'larından hesaplanır
+        all_commitments = []
+        for guardian in self._guardians:
+            record = guardian.publish()
+            all_commitments.extend(record.election_commitments)
+        commitment_hash = hash_elems(all_commitments)
 
         logger.info("Key ceremony başarılı. Joint key üretildi.")
 
@@ -121,8 +131,9 @@ class GuardianCeremony:
             })
 
         return {
-            "joint_key": str(joint_key.joint_public_key),
-            "election_joint_key": joint_key,
+            "joint_key": str(joint_public_key),
+            "joint_public_key_obj": joint_public_key,
+            "commitment_hash": commitment_hash,
             "guardian_records": guardian_records,
             "ceremony_details": {"n": self._n, "q": self._q},
         }

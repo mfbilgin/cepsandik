@@ -91,21 +91,21 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
             ceremony_result = ceremony.perform_ceremony()
 
             # 3. CiphertextElectionContext'i doğrudan oluştur
-            # (election_builder modülü PyPI paketinde mevcut değil)
-            election_joint_key = ceremony_result["election_joint_key"]
+            joint_public_key = ceremony_result["joint_public_key_obj"]
+            commitment_hash = ceremony_result["commitment_hash"]
             manifest_hash = manifest.crypto_hash()
 
             # ElectionGuard spec'e göre hash zincirleri
             crypto_base_hash = hash_elems(n, q, manifest_hash)
             crypto_extended_base_hash = hash_elems(
-                crypto_base_hash, election_joint_key.commitment_hash
+                crypto_base_hash, commitment_hash
             )
 
             election_context = CiphertextElectionContext(
                 number_of_guardians=n,
                 quorum=q,
-                elgamal_public_key=election_joint_key.joint_public_key,
-                commitment_hash=election_joint_key.commitment_hash,
+                elgamal_public_key=joint_public_key,
+                commitment_hash=commitment_hash,
                 manifest_hash=manifest_hash,
                 crypto_base_hash=crypto_base_hash,
                 crypto_extended_base_hash=crypto_extended_base_hash,
