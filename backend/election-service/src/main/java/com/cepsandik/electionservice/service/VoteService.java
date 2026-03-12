@@ -357,6 +357,40 @@ public class VoteService {
                 .build();
     }
 
+    // ==================== ZKP / Verifiability Kanıtları ====================
+
+    /**
+     * Kullanıcının kendi oyuna ait kriptografik (ZKP) ve ElectionGuard kanıtlarını döndürür.
+     */
+    @Transactional(readOnly = true)
+    public VoteProofResponse getMyVoteProof(Long electionId, String userId) {
+        findElectionOrThrow(electionId);
+
+        // Kullanıcının tokenını kontrol et
+        VoteToken voteToken = voteTokenRepository.findByElectionIdAndUserId(electionId, userId)
+                .orElseThrow(() -> ApiException.badRequest("Bu seçimde token sahibi değilsiniz"));
+
+        if (!voteToken.getIsUsed()) {
+            throw ApiException.badRequest("Henüz oy kullanmadınız");
+        }
+
+        // Oy tablosundan ZKP'yi çek
+        Vote vote = voteRepository.findByVoteToken(voteToken.getToken())
+                .orElseThrow(() -> ApiException.notFound("Oy kaydı bulunamadı (belki de şifreli kaydedilmedi)"));
+
+        if (vote.getEncryptedBallot() == null || vote.getZkpProof() == null) {
+            throw ApiException.badRequest("Bu oya ait ElectionGuard kriptografik kanıtları mevcut değil.");
+        }
+
+        return VoteProofResponse.builder()
+                .electionId(electionId)
+                .voteToken(vote.getVoteToken())
+                .trackingCode(vote.getTrackingCode())
+                .encryptedBallot(vote.getEncryptedBallot())
+                .zkpProof(vote.getZkpProof())
+                .build();
+    }
+
     // ==================== Helper Methods ====================
 
     private Election findElectionOrThrow(Long id) {

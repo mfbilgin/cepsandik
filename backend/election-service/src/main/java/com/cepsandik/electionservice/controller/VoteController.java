@@ -76,6 +76,18 @@ public class VoteController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    // ==================== İspat (Zero Knowledge Proof) ====================
+
+    @Operation(summary = "Kullanıcının bu seçimdeki şifrelenmiş oyunun kriptografik kanıtlarını döndürür")
+    @GetMapping("/my-proof")
+    public ResponseEntity<ApiResponse<VoteProofResponse>> getMyVoteProof(
+            @PathVariable Long electionId,
+            @RequestHeader("X-User-Id") String userId) {
+
+        VoteProofResponse response = voteService.getMyVoteProof(electionId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Kriptografik oylama kanıtları getirildi", response));
+    }
+
     // ==================== İstatistikler ====================
 
     @Operation(summary = "Seçim oy istatistiklerini döndürür (CLOSED/ARCHIVED seçimler veya seçim sahibi için)")

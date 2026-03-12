@@ -99,6 +99,10 @@ public class Election {
     @Column(name = "guardian_records", columnDefinition = "TEXT")
     private String guardianRecords;
 
+    /** ElectionGuard Tally Decryption Proof (JSON) */
+    @Column(name = "tally_proof", columnDefinition = "TEXT")
+    private String tallyProof;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

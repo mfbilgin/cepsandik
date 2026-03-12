@@ -186,7 +186,14 @@ public class ElectionController {
         return ResponseEntity.ok(ApiResponse.success("Erişim kodu deaktive edildi"));
     }
 
-    // ==================== PREVIEW & ARCHIVE ====================
+    // ==================== PREVIEW, PROOFS & ARCHIVE ====================
+
+    @Operation(summary = "Seçime ait kriptografik kanıtları (ZKP, Tally, ElectionGuard Context) getirir")
+    @GetMapping("/{id}/proofs")
+    public ResponseEntity<ApiResponse<ElectionProofResponse>> getElectionProofs(@PathVariable Long id) {
+        ElectionProofResponse response = electionService.getElectionProofs(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     @Operation(summary = "Seçim önizleme – yayınlamadan önce tüm bilgileri ve eksikleri gösterir")
     @GetMapping("/{id}/preview")

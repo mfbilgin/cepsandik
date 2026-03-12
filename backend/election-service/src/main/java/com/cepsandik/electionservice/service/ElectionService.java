@@ -277,6 +277,8 @@ public class ElectionService {
                             guardianQuorum
                     );
 
+                    election.setTallyProof(tallyResponse.getTallyProof());
+
                     log.info("Tally çözümlemesi tamamlandı: electionId={}, contest_count={}",
                             id, tallyResponse.getResultsCount());
                 } else {
@@ -525,6 +527,21 @@ public class ElectionService {
                 .candidates(candidates)
                 .readyToPublish(readyToPublish)
                 .warnings(warnings)
+                .build();
+    }
+
+    // ==================== PROOFS ====================
+
+    @Transactional(readOnly = true)
+    public ElectionProofResponse getElectionProofs(Long id) {
+        Election election = findElectionOrThrow(id);
+
+        return ElectionProofResponse.builder()
+                .electionId(election.getId())
+                .electionGuardContext(election.getElectionGuardContext())
+                .electionManifest(election.getElectionManifest())
+                .guardianRecords(election.getGuardianRecords())
+                .tallyProof(election.getTallyProof())
                 .build();
     }
 
