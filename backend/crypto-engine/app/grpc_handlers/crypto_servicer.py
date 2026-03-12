@@ -8,6 +8,7 @@ CiphertextElectionContext doğrudan oluşturulur.
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import grpc
@@ -299,8 +300,8 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
             election_scope_id=f"election-{request.election_id}",
             spec_version="v0.95",
             type=EGElectionType.general,
-            start_date="2024-01-01T00:00:00Z",
-            end_date="2030-12-31T23:59:59Z",
+            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2030, 12, 31, 23, 59, 59, tzinfo=timezone.utc),
             geopolitical_units=[gp_unit],
             contests=contests,
             ballot_styles=[ballot_style],
