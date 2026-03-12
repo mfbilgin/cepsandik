@@ -86,6 +86,7 @@ jobs:
             cd /opt/cepsandik
             git fetch origin main
             git reset --hard origin/main
+            rm -rf mobile/
 
             # 2. Login to GHCR
             echo "$CR_PAT" | docker login ghcr.io -u "$GITHUB_OWNER" --password-stdin
