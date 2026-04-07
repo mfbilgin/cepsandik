@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -22,8 +22,8 @@ public class AccessVerificationResponse {
     private ElectionStatus status;
     private ElectionType type;
     private Integer maxSelections;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Instant startTime;
+    private Instant endTime;
     private Integer candidateCount;
     private List<CandidateResponse> candidates;
     private Boolean anonymousVoting;

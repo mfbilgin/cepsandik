@@ -2,6 +2,7 @@ package com.cepsandik.electionservice.service;
 
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.config.AccessCodeConfig;
+import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.dto.request.CreateAccessCodeRequest;
 import com.cepsandik.electionservice.dto.request.CreateCandidateRequest;
 import com.cepsandik.electionservice.dto.request.CreateElectionRequest;
@@ -30,7 +31,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -46,6 +47,7 @@ public class ElectionService {
     private final AccessCodeMapper accessCodeMapper;
     private final AccessCodeConfig accessCodeConfig;
     private final CryptoEngineClient cryptoEngineClient;
+    private final UtcClock utcClock;
 
     @Value("${app.guardian.count:3}")
     private int guardianCount;
@@ -81,7 +83,7 @@ public class ElectionService {
     public PageResponse<ElectionResponse> getElectionsByCommunity(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedActive(communityId,
-                LocalDateTime.now(), pageable);
+                utcClock.instant(), pageable);
 
         return buildPageResponse(electionPage);
     }
@@ -235,7 +237,7 @@ public class ElectionService {
         }
 
         election.setStatus(ElectionStatus.ACTIVE);
-        election.setStartTime(LocalDateTime.now());
+        election.setStartTime(utcClock.instant());
         Election saved = electionRepository.save(election);
 
         log.info("Seçim başlatıldı: id={}, status=ACTIVE", id);
@@ -292,7 +294,7 @@ public class ElectionService {
         }
 
         election.setStatus(ElectionStatus.CLOSED);
-        election.setEndTime(LocalDateTime.now());
+        election.setEndTime(utcClock.instant());
         Election saved = electionRepository.save(election);
 
         log.info("Seçim sonlandırıldı: id={}, status=CLOSED", id);
@@ -424,7 +426,7 @@ public class ElectionService {
                 .build();
 
         if (request.getExpiresInHours() != null) {
-            accessCode.setExpiresAt(LocalDateTime.now().plusHours(request.getExpiresInHours()));
+            accessCode.setExpiresAt(utcClock.instant().plus(request.getExpiresInHours(), ChronoUnit.HOURS));
         }
 
         AccessCode saved = accessCodeRepository.save(accessCode);
@@ -503,7 +505,7 @@ public class ElectionService {
             warnings.add("Bitiş zamanı belirtilmelidir");
             readyToPublish = false;
         }
-        if (election.getStartTime() != null && election.getStartTime().isBefore(LocalDateTime.now())) {
+        if (election.getStartTime() != null && election.getStartTime().isBefore(utcClock.instant())) {
             warnings.add("Başlangıç zamanı geçmiş, güncellenmesi gerekebilir");
         }
         if (election.getTitle() == null || election.getTitle().isBlank()) {

@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -25,10 +25,10 @@ public class UpdateElectionRequest {
     private Integer maxSelections;
 
     @Future(message = "Başlangıç zamanı gelecekte olmalıdır")
-    private LocalDateTime startTime;
+    private Instant startTime;
 
     @Future(message = "Bitiş zamanı gelecekte olmalıdır")
-    private LocalDateTime endTime;
+    private Instant endTime;
 
     private Boolean resultsPublic;
 

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -42,17 +43,17 @@ public class VoteToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /** Token kullanılma zamanı */
+    /** Token kullanılma anı (UTC) */
     @Column(name = "used_at")
-    private LocalDateTime usedAt;
+    private Instant usedAt;
 
     // Helper methods
     public boolean isValid() {
         return !isUsed;
     }
 
-    public void markAsUsed() {
+    public void markAsUsed(Instant usedAt) {
         this.isUsed = true;
-        this.usedAt = LocalDateTime.now();
+        this.usedAt = usedAt;
     }
 }

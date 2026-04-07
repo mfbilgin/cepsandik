@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Data
@@ -18,5 +19,5 @@ public class VoteTokenResponse {
     private String electionTitle;
     private Boolean isUsed;
     private LocalDateTime createdAt;
-    private LocalDateTime usedAt;
+    private Instant usedAt;
 }

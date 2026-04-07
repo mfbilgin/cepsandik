@@ -1,6 +1,7 @@
 package com.cepsandik.electionservice.service;
 
 import com.cepsandik.electionservice.client.CryptoEngineClient;
+import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.dto.request.CastVoteRequest;
 import com.cepsandik.electionservice.dto.response.*;
 import com.cepsandik.electionservice.entity.*;
@@ -13,6 +14,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,6 +32,7 @@ public class VoteService {
     private final VoteTokenRepository voteTokenRepository;
     private final VoteRepository voteRepository;
     private final CryptoEngineClient cryptoEngineClient;
+    private final UtcClock utcClock;
 
     // ==================== Erişim Kodu Doğrulama ====================
 
@@ -54,11 +59,12 @@ public class VoteService {
         }
 
         // Kodun geçerliliğini kontrol et
-        if (!accessCode.isValid()) {
+        var now = utcClock.instant();
+        if (!accessCode.isValid(now)) {
             if (!accessCode.getIsActive()) {
                 throw ApiException.badRequest("Bu erişim kodu deaktif edilmiş");
             }
-            if (accessCode.getExpiresAt() != null && accessCode.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+            if (accessCode.getExpiresAt() != null && accessCode.getExpiresAt().isBefore(now)) {
                 throw ApiException.badRequest("Bu erişim kodunun süresi dolmuş");
             }
             if (accessCode.getMaxUses() != null && accessCode.getCurrentUses() >= accessCode.getMaxUses()) {
@@ -184,7 +190,8 @@ public class VoteService {
                     .candidateId(existingVote.getCandidate().getId())
                     .candidateName(existingVote.getCandidate().getName())
                     .alreadyVoted(true)
-                    .votedAt(existingVote.getCreatedAt())
+                    .votedAt(voteRecordedAt(existingVote.getCreatedAt()))
+                    .trackingCode(existingVote.getTrackingCode())
                     .build();
         }
 
@@ -238,7 +245,7 @@ public class VoteService {
         vote = voteRepository.save(vote);
 
         // Token'ı kullanıldı olarak işaretle
-        voteToken.markAsUsed();
+        voteToken.markAsUsed(utcClock.instant());
         voteTokenRepository.save(voteToken);
 
         log.info("Oy kullanıldı - Election: {}, Candidate: {}", electionId, request.getCandidateId());
@@ -249,7 +256,8 @@ public class VoteService {
                 .candidateId(candidate.getId())
                 .candidateName(candidate.getName())
                 .alreadyVoted(false)
-                .votedAt(vote.getCreatedAt())
+                .votedAt(voteRecordedAt(vote.getCreatedAt()))
+                .trackingCode(vote.getTrackingCode())
                 .build();
     }
 
@@ -284,11 +292,13 @@ public class VoteService {
 
         // Anonim seçimde aday bilgisini gösterme
         if (election.getAnonymousVoting()) {
+            var anonVote = voteRepository.findByVoteToken(voteToken.getToken());
             return VoteResponse.builder()
                     .electionId(election.getId())
                     .electionTitle(election.getTitle())
                     .alreadyVoted(true)
                     .votedAt(voteToken.getUsedAt())
+                    .trackingCode(anonVote.map(Vote::getTrackingCode).orElse(null))
                     .build();
         }
 
@@ -302,7 +312,8 @@ public class VoteService {
                     .candidateId(vote.getCandidate().getId())
                     .candidateName(vote.getCandidate().getName())
                     .alreadyVoted(true)
-                    .votedAt(vote.getCreatedAt())
+                    .votedAt(voteRecordedAt(vote.getCreatedAt()))
+                    .trackingCode(vote.getTrackingCode())
                     .build();
         }
 
@@ -392,6 +403,11 @@ public class VoteService {
     }
 
     // ==================== Helper Methods ====================
+
+    /** Oy kaydı `timestamp without time zone` olarak UTC duvar saati saklandığı varsayımıyla. */
+    private static Instant voteRecordedAt(LocalDateTime createdAt) {
+        return createdAt != null ? createdAt.atZone(ZoneOffset.UTC).toInstant() : null;
+    }
 
     private Election findElectionOrThrow(Long id) {
         return electionRepository.findById(id)

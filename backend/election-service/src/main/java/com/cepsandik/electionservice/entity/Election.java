@@ -8,6 +8,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,13 +59,13 @@ public class Election {
     @Column(name = "max_selections")
     private Integer maxSelections;
 
-    /** Seçim başlangıç zamanı */
+    /** Seçim başlangıç anı (UTC, DB: timestamptz) */
     @Column(name = "start_time")
-    private LocalDateTime startTime;
+    private Instant startTime;
 
-    /** Seçim bitiş zamanı */
+    /** Seçim bitiş anı (UTC, DB: timestamptz) */
     @Column(name = "end_time")
-    private LocalDateTime endTime;
+    private Instant endTime;
 
     /** Sonuçların herkese açık olup olmadığı */
     @Column(name = "results_public")

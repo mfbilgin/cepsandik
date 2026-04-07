@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -21,15 +21,15 @@ public class MyElectionResponse {
     private Long communityId;
     private ElectionStatus status;
     private ElectionType type;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Instant startTime;
+    private Instant endTime;
     private Integer candidateCount;
 
     /** Kullanıcı oy kullanmış mı */
     private Boolean hasVoted;
 
     /** Oy kullanma zamanı (oy kullanmışsa) */
-    private LocalDateTime votedAt;
+    private Instant votedAt;
 
     /** Kullanıcı bu seçimin sahibi mi */
     private Boolean isOwner;

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -47,18 +48,18 @@ public class AccessCode {
     @Builder.Default
     private Boolean isActive = true;
 
-    /** Son kullanma tarihi (null = süresiz) */
+    /** Son kullanma anı (UTC, DB: timestamptz; null = süresiz) */
     @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     // Helper methods
-    public boolean isValid() {
+    public boolean isValid(Instant now) {
         if (!isActive) return false;
-        if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now())) return false;
+        if (expiresAt != null && expiresAt.isBefore(now)) return false;
         if (maxUses != null && currentUses >= maxUses) return false;
         return true;
     }

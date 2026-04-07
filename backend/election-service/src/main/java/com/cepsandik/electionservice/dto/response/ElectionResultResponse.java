@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,8 +22,8 @@ public class ElectionResultResponse {
     private String electionDescription;
     private ElectionStatus status;
     private ElectionType type;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Instant startTime;
+    private Instant endTime;
     private Long totalVotes;
     private Long totalEligibleVoters;
     private Double turnoutPercentage;

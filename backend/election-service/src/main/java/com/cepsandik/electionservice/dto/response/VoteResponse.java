@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -18,5 +18,8 @@ public class VoteResponse {
     private Long candidateId;
     private String candidateName;
     private Boolean alreadyVoted;
-    private LocalDateTime votedAt;
+    private Instant votedAt;
+
+    /** ElectionGuard doğrulama özeti (şifreli oy yoksa null olabilir) */
+    private String trackingCode;
 }

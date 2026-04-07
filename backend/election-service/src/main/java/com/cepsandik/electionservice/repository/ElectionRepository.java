@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,7 +22,7 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
                      "AND e.isDeleted = false " +
                      "AND (e.endTime IS NULL OR e.endTime > :now OR e.status IN ('CLOSED', 'ARCHIVED'))")
        Page<Election> findByCommunityIdAndIsDeletedActive(@Param("communityId") Long communityId,
-                     @Param("now") LocalDateTime now, Pageable pageable);
+                     @Param("now") Instant now, Pageable pageable);
 
        Page<Election> findByCommunityIdAndIsDeletedFalse(Long communityId, Pageable pageable);
 
@@ -32,14 +32,16 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
        List<Election> findByCreatedByAndIsDeletedFalse(String userId);
 
        /** Başlaması gereken seçimleri bul (SCHEDULED → ACTIVE) */
-       @Query("SELECT e FROM Election e WHERE e.status = 'SCHEDULED' " +
+       @Query("SELECT e FROM Election e WHERE e.status = :scheduled " +
                      "AND e.startTime <= :now AND e.isDeleted = false")
-       List<Election> findElectionsToStart(@Param("now") LocalDateTime now);
+       List<Election> findElectionsToStart(@Param("scheduled") ElectionStatus scheduled,
+                     @Param("now") Instant now);
 
        /** Bitmesi gereken seçimleri bul (ACTIVE → CLOSED) */
-       @Query("SELECT e FROM Election e WHERE e.status = 'ACTIVE' " +
+       @Query("SELECT e FROM Election e WHERE e.status = :active " +
                      "AND e.endTime <= :now AND e.isDeleted = false")
-       List<Election> findElectionsToEnd(@Param("now") LocalDateTime now);
+       List<Election> findElectionsToEnd(@Param("active") ElectionStatus active,
+                     @Param("now") Instant now);
 
        /** Topluluk bazlı aktif seçimleri getir */
        @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
@@ -54,7 +56,7 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
                      "AND e.status IN ('ACTIVE', 'SCHEDULED') AND e.isDeleted = false " +
                      "AND (e.endTime IS NULL OR e.endTime > :now) " +
                      "ORDER BY e.startTime ASC")
-       List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId, @Param("now") LocalDateTime now);
+       List<Election> findActiveOrScheduledByCreatedBy(@Param("userId") String userId, @Param("now") Instant now);
 
        /** Kullanıcının oluşturduğu kapanmış seçimler */
        @Query("SELECT e FROM Election e WHERE e.createdBy = :userId " +
@@ -70,6 +72,6 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
        /** Bitiş zamanı yaklaşan aktif seçimler (hatırlatma bildirimi için) */
        @Query("SELECT e FROM Election e WHERE e.status = 'ACTIVE' " +
                      "AND e.endTime > :now AND e.endTime <= :threshold AND e.isDeleted = false")
-       List<Election> findElectionsNearingEnd(@Param("now") LocalDateTime now,
-                     @Param("threshold") LocalDateTime threshold);
+       List<Election> findElectionsNearingEnd(@Param("now") Instant now,
+                     @Param("threshold") Instant threshold);
 }

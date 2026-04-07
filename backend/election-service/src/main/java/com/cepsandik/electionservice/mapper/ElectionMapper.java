@@ -48,6 +48,8 @@ public class ElectionMapper {
                 .updatedAt(election.getUpdatedAt())
                 .candidateCount(election.getCandidates() != null ? 
                         (int) election.getCandidates().stream().filter(c -> !c.getIsDeleted()).count() : 0)
+                .encryptedVotingEnabled(election.getElectionGuardContext() != null
+                        && !election.getElectionGuardContext().isBlank())
                 .build();
     }
 
@@ -71,6 +73,8 @@ public class ElectionMapper {
                 .description(candidate.getDescription())
                 .imageUrl(candidate.getImageUrl())
                 .displayOrder(candidate.getDisplayOrder())
+                .candidateType(candidate.getCandidateType())
+                .memberUserId(candidate.getMemberUserId())
                 .createdAt(candidate.getCreatedAt())
                 .build();
     }

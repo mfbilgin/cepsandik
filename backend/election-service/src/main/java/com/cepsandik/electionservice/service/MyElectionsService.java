@@ -3,6 +3,7 @@ package com.cepsandik.electionservice.service;
 import com.cepsandik.electionservice.dto.response.MyElectionResponse;
 import com.cepsandik.electionservice.entity.Election;
 import com.cepsandik.electionservice.entity.VoteToken;
+import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.repository.CandidateRepository;
 import com.cepsandik.electionservice.repository.ElectionRepository;
 import com.cepsandik.electionservice.repository.VoteRepository;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,6 +26,8 @@ public class MyElectionsService {
     private final VoteTokenRepository voteTokenRepository;
     private final VoteRepository voteRepository;
     private final CandidateRepository candidateRepository;
+    private final ElectionLifecycleService electionLifecycleService;
+    private final UtcClock utcClock;
 
     /**
      * Kullanıcının dahil olduğu aktif seçimleri listeler.
@@ -33,12 +37,17 @@ public class MyElectionsService {
      */
     @Transactional(readOnly = true)
     public List<MyElectionResponse> getMyActiveElections(String userId) {
-        Map<Long, MyElectionResponse> resultMap = new LinkedHashMap<>();
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        electionLifecycleService.processAllDueTransitions();
 
-        // 1) Kullanıcının oluşturduğu aktif/scheduled seçimler
+        Map<Long, MyElectionResponse> resultMap = new LinkedHashMap<>();
+        Instant now = utcClock.instant();
+
+        // 1) Kullanıcının oluşturduğu seçimler (yalnızca gerçekten ACTIVE — henüz başlamamış SCHEDULED listede yok)
         List<Election> ownedElections = electionRepository.findActiveOrScheduledByCreatedBy(userId, now);
         for (Election election : ownedElections) {
+            if (!election.isActive()) {
+                continue;
+            }
             resultMap.put(election.getId(), mapToResponse(election, userId, true));
         }
 

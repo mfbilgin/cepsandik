@@ -7,7 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -36,11 +36,11 @@ public class CreateElectionRequest {
 
     @NotNull(message = "Başlangıç zamanı zorunludur")
     @Future(message = "Başlangıç zamanı gelecekte olmalıdır")
-    private LocalDateTime startTime;
+    private Instant startTime;
 
     @NotNull(message = "Bitiş zamanı zorunludur")
     @Future(message = "Bitiş zamanı gelecekte olmalıdır")
-    private LocalDateTime endTime;
+    private Instant endTime;
 
     /** Sonuçların herkese açık olup olmadığı */
     private Boolean resultsPublic = false;

@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,8 +27,8 @@ public class ElectionResponse {
     private ElectionType type;
     private ParticipantType participantType;
     private Integer maxSelections;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Instant startTime;
+    private Instant endTime;
     private Boolean resultsPublic;
     private Boolean anonymousVoting;
     private LocalDateTime createdAt;
@@ -38,4 +39,7 @@ public class ElectionResponse {
     
     /** Adaylar (detaylı görünümde) */
     private List<CandidateResponse> candidates;
+
+    /** ElectionGuard kurulduysa true — mobil oy için transit RSA şifrelemesi kullanılmalı */
+    private Boolean encryptedVotingEnabled;
 }
