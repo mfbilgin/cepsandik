@@ -97,6 +97,32 @@ class KeyManager:
         cipher = PKCS1_OAEP.new(self._private_key)
         return cipher.decrypt(ciphertext)
 
+    def decrypt_transit_payload(self, payload: bytes) -> bytes:
+        """
+        Transit payload: ya tek blok RSA-OAEP (kısa JSON, 256 bayt) ya da hibrit
+        RSA-OAEP(32 bayt AES anahtarı) || IV(12) || AES-GCM şifre metni+tag(16).
+        """
+        rsa_ct_len = self._private_key.size_in_bytes() if self._private_key else 256
+        if len(payload) == rsa_ct_len:
+            return self.decrypt(payload)
+        if len(payload) < rsa_ct_len + 12 + 16:
+            raise ValueError(f"Geçersiz transit payload uzunluğu: {len(payload)}")
+
+        from Crypto.Cipher import AES
+
+        rsa_blob = payload[:rsa_ct_len]
+        aes_key = self.decrypt(rsa_blob)
+        if len(aes_key) != 32:
+            raise ValueError(f"Beklenen 32 bayt AES anahtarı, gelen: {len(aes_key)}")
+
+        iv = payload[rsa_ct_len : rsa_ct_len + 12]
+        ct_and_tag = payload[rsa_ct_len + 12 :]
+        tag = ct_and_tag[-16:]
+        ct = ct_and_tag[:-16]
+
+        cipher = AES.new(aes_key, AES.MODE_GCM, nonce=iv)
+        return cipher.decrypt_and_verify(ct, tag)
+
     def encrypt_for_test(self, plaintext: bytes) -> bytes:
         """
         Test amaçlı: Public key ile RSA-OAEP şifreleme.

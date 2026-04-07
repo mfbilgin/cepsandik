@@ -156,10 +156,10 @@ class CryptoServicer(crypto_pb2_grpc.CryptoServiceServicer):
         )
 
         try:
-            # 1. RSA ile transit şifrelemeyi çöz
+            # 1. RSA (veya RSA+AES-GCM hibrit) ile transit şifrelemeyi çöz
             if request.rsa_encrypted_payload:
-                plaintext_bytes = self._key_manager.decrypt(
-                    request.rsa_encrypted_payload
+                plaintext_bytes = self._key_manager.decrypt_transit_payload(
+                    bytes(request.rsa_encrypted_payload)
                 )
                 ballot_data = json.loads(plaintext_bytes.decode("utf-8"))
             else:
