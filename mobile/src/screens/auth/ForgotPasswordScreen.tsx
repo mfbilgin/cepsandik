@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const ForgotPasswordScreen = () => {
     const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export const ForgotPasswordScreen = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -31,7 +33,7 @@ export const ForgotPasswordScreen = () => {
 
     const handleReset = async () => {
         if (!email) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Lütfen e-posta adresinizi girin.' });
+            Toast.show({ type: 'error', text1: t('auth.forgot.errorTitle'), text2: t('auth.forgot.emailRequired') });
             return;
         }
 
@@ -41,7 +43,7 @@ export const ForgotPasswordScreen = () => {
             await AuthService.forgotPassword(email);
             setIsSuccess(true);
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'İşlem Başarısız', text2: error.response?.data?.message || 'Bir hata oluştu.' });
+            Toast.show({ type: 'error', text1: t('auth.forgot.failedTitle'), text2: error.response?.data?.message || t('auth.forgot.failedBody') });
         } finally {
             setIsLoading(false);
         }
@@ -76,9 +78,9 @@ export const ForgotPasswordScreen = () => {
                             <View style={tw`bg-[#1162d4]/10 p-5 rounded-full mb-6 items-center justify-center`}>
                                 <MaterialIcons name="lock-reset" size={40} color="#1162d4" />
                             </View>
-                            <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>Parolamı Unuttum?</Text>
+                            <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>{t('auth.forgot.title')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
-                                CepSandık hesabınız için parola sıfırlama kodu almak üzere e-posta adresinizi girin.
+                                {t('auth.forgot.description')}
                             </Text>
                         </View>
 
@@ -113,7 +115,7 @@ export const ForgotPasswordScreen = () => {
                                 disabled={isLoading}
                                 activeOpacity={0.8}
                             >
-                                <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}</Text>
+                                <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('auth.forgot.submitLoading') : t('auth.forgot.submit')}</Text>
                             </TouchableOpacity>
                         </View>
                         <View style={tw`flex-row items-center justify-center pb-4 opacity-60`}>
@@ -128,9 +130,9 @@ export const ForgotPasswordScreen = () => {
                             <View style={tw`w-24 h-24 bg-green-100 rounded-full items-center justify-center mb-8`}>
                                 <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
                             </View>
-                            <Text style={tw`text-2xl font-bold text-slate-900 mb-3 text-center`}>E-postanızı Kontrol Edin</Text>
+                            <Text style={tw`text-2xl font-bold text-slate-900 mb-3 text-center`}>{t('auth.forgot.checkEmail')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
-                                Parola kurtarma talimatlarını {email} adresine gönderdik.
+                                {t('auth.forgot.sentToEmail', { email })}
                             </Text>
                         </View>
 
@@ -140,12 +142,12 @@ export const ForgotPasswordScreen = () => {
                                 onPress={() => navigation.navigate('Login')}
                                 activeOpacity={0.8}
                             >
-                                <Text style={tw`text-slate-900 font-bold text-base`}>Giriş Ekranına Dön</Text>
+                                <Text style={tw`text-slate-900 font-bold text-base`}>{t('auth.forgot.backToLogin')}</Text>
                             </TouchableOpacity>
 
                             <View style={tw`flex-row items-center justify-center mt-6 gap-2`}>
                                 <Text style={tw`text-xs font-medium text-slate-500`}>
-                                    E-postayı almadınız mı? <Text style={tw`text-[#1162d4] font-semibold`} onPress={handleReset}>Tekrar Gönder</Text>
+                                    {t('auth.forgot.notReceived')} <Text style={tw`text-[#1162d4] font-semibold`} onPress={handleReset}>{t('auth.forgot.resend')}</Text>
                                 </Text>
                             </View>
                         </View>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_URL = 'https://api.cepsandik.com/v1';
+export const API_URL = 'http://10.114.147.115:8088/v1';
 
 export const api = axios.create({
     baseURL: API_URL,

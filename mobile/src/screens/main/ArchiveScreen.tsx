@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const ArchiveScreen = () => {
     const [archived, setArchived] = useState<any[]>([]);
@@ -13,6 +14,7 @@ export const ArchiveScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortAsc, setSortAsc] = useState(false); // false = newest first, true = oldest first
     const navigation = useNavigation<any>();
+    const { t, language } = useI18n();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -70,7 +72,7 @@ export const ArchiveScreen = () => {
             {/* Header / Navigation */}
             <View style={tw`bg-white border-b border-slate-200 px-5 pt-14 pb-4 shadow-sm z-30`}>
                 <View style={tw`flex-row items-center justify-between mb-4`}>
-                    <Text style={tw`text-3xl font-bold tracking-tight text-slate-900`}>Seçim Geçmişi</Text>
+                    <Text style={tw`text-3xl font-bold tracking-tight text-slate-900`}>{t('archive.title')}</Text>
                     <TouchableOpacity
                         style={tw`p-2 rounded-full ${sortAsc ? 'bg-[#1162d4]/10' : 'bg-slate-50'}`}
                         onPress={() => setSortAsc(!sortAsc)}
@@ -87,7 +89,7 @@ export const ArchiveScreen = () => {
                     </View>
                     <TextInput
                         style={tw`flex-1 pl-10 pr-10 py-3 rounded-xl bg-slate-100 text-slate-900 border-none items-center shadow-sm`}
-                        placeholder="Geçmiş seçimlerde ara..."
+                        placeholder={t('archive.searchPlaceholder')}
                         placeholderTextColor="#64748b"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -114,7 +116,7 @@ export const ArchiveScreen = () => {
                             <Ionicons name="documents-outline" size={36} color="#94a3b8" />
                         </View>
                         <Text style={tw`text-base text-slate-500 font-medium`}>
-                            {searchQuery ? 'Aradığınız kriterlere uygun seçim bulunamadı.' : 'Geçmiş seçim bulunamadı.'}
+                            {searchQuery ? t('archive.searchEmpty') : t('archive.empty')}
                         </Text>
                     </View>
                 ) : (
@@ -139,17 +141,17 @@ export const ArchiveScreen = () => {
                                     <View style={tw`flex-row items-center mt-1 mb-3`}>
                                         <Ionicons name="time-outline" size={14} color="#64748b" style={tw`mr-1`} />
                                         <Text style={tw`text-xs font-medium text-slate-500`}>
-                                            Bitiş: {new Date(item.endTime).toLocaleDateString('tr-TR')}
+                                            {t('archive.endDate', { date: new Date(item.endTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR') })}
                                         </Text>
                                     </View>
                                     <View style={tw`flex-row items-center gap-2`}>
                                         <View style={tw`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200`}>
                                             <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                                            <Text style={tw`text-xs font-bold text-green-700`}>Oy Verildi</Text>
+                                            <Text style={tw`text-xs font-bold text-green-700`}>{t('archive.voted')}</Text>
                                         </View>
                                         <View style={tw`flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200`}>
                                             <Ionicons name="shield-checkmark" size={12} color="#1162d4" />
-                                            <Text style={tw`text-[10px] font-bold text-[#1162d4] uppercase tracking-wide`}>Doğrulandı</Text>
+                                            <Text style={tw`text-[10px] font-bold text-[#1162d4] uppercase tracking-wide`}>{t('archive.verified')}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -163,7 +165,7 @@ export const ArchiveScreen = () => {
                         <View style={tw`w-12 h-12 bg-slate-200 rounded-full flex-row items-center justify-center mb-3`}>
                             <Ionicons name="checkmark-done" size={24} color="#64748b" />
                         </View>
-                        <Text style={tw`text-sm font-medium text-slate-500`}>Tüm geçmiş yüklendi</Text>
+                        <Text style={tw`text-sm font-medium text-slate-500`}>{t('archive.allLoaded')}</Text>
                     </View>
                 )}
             </ScrollView>

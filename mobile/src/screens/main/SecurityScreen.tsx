@@ -6,9 +6,11 @@ import { api } from '../../services/api';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
 import * as SecureStore from 'expo-secure-store';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const SecurityScreen = () => {
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -68,17 +70,23 @@ export const SecurityScreen = () => {
     };
 
     const strength = calculateStrength(newPassword);
-    const strengthLevels = ['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Güçlü'];
+    const strengthLevels = [
+        t('auth.reset.passwordStrength.0'),
+        t('auth.reset.passwordStrength.1'),
+        t('auth.reset.passwordStrength.2'),
+        t('auth.reset.passwordStrength.3'),
+        t('auth.reset.passwordStrength.4'),
+    ];
     const strengthColors = ['#f43f5e', '#f97316', '#eab308', '#84cc16', '#22c55e'];
 
     const handleChangePassword = async () => {
         if (!currentPassword || !newPassword || !confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Eksik Bilgi', text2: 'Lütfen tüm alanları doldurun.' });
+            Toast.show({ type: 'error', text1: t('security.missingTitle'), text2: t('security.missingBody') });
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Yeni parolalar eşleşmiyor.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: t('security.passwordMismatch') });
             return;
         }
 
@@ -92,12 +100,12 @@ export const SecurityScreen = () => {
                 confirmPassword
             });
             await SecureStore.deleteItemAsync('saved_password');
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Parolanız başarıyla değiştirildi. Biyometrik giriş sıfırlandı.' });
+            Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('security.successBody') });
             setTimeout(() => {
                 navigation.goBack();
             }, 1000);
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'Parola değiştirilemedi.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: error.response?.data?.message || t('security.updateError') });
         } finally {
             setIsLoading(false);
         }
@@ -105,7 +113,7 @@ export const SecurityScreen = () => {
 
     const handleDisable2FA = async () => {
         if (!verificationPassword) {
-            Toast.show({ type: 'error', text1: 'Parola Gerekli', text2: '2FA özelliğini kapatmak için mevcut parolanızı girmeniz gereklidir.' });
+            Toast.show({ type: 'error', text1: t('security.passwordRequiredTitle'), text2: t('security.passwordRequiredBody') });
             return;
         }
 
@@ -114,9 +122,9 @@ export const SecurityScreen = () => {
             await api.post('/users/me/2fa/disable', { password: verificationPassword });
             setIs2FAEnabled(false);
             setVerificationPassword('');
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'İki Aşamalı Doğrulama devre dışı bırakıldı.' });
+            Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('security.disableSuccess') });
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || '2FA devre dışı bırakılamadı. Parolanızı kontrol edin.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: error.response?.data?.message || t('security.disableError') });
         } finally {
             setIsLoading(false);
         }
@@ -132,15 +140,15 @@ export const SecurityScreen = () => {
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>Güvenlik ve Parola</Text>
+                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('security.title')}</Text>
             </View>
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6 ${isKeyboardVisible ? 'pb-100' : ''}`} keyboardShouldPersistTaps="handled">
                 <View style={tw`flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
-                    <Text style={tw`text-lg font-bold text-slate-900 mb-1`}>Parola Değiştir</Text>
+                    <Text style={tw`text-lg font-bold text-slate-900 mb-1`}>{t('security.changePassword')}</Text>
 
                     <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>Mevcut Parola</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('security.currentPassword')}</Text>
                         <View style={tw`relative`}>
                             <TextInput
                                 style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 pr-12 text-base`}
@@ -157,7 +165,7 @@ export const SecurityScreen = () => {
                     </View>
 
                     <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>Yeni Parola</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('security.newPassword')}</Text>
                         <View style={tw`relative`}>
                             <TextInput
                                 style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 pr-12 text-base`}
@@ -184,7 +192,7 @@ export const SecurityScreen = () => {
                     </View>
 
                     <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>Yeni Parola (Tekrar)</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('security.newPasswordAgain')}</Text>
                         <View style={tw`relative`}>
                             <TextInput
                                 style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 pr-12 text-base`}
@@ -205,7 +213,7 @@ export const SecurityScreen = () => {
                         onPress={handleChangePassword}
                         disabled={isLoading}
                     >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Güncelleniyor...' : 'Parolayı Güncelle'}</Text>
+                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('security.updating') : t('security.updatePassword')}</Text>
                         {!isLoading && <Ionicons name="lock-closed" size={20} color="white" />}
                     </TouchableOpacity>
                 </View>
@@ -215,31 +223,31 @@ export const SecurityScreen = () => {
                     <View style={tw`flex-row items-center justify-between`}>
                         <View style={tw`flex-row items-center gap-2`}>
                             <Ionicons name="shield-checkmark" size={24} color={is2FAEnabled ? "#10b981" : "#1162d4"} />
-                            <Text style={tw`text-lg font-bold text-slate-900`}>İki Aşamalı Doğrulama</Text>
+                            <Text style={tw`text-lg font-bold text-slate-900`}>{t('security.2faTitle')}</Text>
                         </View>
                         {is2FAEnabled && (
                             <View style={tw`bg-emerald-100 px-2 py-1 rounded-md`}>
-                                <Text style={tw`text-emerald-700 text-xs font-bold`}>AKTİF</Text>
+                                <Text style={tw`text-emerald-700 text-xs font-bold`}>{t('security.active')}</Text>
                             </View>
                         )}
                     </View>
                     <Text style={tw`text-sm text-slate-500 mt-2 leading-relaxed`}>
                         {is2FAEnabled
-                            ? 'Hesabınız Authenticator Uygulaması ile korunmaktadır. Devre dışı bırakmak için mevcut parolanızı doğrulamanız gereklidir.'
-                            : 'Hesabınızı korumak için şimdilik Yalnızca Authenticator Uygulaması ile 2FA(Google Auth vb.) işlemleri desteklenmektedir.'
+                            ? t('security.2faEnabledDesc')
+                            : t('security.2faDisabledDesc')
                         }
                     </Text>
 
                     {is2FALoading ? (
                         <View style={tw`mt-4 py-3.5`}>
-                            <Text style={tw`text-slate-400 text-center`}>Durum kontrol ediliyor...</Text>
+                            <Text style={tw`text-slate-400 text-center`}>{t('security.statusChecking')}</Text>
                         </View>
                     ) : is2FAEnabled ? (
                         <View style={tw`flex-col gap-3 mt-4`}>
                             <View style={tw`relative`}>
                                 <TextInput
                                     style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3 pr-12 text-sm max-h-12`}
-                                    placeholder="Devre dışı bırakmak için parolanız"
+                                    placeholder={t('security.disablePlaceholder')}
                                     placeholderTextColor="#94a3b8"
                                     secureTextEntry={secureText.verification}
                                     value={verificationPassword}
@@ -255,7 +263,7 @@ export const SecurityScreen = () => {
                                 onPress={handleDisable2FA}
                                 disabled={isLoading}
                             >
-                                <Text style={tw`text-red-600 font-bold text-base`}>2FA Devre Dışı Bırak</Text>
+                                <Text style={tw`text-red-600 font-bold text-base`}>{t('security.disable2fa')}</Text>
                                 <Ionicons name="trash-outline" size={20} color="#dc2626" />
                             </TouchableOpacity>
                         </View>
@@ -264,7 +272,7 @@ export const SecurityScreen = () => {
                             style={tw`mt-4 w-full bg-slate-100 flex-row items-center justify-between py-3.5 px-4 rounded-xl shadow-sm`}
                             onPress={() => navigation.navigate('TwoFactorSetupSelection')}
                         >
-                            <Text style={tw`text-slate-700 font-bold text-base`}>2FA Ayarla (Uygulama İle)</Text>
+                            <Text style={tw`text-slate-700 font-bold text-base`}>{t('security.setup2fa')}</Text>
                             <Ionicons name="chevron-forward" size={20} color="#64748b" />
                         </TouchableOpacity>
                     )}
@@ -273,7 +281,7 @@ export const SecurityScreen = () => {
                 <View style={tw`flex-row items-center gap-3 p-4 bg-orange-50 rounded-xl border border-orange-100 mt-2`}>
                     <Ionicons name="warning" size={24} color="#ea580c" />
                     <Text style={tw`flex-1 text-sm text-orange-800 leading-tight`}>
-                        Parolanızı unuttuysanız, çıkış yaptıktan sonra giriş ekranındaki "Parolamı Unuttum" adımını kullanabilirsiniz.
+                        {t('security.warning')}
                     </Text>
                 </View>
             </ScrollView>

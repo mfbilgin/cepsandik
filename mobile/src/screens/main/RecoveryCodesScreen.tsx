@@ -9,21 +9,23 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const RecoveryCodesScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { codes = [] } = route.params || {};
     const [confirmed, setConfirmed] = useState(false);
+    const { t } = useI18n();
 
     const copyAll = async () => {
         await Clipboard.setStringAsync(codes.join('\n'));
-        Toast.show({ type: 'success', text1: 'Kopyalandı', text2: 'Tüm kurtarma kodları panoya kopyalandı.' });
+        Toast.show({ type: 'success', text1: t('recovery.copySuccessTitle'), text2: t('recovery.copySuccessBody') });
     };
 
     const downloadTxt = async () => {
         try {
-            const content = `CepSandık 2FA Kurtarma Kodları\n==============================\n\n${codes.join('\n')}\n\nBu kodları güvenli bir yerde saklayın.`;
+            const content = `${t('recovery.fileHeader')}\n==============================\n\n${codes.join('\n')}\n\n${t('recovery.fileFooter')}`;
 
             if (Platform.OS === 'android') {
                 const permissions = await LegacyFileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -34,7 +36,7 @@ export const RecoveryCodesScreen = () => {
                         'text/plain'
                     );
                     await LegacyFileSystem.writeAsStringAsync(fileUri, content, { encoding: LegacyFileSystem.EncodingType.UTF8 });
-                    Toast.show({ type: 'success', text1: 'Kaydedildi', text2: 'Dosya başarıyla indirildi.' });
+                    Toast.show({ type: 'success', text1: t('recovery.saveSuccessTitle'), text2: t('recovery.saveSuccessBody') });
                 }
             } else {
                 // iOS - Using new File/Paths API for consistency
@@ -45,26 +47,26 @@ export const RecoveryCodesScreen = () => {
                 if (await Sharing.isAvailableAsync()) {
                     await Sharing.shareAsync(fileUri, {
                         mimeType: 'text/plain',
-                        dialogTitle: 'Kurtarma Kodlarını Kaydet',
+                        dialogTitle: t('recovery.shareDialogTitle'),
                         UTI: 'public.plain-text'
                     });
                 }
             }
         } catch (e) {
             console.error('Download error:', e);
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Dosya kaydedilirken bir sorun oluştu.' });
+            Toast.show({ type: 'error', text1: t('recovery.saveErrorTitle'), text2: t('recovery.saveErrorBody') });
         }
     };
 
     const handleDone = () => {
         if (!confirmed) {
             Alert.alert(
-                'Emin misiniz?',
-                'Kurtarma kodlarınızı güvenli bir yere kaydettiğinizi onaylayın.',
+                t('recovery.confirmTitle'),
+                t('recovery.confirmBody'),
                 [
-                    { text: 'İptal', style: 'cancel' },
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                        text: 'Onaylayın', onPress: () => navigation.reset({
+                        text: t('recovery.confirmAction'), onPress: () => navigation.reset({
                             index: 1,
                             routes: [{ name: 'MainTab' }, { name: 'SecuritySettings' }],
                         })
@@ -86,7 +88,7 @@ export const RecoveryCodesScreen = () => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center`}>
                     <Ionicons name="arrow-back" size={24} color="#1162d4" />
                 </TouchableOpacity>
-                <Text style={tw`text-lg font-bold text-slate-900 flex-1 text-center`}>Kurtarma Kodları</Text>
+                <Text style={tw`text-lg font-bold text-slate-900 flex-1 text-center`}>{t('recovery.title')}</Text>
                 <View style={tw`w-10`} />
             </View>
 
@@ -97,10 +99,10 @@ export const RecoveryCodesScreen = () => {
                         <MaterialIcons name="shield" size={48} color="#1162d4" />
                     </View>
                     <Text style={tw`text-2xl font-bold text-slate-900 text-center tracking-tight mb-3`}>
-                        Kurtarma Kodlarını Kaydedin
+                        {t('recovery.heroTitle')}
                     </Text>
                     <Text style={tw`text-sm text-slate-600 text-center font-medium leading-relaxed`}>
-                        Bu kodları güvenli bir yerde saklayın. Cihazınızı kaybettiğinizde veya 2FA kodlarına erişemediğinizde hesabınıza girmenin <Text style={tw`font-bold`}>tek yolu</Text> bunlardır.
+                        {t('recovery.heroBody')}
                     </Text>
                 </View>
 
@@ -114,7 +116,7 @@ export const RecoveryCodesScreen = () => {
                             </View>
                         )) : (
                             <View style={tw`w-full items-center p-6`}>
-                                <Text style={tw`text-slate-400 font-medium`}>Kurtarma kodu bulunamadı.</Text>
+                                <Text style={tw`text-slate-400 font-medium`}>{t('recovery.empty')}</Text>
                             </View>
                         )}
                     </View>
@@ -128,14 +130,14 @@ export const RecoveryCodesScreen = () => {
                             style={tw`flex-1 bg-[#1162d4]/10 h-12 rounded-xl flex-row items-center justify-center gap-2`}
                         >
                             <MaterialIcons name="download" size={20} color="#1162d4" />
-                            <Text style={tw`text-[#1162d4] font-bold text-sm`}>TXT İndir</Text>
+                            <Text style={tw`text-[#1162d4] font-bold text-sm`}>{t('recovery.downloadTxt')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={copyAll}
                             style={tw`flex-1 bg-[#1162d4]/10 h-12 rounded-xl flex-row items-center justify-center gap-2`}
                         >
                             <MaterialIcons name="content-copy" size={20} color="#1162d4" />
-                            <Text style={tw`text-[#1162d4] font-bold text-sm`}>Tümünü Kopyala</Text>
+                            <Text style={tw`text-[#1162d4] font-bold text-sm`}>{t('recovery.copyAll')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -150,7 +152,7 @@ export const RecoveryCodesScreen = () => {
                             {confirmed && <MaterialIcons name="check" size={14} color="white" />}
                         </View>
                         <Text style={tw`text-sm font-semibold text-[#1162d4] flex-1 leading-snug`}>
-                            Bu kurtarma kodlarını güvenli bir yere kaydettiğimi onaylıyorum
+                            {t('recovery.checkbox')}
                         </Text>
                     </TouchableOpacity>
 
@@ -158,7 +160,7 @@ export const RecoveryCodesScreen = () => {
                         onPress={handleDone}
                         style={tw`w-full h-14 bg-[#1162d4] rounded-xl items-center justify-center shadow-lg shadow-blue-500/30`}
                     >
-                        <Text style={tw`text-white font-bold text-base tracking-wide`}>Tamamlandı</Text>
+                        <Text style={tw`text-white font-bold text-base tracking-wide`}>{t('recovery.done')}</Text>
                     </TouchableOpacity>
 
                     {/* iOS Home Bar */}

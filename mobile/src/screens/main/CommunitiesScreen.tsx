@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const CommunitiesScreen = () => {
     const [communities, setCommunities] = useState<any[]>([]);
@@ -14,6 +15,7 @@ export const CommunitiesScreen = () => {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -69,7 +71,7 @@ export const CommunitiesScreen = () => {
                 <View style={tw`flex-row items-center justify-between mb-3`}>
                     {!isSearchOpen ? (
                         <>
-                            <Text style={tw`text-2xl font-bold tracking-tight text-slate-900`}>Topluluklar</Text>
+                            <Text style={tw`text-2xl font-bold tracking-tight text-slate-900`}>{t('communities.title')}</Text>
                             <View style={tw`flex-row items-center gap-2`}>
                                 <TouchableOpacity style={tw`p-2 rounded-full bg-slate-50`} onPress={() => setIsSearchOpen(true)}>
                                     <Ionicons name="search" size={22} color="#475569" />
@@ -84,7 +86,7 @@ export const CommunitiesScreen = () => {
                             <Ionicons name="search" size={20} color="#94a3b8" />
                             <TextInput
                                 style={tw`flex-1 h-10 px-3 text-slate-900 text-base`}
-                                placeholder="Topluluk ara..."
+                                placeholder={t('communities.searchPlaceholder')}
                                 placeholderTextColor="#94a3b8"
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -105,7 +107,7 @@ export const CommunitiesScreen = () => {
                         activeOpacity={0.8}
                     >
                         <Text style={tw`text-center text-sm ${activeTab === 'memberships' ? 'font-bold text-[#1162d4]' : 'font-semibold text-slate-500'}`}>
-                            Üyeliklerim
+                            {t('communities.tab.memberships')}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -114,7 +116,7 @@ export const CommunitiesScreen = () => {
                         activeOpacity={0.8}
                     >
                         <Text style={tw`text-center text-sm ${activeTab === 'managed' ? 'font-bold text-[#1162d4]' : 'font-semibold text-slate-500'}`}>
-                            Yönettiklerim
+                            {t('communities.tab.managed')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -134,7 +136,7 @@ export const CommunitiesScreen = () => {
                     <View style={tw`flex-col items-center justify-center p-8 mt-10 bg-white rounded-2xl border border-slate-100 shadow-sm`}>
                         <Ionicons name="people-outline" size={64} color="#e2e8f0" />
                         <Text style={tw`text-slate-500 font-medium mt-4 text-center`}>
-                            {searchQuery ? 'Aramanıza uygun topluluk bulunamadı.' : 'Henüz bir topluluk bulunmuyor.'}
+                            {searchQuery ? t('communities.searchEmpty') : t('communities.empty')}
                         </Text>
                     </View>
                 ) : (
@@ -154,7 +156,7 @@ export const CommunitiesScreen = () => {
 
                                 <Text style={tw`text-xl font-bold text-slate-900 leading-tight`}>{comm.name}</Text>
                                 <Text style={tw`text-sm text-slate-500 mt-1.5 leading-relaxed`} numberOfLines={2}>
-                                    {comm.description || 'Topluluk açıklaması bulunmuyor.'}
+                                    {comm.description || t('communities.noDescription')}
                                 </Text>
 
                                 <View style={tw`mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4`}>
@@ -162,7 +164,7 @@ export const CommunitiesScreen = () => {
                                         <View style={tw`bg-[#1162d4]/10 p-1.5 rounded-lg`}>
                                             <Ionicons name="people" size={16} color="#1162d4" />
                                         </View>
-                                        <Text style={tw`text-sm font-semibold text-slate-700`}>Topluluk Üyesi</Text>
+                                        <Text style={tw`text-sm font-semibold text-slate-700`}>{t('communities.member')}</Text>
                                     </View>
                                     <View style={tw`w-8 h-8 rounded-full bg-slate-50 items-center justify-center`}>
                                         <Ionicons name="chevron-forward" size={18} color="#94a3b8" />

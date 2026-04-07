@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const ProfileScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
@@ -12,6 +13,7 @@ export const ProfileScreen = () => {
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
     const navigation = useNavigation<any>();
+    const { t, language, setLanguage } = useI18n();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -38,17 +40,17 @@ export const ProfileScreen = () => {
     }, [refreshUser]);
 
     const handleLogout = () => {
-        Alert.alert('Çıkış Yap', 'Hesabınızdan çıkış yapmak istediğinize emin misiniz?', [
-            { text: 'İptal', style: 'cancel' },
-            { text: 'Çıkış Yap', onPress: signOut, style: 'destructive' }
+        Alert.alert(t('profile.logoutTitle'), t('profile.logoutBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('profile.logout'), onPress: signOut, style: 'destructive' }
         ]);
     };
 
     const handleNotImplemented = () => {
         Toast.show({
             type: 'info',
-            text1: 'Yakında',
-            text2: 'Bu özellik şu anda geliştirme aşamasındadır.',
+            text1: t('profile.comingSoonTitle'),
+            text2: t('profile.comingSoonBody'),
             visibilityTime: 2000,
         });
     };
@@ -79,7 +81,7 @@ export const ProfileScreen = () => {
                     type,
                 } as any);
 
-                Toast.show({ type: 'info', text1: 'Yükleniyor', text2: 'Profil fotoğrafınız güncelleniyor...' });
+                Toast.show({ type: 'info', text1: t('profile.uploadingTitle'), text2: t('profile.uploadingBody') });
 
                 const { api } = require('../../services/api');
                 await api.post('/users/me/profile-image', formData, {
@@ -87,11 +89,11 @@ export const ProfileScreen = () => {
                 });
 
                 await refreshUser();
-                Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Profil fotoğrafınız güncellendi.' });
+                Toast.show({ type: 'success', text1: t('profile.uploadSuccessTitle'), text2: t('profile.uploadSuccessBody') });
             }
         } catch (error) {
             console.log(error);
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Profil fotoğrafı yüklenirken bir sorun oluştu.' });
+            Toast.show({ type: 'error', text1: t('profile.uploadErrorTitle'), text2: t('profile.uploadErrorBody') });
         }
     };
 
@@ -102,7 +104,7 @@ export const ProfileScreen = () => {
             {/* Header */}
             <View style={tw`items-center justify-center p-4 pt-14 pb-4 bg-white border-b border-slate-100 z-10 shadow-sm`}>
                 <Text style={tw`text-xl font-bold leading-tight tracking-tight text-center text-slate-900`}>
-                    Profil ve Ayarlar
+                    {t('profile.title')}
                 </Text>
             </View>
 
@@ -133,10 +135,10 @@ export const ProfileScreen = () => {
                         </TouchableOpacity>
                     </View>
                     <Text style={tw`text-2xl font-bold text-slate-900 mb-1`}>{user?.firstName} {user?.lastName}</Text>
-                    <Text style={tw`text-slate-500 text-sm font-medium`}>{user?.email || 'kullanici@posta.com'}</Text>
+                    <Text style={tw`text-slate-500 text-sm font-medium`}>{user?.email || t('profile.defaultEmail')}</Text>
                     <View style={tw`mt-4 px-3.5 py-1.5 bg-green-50 items-center justify-center flex-row gap-1.5 rounded-full border border-green-200`}>
                         <Ionicons name="shield-checkmark" size={16} color="#16a34a" />
-                        <Text style={tw`text-green-700 text-xs font-bold uppercase tracking-wide`}>Onaylı Seçmen</Text>
+                        <Text style={tw`text-green-700 text-xs font-bold uppercase tracking-wide`}>{t('profile.verifiedVoter')}</Text>
                     </View>
                 </View>
 
@@ -144,7 +146,7 @@ export const ProfileScreen = () => {
                 <View style={tw`px-5 pb-8 flex-col gap-6 mt-2`}>
                     {/* Account Settings Group */}
                     <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>Hesap</Text>
+                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>{t('profile.section.account')}</Text>
                         <View style={tw`bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
                             {/* Edit Profile */}
                             <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white border-b border-slate-100`} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.7}>
@@ -152,7 +154,7 @@ export const ProfileScreen = () => {
                                     <View style={tw`w-10 h-10 rounded-xl bg-[#1162d4]/10 items-center justify-center`}>
                                         <Ionicons name="person-outline" size={20} color="#1162d4" />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>Profili Düzenle</Text>
+                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.editProfile')}</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -164,7 +166,7 @@ export const ProfileScreen = () => {
                                         <Ionicons name="lock-closed-outline" size={20} color="#ea580c" />
                                     </View>
                                     <View style={tw`flex-col`}>
-                                        <Text style={tw`text-base font-semibold text-slate-900`}>Güvenlik ve Parola</Text>
+                                        <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.securityPassword')}</Text>
 
                                     </View>
                                 </View>
@@ -177,16 +179,47 @@ export const ProfileScreen = () => {
                                     <View style={tw`w-10 h-10 rounded-xl bg-purple-50 items-center justify-center`}>
                                         <Ionicons name="notifications-outline" size={20} color="#9333ea" />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>Bildirim Ayarları</Text>
+                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.notificationSettings')}</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
                             </TouchableOpacity>
+
+                            <View style={tw`p-4 bg-white border-t border-slate-100`}>
+                                <View style={tw`flex-row items-center justify-between`}>
+                                    <View style={tw`flex-row items-center gap-4`}>
+                                        <View style={tw`w-10 h-10 rounded-xl bg-indigo-50 items-center justify-center`}>
+                                            <Ionicons name="language-outline" size={20} color="#4f46e5" />
+                                        </View>
+                                        <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.language')}</Text>
+                                    </View>
+                                    <View style={tw`flex-row rounded-xl bg-slate-100 p-1`}>
+                                        <TouchableOpacity
+                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'tr' ? 'bg-white' : '')}
+                                            onPress={() => setLanguage('tr')}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={tw.style(`text-xs font-bold`, language === 'tr' ? 'text-slate-900' : 'text-slate-500')}>
+                                                {t('profile.languageTurkish')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'en' ? 'bg-white' : '')}
+                                            onPress={() => setLanguage('en')}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={tw.style(`text-xs font-bold`, language === 'en' ? 'text-slate-900' : 'text-slate-500')}>
+                                                {t('profile.languageEnglish')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
                         </View>
                     </View>
 
                     {/* Support Group */}
                     <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>Destek</Text>
+                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>{t('profile.section.support')}</Text>
                         <View style={tw`bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
                             {/* About */}
                             <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white border-b border-slate-100`} onPress={() => navigation.navigate('About')} activeOpacity={0.7}>
@@ -194,7 +227,7 @@ export const ProfileScreen = () => {
                                     <View style={tw`w-10 h-10 rounded-xl bg-slate-50 items-center justify-center`}>
                                         <Ionicons name="information-circle-outline" size={22} color="#475569" />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>CepSandık Hakkında</Text>
+                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.about')}</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -205,7 +238,7 @@ export const ProfileScreen = () => {
                                     <View style={tw`w-10 h-10 rounded-xl bg-slate-50 items-center justify-center`}>
                                         <Ionicons name="help-buoy-outline" size={22} color="#475569" />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>Yardım Merkezi</Text>
+                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.helpCenter')}</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -219,10 +252,10 @@ export const ProfileScreen = () => {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="log-out-outline" size={24} color="#dc2626" />
-                        <Text style={tw`text-red-600 font-bold text-base`}>Çıkış Yap</Text>
+                        <Text style={tw`text-red-600 font-bold text-base`}>{t('profile.logout')}</Text>
                     </TouchableOpacity>
 
-                    <Text style={tw`text-center text-xs text-slate-400 mt-2 font-medium`}>Sürüm 1.0.4 • Build 2026</Text>
+                    <Text style={tw`text-center text-xs text-slate-400 mt-2 font-medium`}>{t('profile.version')}</Text>
                 </View>
             </ScrollView>
         </View>

@@ -3,9 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const NotificationInboxScreen = () => {
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
     const [refreshing, setRefreshing] = useState(false);
 
     const onRefresh = React.useCallback(async () => {
@@ -16,8 +18,8 @@ export const NotificationInboxScreen = () => {
 
     // Placeholder mock notifications
     const notifications = [
-        { id: '1', title: 'Yeni Seçim Başladı!', message: 'Odanızda yeni bir seçim başladı. Hemen oyunuzu kullanın.', time: '2 saat önce', isRead: false },
-        { id: '2', title: 'Hoş Geldiniz', message: 'CepSandık uygulamasına hoş geldiniz. İlk seçiminizi oluşturabilirsiniz.', time: '1 gün önce', isRead: true },
+        { id: '1', title: t('inbox.mock1Title'), message: t('inbox.mock1Body'), time: t('inbox.mockTime1'), isRead: false },
+        { id: '2', title: t('inbox.mock2Title'), message: t('inbox.mock2Body'), time: t('inbox.mockTime2'), isRead: true },
     ];
 
     return (
@@ -27,7 +29,7 @@ export const NotificationInboxScreen = () => {
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>Bildirimler</Text>
+                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('inbox.title')}</Text>
             </View>
 
             <ScrollView
@@ -39,8 +41,8 @@ export const NotificationInboxScreen = () => {
                         <View style={tw`w-24 h-24 bg-slate-100 rounded-full items-center justify-center mb-4`}>
                             <Ionicons name="notifications-off-outline" size={40} color="#94a3b8" />
                         </View>
-                        <Text style={tw`text-lg font-bold text-slate-700 text-center mb-1`}>Bildirim Yok</Text>
-                        <Text style={tw`text-sm text-slate-500 text-center`}>Şu an için yeni bir bildiriminiz bulunmuyor.</Text>
+                        <Text style={tw`text-lg font-bold text-slate-700 text-center mb-1`}>{t('inbox.emptyTitle')}</Text>
+                        <Text style={tw`text-sm text-slate-500 text-center`}>{t('inbox.emptyBody')}</Text>
                     </View>
                 ) : (
                     <View style={tw`flex-col gap-3`}>

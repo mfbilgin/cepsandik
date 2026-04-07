@@ -17,10 +17,13 @@ import { CommunityDetailScreen } from '../screens/main/CommunityDetailScreen';
 import { CommunityManagementScreen } from '../screens/main/CommunityManagementScreen';
 import { CreateElectionScreen } from '../screens/main/CreateElectionScreen';
 import { RecoveryCodesScreen } from '../screens/main/RecoveryCodesScreen';
+import { useI18n } from '../i18n/LanguageContext';
 
 const Stack = createNativeStackNavigator();
 
 export const MainStack = () => {
+    const { t } = useI18n();
+
     return (
         <Stack.Navigator>
             <Stack.Screen
@@ -41,12 +44,12 @@ export const MainStack = () => {
             <Stack.Screen
                 name="ElectionDetail"
                 component={ElectionDetailScreen}
-                options={{ title: 'Seçim Detayı' }}
+                options={{ title: t('main.stack.electionDetail') }}
             />
             <Stack.Screen
                 name="VotingBallot"
                 component={VotingBallotScreen}
-                options={{ title: 'Oy Pusulası' }}
+                options={{ title: t('main.stack.votingBallot') }}
             />
             <Stack.Screen
                 name="CreateCommunity"

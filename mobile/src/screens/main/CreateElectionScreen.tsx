@@ -10,6 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
 import { api } from '../../services/api';
+import { useI18n } from '../../i18n/LanguageContext';
 
 type CandidateType = 'PERSON' | 'TEXT_OPTION' | 'IMAGE_OPTION';
 type ElectionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RANKED_CHOICE';
@@ -26,6 +27,7 @@ export const CreateElectionScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { communityId } = route.params || {};
+    const { t } = useI18n();
 
     // === Step ===
     const [step, setStep] = useState(1); // 1 = Basic info, 2 = Candidates
@@ -86,7 +88,7 @@ export const CreateElectionScreen = () => {
     const addCandidate = () => setCandidates(prev => [...prev, { name: '', description: '', imageUrl: '', candidateType, memberUserId: '' }]);
     const removeCandidate = (idx: number) => {
         if (candidates.length <= 2) {
-            Toast.show({ type: 'info', text1: 'Minimum 2 aday gerekli' });
+            Toast.show({ type: 'info', text1: t('createElection.minCandidates') });
             return;
         }
         setCandidates(prev => prev.filter((_, i) => i !== idx));
@@ -101,7 +103,7 @@ export const CreateElectionScreen = () => {
     };
 
     const selectMember = (member: any) => {
-        const displayName = member.displayName || member.userId || 'Bilinmeyen Üye';
+        const displayName = member.displayName || member.userId || t('createElection.unknownMember');
         const avatarUrl = member.avatarUrl || '';
         setCandidates(prev => prev.map((c, i) => i === pickerTargetIndex
             ? { ...c, name: displayName, imageUrl: avatarUrl, memberUserId: member.userId }
@@ -111,22 +113,17 @@ export const CreateElectionScreen = () => {
     };
 
     const validateStep1 = () => {
-        if (!title.trim()) { Toast.show({ type: 'error', text1: 'Başlık zorunludur' }); return false; }
-        if (startTime <= new Date()) { Toast.show({ type: 'error', text1: 'Başlangıç zamanı gelecekte olmalı' }); return false; }
-        if (endTime <= startTime) { Toast.show({ type: 'error', text1: 'Bitiş zamanı başlangıçtan sonra olmalı' }); return false; }
+        if (!title.trim()) { Toast.show({ type: 'error', text1: t('createElection.titleRequired') }); return false; }
+        if (startTime <= new Date()) { Toast.show({ type: 'error', text1: t('createElection.startFuture') }); return false; }
+        if (endTime <= startTime) { Toast.show({ type: 'error', text1: t('createElection.endAfterStart') }); return false; }
         return true;
     };
 
     const validateStep2 = () => {
         for (let i = 0; i < candidates.length; i++) {
-            if (!candidates[i].name.trim()) { Toast.show({ type: 'error', text1: `Aday ${i + 1} için ad zorunludur` }); return false; }
+            if (!candidates[i].name.trim()) { Toast.show({ type: 'error', text1: t('createElection.candidateNameRequired', { index: i + 1 }) }); return false; }
         }
         return true;
-    };
-
-    const formatLocalISO = (date: Date) => {
-        const tzOffset = date.getTimezoneOffset() * 60000;
-        return new Date(date.getTime() - tzOffset).toISOString().slice(0, 19);
     };
 
     const handleCreate = async () => {
@@ -141,14 +138,14 @@ export const CreateElectionScreen = () => {
                 communityId: communityId || null,
                 type: electionType,
                 participantType: 'PUBLIC',
-                startTime: formatLocalISO(startTime),
-                endTime: formatLocalISO(endTime),
+                startTime: startTime.toISOString(),
+                endTime: endTime.toISOString(),
                 resultsPublic: true,
                 anonymousVoting: true,
             });
 
             const electionId = electionRes.data?.data?.id;
-            if (!electionId) throw new Error('Seçim oluşturulamadı');
+            if (!electionId) throw new Error(t('createElection.createFailBody'));
 
             // 2. Add candidates
             for (let i = 0; i < candidates.length; i++) {
@@ -163,25 +160,25 @@ export const CreateElectionScreen = () => {
                 });
             }
 
-            Toast.show({ type: 'success', text1: 'Seçim oluşturuldu!', text2: 'Adaylar başarıyla eklendi.' });
+            Toast.show({ type: 'success', text1: t('createElection.createSuccessTitle'), text2: t('createElection.createSuccessBody') });
             navigation.navigate('ElectionDetail', { electionId: electionId });
         } catch (e: any) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: e.response?.data?.message || 'Seçim oluşturulamadı.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || t('createElection.createFailBody') });
         } finally {
             setIsCreating(false);
         }
     };
 
     const ELECTION_TYPES = [
-        { key: 'SINGLE_CHOICE', label: 'Tek Seçim', icon: 'radio-button-checked', desc: 'En fazla 1 aday' },
-        { key: 'MULTIPLE_CHOICE', label: 'Çoklu Seçim', icon: 'check-box', desc: 'Birden fazla aday' },
-        { key: 'RANKED_CHOICE', label: 'Sıralı Seçim', icon: 'format-list-numbered', desc: 'Tercih sıralaması' },
+        { key: 'SINGLE_CHOICE', label: t('createElection.stepType.singleLabel'), icon: 'radio-button-checked', desc: t('createElection.stepType.singleDesc') },
+        { key: 'MULTIPLE_CHOICE', label: t('createElection.stepType.multiLabel'), icon: 'check-box', desc: t('createElection.stepType.multiDesc') },
+        { key: 'RANKED_CHOICE', label: t('createElection.stepType.rankedLabel'), icon: 'format-list-numbered', desc: t('createElection.stepType.rankedDesc') },
     ] as const;
 
     const CANDIDATE_TYPES = [
-        { key: 'PERSON', label: 'Kişi', icon: 'person', desc: 'Topluluk üyesinden seç' },
-        { key: 'TEXT_OPTION', label: 'Metin Seçeneği', icon: 'text-fields', desc: 'Serbest metin (Evet/Hayır vb.)' },
-        { key: 'IMAGE_OPTION', label: 'Görsel Seçenek', icon: 'image', desc: 'Görselle temsil edilen seçenek' },
+        { key: 'PERSON', label: t('createElection.candidateType.personLabel'), icon: 'person', desc: t('createElection.candidateType.personDesc') },
+        { key: 'TEXT_OPTION', label: t('createElection.candidateType.textLabel'), icon: 'text-fields', desc: t('createElection.candidateType.textDesc') },
+        { key: 'IMAGE_OPTION', label: t('createElection.candidateType.imageLabel'), icon: 'image', desc: t('createElection.candidateType.imageDesc') },
     ] as const;
 
     return (
@@ -195,7 +192,7 @@ export const CreateElectionScreen = () => {
                     <MaterialIcons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
                 <Text style={tw`flex-1 text-lg font-bold text-center text-slate-900`}>
-                    {step === 1 ? 'Yeni Seçim' : 'Adayları Belirle'}
+                    {step === 1 ? t('createElection.newElection') : t('createElection.setCandidates')}
                 </Text>
                 <View style={tw`flex-row gap-1`}>
                     {[1, 2].map(s => (
@@ -208,27 +205,27 @@ export const CreateElectionScreen = () => {
                 <ScrollView contentContainerStyle={tw`p-4 gap-4 pb-32`} showsVerticalScrollIndicator={false}>
                     {/* Basic Info Card */}
                     <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
-                        <Text style={tw`text-slate-900 font-bold text-base`}>Seçim Bilgileri</Text>
+                        <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.basicInfo')}</Text>
 
                         <View style={tw`gap-1`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>Başlık *</Text>
+                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('createElection.titleLabel')}</Text>
                             <TextInput
                                 value={title}
                                 onChangeText={setTitle}
                                 style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
-                                placeholder="Seçim başlığını girin..."
+                                placeholder={t('createElection.titlePlaceholder')}
                                 placeholderTextColor="#94a3b8"
                                 maxLength={200}
                             />
                         </View>
 
                         <View style={tw`gap-1`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>Açıklama</Text>
+                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('createElection.descriptionLabel')}</Text>
                             <TextInput
                                 value={description}
                                 onChangeText={setDescription}
                                 style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium min-h-[80px]`}
-                                placeholder="Seçim hakkında bilgi verin..."
+                                placeholder={t('createElection.descriptionPlaceholder')}
                                 placeholderTextColor="#94a3b8"
                                 multiline
                                 textAlignVertical="top"
@@ -239,7 +236,7 @@ export const CreateElectionScreen = () => {
 
                     {/* Election Type Card */}
                     <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
-                        <Text style={tw`text-slate-900 font-bold text-base`}>Seçim Türü</Text>
+                        <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.typeTitle')}</Text>
                         {ELECTION_TYPES.map(t => (
                             <TouchableOpacity
                                 key={t.key}
@@ -258,7 +255,7 @@ export const CreateElectionScreen = () => {
 
                     {/* Candidate Type Card */}
                     <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
-                        <Text style={tw`text-slate-900 font-bold text-base`}>Aday Tipi</Text>
+                        <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.candidateTypeTitle')}</Text>
                         {CANDIDATE_TYPES.map(t => (
                             <TouchableOpacity
                                 key={t.key}
@@ -280,11 +277,11 @@ export const CreateElectionScreen = () => {
 
                     {/* Date/Time Card */}
                     <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
-                        <Text style={tw`text-slate-900 font-bold text-base`}>Zaman Aralığı</Text>
+                        <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.timeRange')}</Text>
 
                         {/* Start Time */}
                         <View style={tw`gap-2`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>Başlangıç *</Text>
+                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('createElection.startLabel')}</Text>
                             <View style={tw`flex-row gap-2`}>
                                 <TouchableOpacity
                                     onPress={() => { setStartPickerMode('date'); setShowStartPicker(true); }}
@@ -305,7 +302,7 @@ export const CreateElectionScreen = () => {
 
                         {/* End Time */}
                         <View style={tw`gap-2`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>Bitiş *</Text>
+                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('createElection.endLabel')}</Text>
                             <View style={tw`flex-row gap-2`}>
                                 <TouchableOpacity
                                     onPress={() => { setEndPickerMode('date'); setShowEndPicker(true); }}
@@ -347,16 +344,16 @@ export const CreateElectionScreen = () => {
                     <View style={tw`bg-[#1162d4]/5 border border-[#1162d4]/20 rounded-xl p-3 flex-row items-center gap-2`}>
                         <MaterialIcons name="info" size={18} color="#1162d4" />
                         <Text style={tw`text-[#1162d4] text-sm font-medium flex-1`}>
-                            {candidateType === 'PERSON' ? 'Topluluk üyelerini aday olarak seçin.' :
-                                candidateType === 'TEXT_OPTION' ? 'Oy pusulasında gösterilecek metin seçeneklerini girin.' :
-                                    'Her seçenek için bir görsel URL ve etiket girin.'}
+                            {candidateType === 'PERSON' ? t('createElection.candidateInfoPerson') :
+                                candidateType === 'TEXT_OPTION' ? t('createElection.candidateInfoText') :
+                                    t('createElection.candidateInfoImage')}
                         </Text>
                     </View>
 
                     {candidates.map((candidate, idx) => (
                         <View key={idx} style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
                             <View style={tw`flex-row items-center justify-between`}>
-                                <Text style={tw`text-slate-900 font-bold`}>Aday {idx + 1}</Text>
+                                <Text style={tw`text-slate-900 font-bold`}>{t('createElection.candidateN', { index: idx + 1 })}</Text>
                                 <TouchableOpacity onPress={() => removeCandidate(idx)} style={tw`w-8 h-8 rounded-full bg-red-50 items-center justify-center`}>
                                     <MaterialIcons name="close" size={16} color="#ef4444" />
                                 </TouchableOpacity>
@@ -369,7 +366,7 @@ export const CreateElectionScreen = () => {
                                 >
                                     <MaterialIcons name="person" size={22} color="#1162d4" />
                                     <Text style={tw`flex-1 ${candidate.name ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
-                                        {candidate.name || 'Üye seçin...'}
+                                        {candidate.name || t('createElection.selectMember')}
                                     </Text>
                                     <MaterialIcons name="chevron-right" size={20} color="#94a3b8" />
                                 </TouchableOpacity>
@@ -379,7 +376,7 @@ export const CreateElectionScreen = () => {
                                         value={candidate.name}
                                         onChangeText={v => updateCandidate(idx, 'name', v)}
                                         style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
-                                        placeholder={candidateType === 'IMAGE_OPTION' ? 'Kısa etiket (örn. Logo A)...' : 'Seçenek adı (örn. Evet)...'}
+                                        placeholder={candidateType === 'IMAGE_OPTION' ? t('createElection.imageLabelPlaceholder') : t('createElection.optionNamePlaceholder')}
                                         placeholderTextColor="#94a3b8"
                                         maxLength={200}
                                     />
@@ -388,7 +385,7 @@ export const CreateElectionScreen = () => {
                                             value={candidate.imageUrl}
                                             onChangeText={v => updateCandidate(idx, 'imageUrl', v)}
                                             style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
-                                            placeholder="Görsel URL'si..."
+                                            placeholder={t('createElection.imageUrlPlaceholder')}
                                             placeholderTextColor="#94a3b8"
                                             autoCapitalize="none"
                                             keyboardType="url"
@@ -404,7 +401,7 @@ export const CreateElectionScreen = () => {
                         style={tw`bg-white border-2 border-dashed border-[#1162d4]/40 rounded-2xl p-4 flex-row items-center justify-center gap-2`}
                     >
                         <MaterialIcons name="add" size={22} color="#1162d4" />
-                        <Text style={tw`text-[#1162d4] font-semibold`}>Aday Ekle</Text>
+                        <Text style={tw`text-[#1162d4] font-semibold`}>{t('createElection.addCandidate')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             )}
@@ -420,7 +417,7 @@ export const CreateElectionScreen = () => {
                         <ActivityIndicator color="white" />
                     ) : (
                         <Text style={tw`text-white font-bold text-base tracking-wide`}>
-                            {step === 1 ? 'Devam Et: Adaylar →' : 'Seçimi Oluştur'}
+                            {step === 1 ? t('createElection.continueCandidates') : t('createElection.createElection')}
                         </Text>
                     )}
                 </TouchableOpacity>
@@ -432,7 +429,7 @@ export const CreateElectionScreen = () => {
                     <TouchableOpacity style={tw`flex-1`} onPress={() => setMemberPickerVisible(false)} />
                     <View style={tw`bg-white rounded-t-3xl max-h-[60%] border-t border-slate-100 shadow-2xl`}>
                         <View style={tw`flex-row items-center px-4 py-4 border-b border-slate-100`}>
-                            <Text style={tw`flex-1 text-base font-bold text-slate-900`}>Üye Seç</Text>
+                            <Text style={tw`flex-1 text-base font-bold text-slate-900`}>{t('createElection.pickMember')}</Text>
                             <TouchableOpacity onPress={() => setMemberPickerVisible(false)}>
                                 <MaterialIcons name="close" size={24} color="#64748b" />
                             </TouchableOpacity>
@@ -440,7 +437,7 @@ export const CreateElectionScreen = () => {
                         {membersLoading ? (
                             <ActivityIndicator style={tw`p-8`} color="#1162d4" />
                         ) : communityMembers.length === 0 ? (
-                            <Text style={tw`text-center text-slate-400 p-8`}>Üye listesi yüklenemedi.</Text>
+                            <Text style={tw`text-center text-slate-400 p-8`}>{t('createElection.membersLoadFail')}</Text>
                         ) : (
                             <FlatList
                                 data={communityMembers}

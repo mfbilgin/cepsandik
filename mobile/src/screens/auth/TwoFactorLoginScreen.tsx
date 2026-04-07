@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 type ParamList = {
     TwoFactorLogin: { tempToken: string };
@@ -17,6 +18,7 @@ export const TwoFactorLoginScreen = () => {
     const route = useRoute<RouteProp<ParamList, 'TwoFactorLogin'>>();
     const { tempToken } = route.params;
     const { signIn } = useAuth();
+    const { t } = useI18n();
     const [code, setCode] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRecoveryMode, setIsRecoveryMode] = useState(false);
@@ -35,8 +37,11 @@ export const TwoFactorLoginScreen = () => {
         if (code.length !== maxCodeLength) {
             Toast.show({
                 type: 'error',
-                text1: 'Hata',
-                text2: `Lütfen ${maxCodeLength} haneli ${isRecoveryMode ? 'kurtarma kodunu' : 'doğrulama kodunu'} eksiksiz girin.`
+                text1: t('auth.twoFactor.errorTitle'),
+                text2: t('auth.twoFactor.errorFillCode', {
+                    length: maxCodeLength,
+                    codeType: isRecoveryMode ? t('auth.twoFactor.codeTypeRecovery') : t('auth.twoFactor.codeTypeVerification'),
+                }),
             });
             return;
         }
@@ -48,11 +53,11 @@ export const TwoFactorLoginScreen = () => {
             if (response.accessToken) {
                 const userData = await AuthService.getProfile();
                 await signIn(response.accessToken, response.refreshToken || null, userData);
-                Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Giriş Başarılı, Yönlendiriliyorsunuz...' });
+                Toast.show({ type: 'success', text1: t('auth.twoFactor.successTitle'), text2: t('auth.twoFactor.successBody') });
             }
         } catch (error: any) {
             console.log('Failed to verify 2FA code:', error?.response?.data || error.message);
-            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'Kod doğrulanamadı. Lütfen tekrar deneyin.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: error.response?.data?.message || t('auth.twoFactor.errorVerify') });
         } finally {
             setIsLoading(false);
         }
@@ -90,7 +95,7 @@ export const TwoFactorLoginScreen = () => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-[#1162d4]/10`}>
                     <Ionicons name="chevron-back" size={24} color="#334155" />
                 </TouchableOpacity>
-                <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>İki Adımlı Giriş</Text>
+                <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>{t('auth.twoFactor.title')}</Text>
                 <View style={tw`h-10 w-10`} />
             </View>
 
@@ -103,12 +108,12 @@ export const TwoFactorLoginScreen = () => {
                 {/* Heading & Instructions */}
                 <View style={tw`text-center mb-8 flex-col items-center`}>
                     <Text style={tw`text-2xl font-bold mb-3 text-slate-900`}>
-                        {isRecoveryMode ? 'Kurtarma Kodu' : 'Doğrulama Kodu'}
+                        {isRecoveryMode ? t('auth.twoFactor.recoveryCode') : t('auth.twoFactor.verificationCode')}
                     </Text>
                     <Text style={tw`text-slate-600 text-base text-center`}>
                         {isRecoveryMode
-                            ? '8 haneli yedek kurtarma kodunuzu lütfen girin.'
-                            : 'Authenticator uygulamanızdan aldığınız 6 haneli kodu lütfen girin.'}
+                            ? t('auth.twoFactor.recoveryDesc')
+                            : t('auth.twoFactor.verificationDesc')}
                     </Text>
                 </View>
 
@@ -125,7 +130,7 @@ export const TwoFactorLoginScreen = () => {
                         disabled={isLoading}
                         activeOpacity={0.8}
                     >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Bekleniyor...' : 'Giriş Yap'}</Text>
+                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('auth.twoFactor.waiting') : t('auth.twoFactor.signIn')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -136,7 +141,7 @@ export const TwoFactorLoginScreen = () => {
                         style={tw`py-2`}
                     >
                         <Text style={tw`text-[#1162d4] text-center font-medium`}>
-                            {isRecoveryMode ? 'Uygulama Kodu Kullan' : 'Kurtarma Kodu Kullan'}
+                            {isRecoveryMode ? t('auth.twoFactor.useAppCode') : t('auth.twoFactor.useRecoveryCode')}
                         </Text>
                     </TouchableOpacity>
                 </View>

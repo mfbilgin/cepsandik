@@ -2,19 +2,21 @@ import React, { useLayoutEffect, useState, useEffect, useCallback } from 'react'
 import {
     View, Text, TouchableOpacity, SafeAreaView, ScrollView,
     ActivityIndicator, RefreshControl, ImageBackground,
-    StatusBar, Platform, FlatList
+    StatusBar, Platform
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import tw from 'twrnc';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const CommunityDetailScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { id } = route.params || {};
     const { user } = useAuth();
+    const { t, language } = useI18n();
 
     const [community, setCommunity] = useState<any>(null);
     const [elections, setElections] = useState<any[]>([]);
@@ -22,7 +24,7 @@ export const CommunityDetailScreen = () => {
     const [members, setMembers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('Aktif Seçimler');
+    const [activeTab, setActiveTab] = useState(t('communityDetail.tab.active'));
     const [membersLoading, setMembersLoading] = useState(false);
     const [archivedLoading, setArchivedLoading] = useState(false);
 
@@ -78,8 +80,8 @@ export const CommunityDetailScreen = () => {
     useEffect(() => { fetchData(); }, [id]);
 
     useEffect(() => {
-        if (activeTab === 'Arşiv') fetchArchivedElections();
-        if (activeTab === 'Üyeler') fetchMembers();
+        if (activeTab === t('communityDetail.tab.archive')) fetchArchivedElections();
+        if (activeTab === t('communityDetail.tab.members')) fetchMembers();
     }, [activeTab]);
 
     const onRefresh = useCallback(() => {
@@ -90,7 +92,12 @@ export const CommunityDetailScreen = () => {
     }, [id]);
 
     const isOwner = community?.ownerId === user?.id;
-    const tabs = ['Aktif Seçimler', 'Arşiv', ...(isOwner ? ['Üyeler'] : []), 'Hakkında'];
+    const tabs = [
+        t('communityDetail.tab.active'),
+        t('communityDetail.tab.archive'),
+        ...(isOwner ? [t('communityDetail.tab.members')] : []),
+        t('communityDetail.tab.about'),
+    ];
 
     const statusColor = (status: string) => {
         if (status === 'ACTIVE') return 'text-green-600';
@@ -103,17 +110,17 @@ export const CommunityDetailScreen = () => {
         return 'bg-slate-400';
     };
     const statusLabel = (status: string) => {
-        if (status === 'ACTIVE') return 'Aktif';
-        if (status === 'SCHEDULED') return 'Planlandı';
-        if (status === 'CLOSED') return 'Kapandı';
-        if (status === 'ARCHIVED') return 'Arşivlendi';
-        if (status === 'CANCELLED') return 'İptal';
+        if (status === 'ACTIVE') return t('communityDetail.status.active');
+        if (status === 'SCHEDULED') return t('communityDetail.status.scheduled');
+        if (status === 'CLOSED') return t('communityDetail.status.closed');
+        if (status === 'ARCHIVED') return t('communityDetail.status.archived');
+        if (status === 'CANCELLED') return t('communityDetail.status.cancelled');
         return status;
     };
     const roleLabel = (role: string) => {
-        if (role === 'OWNER') return 'Sahip';
-        if (role === 'ADMIN') return 'Yönetici';
-        return 'Üye';
+        if (role === 'OWNER') return t('communityDetail.role.owner');
+        if (role === 'ADMIN') return t('communityDetail.role.admin');
+        return t('communityDetail.role.member');
     };
 
     const ElectionCard = ({ election, onPress }: { election: any; onPress: () => void }) => (
@@ -131,7 +138,7 @@ export const CommunityDetailScreen = () => {
                 </View>
                 <View style={tw`flex-row items-center bg-slate-100 px-2 py-0.5 rounded`}>
                     <MaterialIcons name="lock" size={12} color="#64748b" />
-                    <Text style={tw`text-[10px] text-slate-500 font-bold tracking-wide ml-1`}>ŞİFRELİ</Text>
+                    <Text style={tw`text-[10px] text-slate-500 font-bold tracking-wide ml-1`}>{t('communityDetail.encrypted')}</Text>
                 </View>
             </View>
             <Text style={tw`text-slate-900 font-bold text-base mb-1 leading-tight`}>{election.title}</Text>
@@ -141,17 +148,17 @@ export const CommunityDetailScreen = () => {
             <View style={tw`flex-row items-center justify-between pt-3 border-t border-slate-100`}>
                 <View>
                     <Text style={tw`text-xs text-slate-400 font-medium`}>
-                        {election.status === 'ACTIVE' ? 'Bitiş:' : 'Başlangıç:'}
+                        {election.status === 'ACTIVE' ? t('communityDetail.ends') : t('communityDetail.starts')}
                     </Text>
                     <Text style={tw`text-sm font-bold text-slate-900`}>
                         {election.status === 'ACTIVE'
-                            ? new Date(election.endTime).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-                            : new Date(election.startTime).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            ? new Date(election.endTime).toLocaleString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            : new Date(election.startTime).toLocaleString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </Text>
                 </View>
                 <View style={tw`${election.status === 'ACTIVE' ? 'bg-[#1162d4]' : 'bg-slate-100'} px-4 py-2 rounded-lg`}>
                     <Text style={tw`${election.status === 'ACTIVE' ? 'text-white' : 'text-slate-500'} text-sm font-semibold`}>
-                        {election.status === 'ACTIVE' ? 'Oy Ver' : 'İncele'}
+                        {election.status === 'ACTIVE' ? t('communityDetail.card.vote') : t('communityDetail.card.review')}
                     </Text>
                 </View>
             </View>
@@ -162,7 +169,7 @@ export const CommunityDetailScreen = () => {
         return (
             <SafeAreaView style={tw`flex-1 bg-[#f6f7f8] justify-center items-center`}>
                 <ActivityIndicator size="large" color="#1162d4" />
-                <Text style={tw`text-slate-500 mt-4 font-medium`}>Topluluk yükleniyor...</Text>
+                <Text style={tw`text-slate-500 mt-4 font-medium`}>{t('communityDetail.loading')}</Text>
             </SafeAreaView>
         );
     }
@@ -174,11 +181,11 @@ export const CommunityDetailScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center rounded-full`}>
                         <MaterialIcons name="arrow-back" size={24} color="#0f172a" />
                     </TouchableOpacity>
-                    <Text style={tw`text-lg font-bold text-slate-900 ml-2`}>Topluluk Bulunamadı</Text>
+                    <Text style={tw`text-lg font-bold text-slate-900 ml-2`}>{t('communityDetail.notFoundTitle')}</Text>
                 </View>
                 <View style={tw`flex-1 items-center justify-center p-6`}>
                     <MaterialIcons name="error-outline" size={64} color="#334155" />
-                    <Text style={tw`mt-4 text-lg text-slate-500 text-center`}>Bu topluluğa ulaşılamıyor veya silinmiş olabilir.</Text>
+                    <Text style={tw`mt-4 text-lg text-slate-500 text-center`}>{t('communityDetail.notFoundBody')}</Text>
                 </View>
             </SafeAreaView>
         );
@@ -249,9 +256,9 @@ export const CommunityDetailScreen = () => {
                             <Text style={tw`text-2xl font-bold text-slate-900 tracking-tight text-center`} numberOfLines={1}>{community.name}</Text>
                             <View style={tw`flex-row items-center justify-center gap-2 mt-1`}>
                                 <MaterialIcons name="group" size={16} color="#64748b" />
-                                <Text style={tw`text-sm font-medium text-slate-600`}>{community.memberCount ?? 0} Üye</Text>
+                                <Text style={tw`text-sm font-medium text-slate-600`}>{t('communityDetail.memberCount', { count: community.memberCount ?? 0 })}</Text>
                                 <View style={tw`w-1 h-1 rounded-full bg-slate-300`} />
-                                <Text style={tw`text-sm font-medium text-[#1162d4]`}>{community.visibility === 'PUBLIC' ? 'Herkese Açık' : 'Gizli'}</Text>
+                                <Text style={tw`text-sm font-medium text-[#1162d4]`}>{community.visibility === 'PUBLIC' ? t('communityDetail.visibility.public') : t('communityDetail.visibility.private')}</Text>
                             </View>
                         </View>
 
@@ -265,7 +272,7 @@ export const CommunityDetailScreen = () => {
                             ) : (
                                 <TouchableOpacity style={tw`flex-1 h-10 bg-[#1162d4] rounded-lg items-center justify-center flex-row gap-2 shadow-sm`}>
                                     <MaterialIcons name="how-to-reg" size={18} color="white" />
-                                    <Text style={tw`text-white text-sm font-semibold`}>Topluluğa Katıl</Text>
+                                    <Text style={tw`text-white text-sm font-semibold`}>{t('communityDetail.joinCommunity')}</Text>
                                 </TouchableOpacity>
                             )}
                             <TouchableOpacity style={tw`w-10 h-10 items-center justify-center border border-slate-200 rounded-lg bg-white`}>
@@ -297,19 +304,18 @@ export const CommunityDetailScreen = () => {
                 {/* Tab Content */}
                 <View style={tw`px-4`}>
 
-                    {/* AKTİF SEÇİMLER */}
-                    {activeTab === 'Aktif Seçimler' && (
+                    {activeTab === t('communityDetail.tab.active') && (
                         <>
                             <View style={tw`flex-row items-center justify-between mb-4`}>
-                                <Text style={tw`text-slate-900 text-lg font-bold`}>Aktif Seçimler</Text>
+                                <Text style={tw`text-slate-900 text-lg font-bold`}>{t('communityDetail.activeHeader')}</Text>
                                 <View style={tw`bg-[#1162d4]/10 rounded-full px-2 py-1`}>
-                                    <Text style={tw`text-xs font-medium text-[#1162d4]`}>{activeElections.length} Aktif</Text>
+                                    <Text style={tw`text-xs font-medium text-[#1162d4]`}>{t('communityDetail.activeCount', { count: activeElections.length })}</Text>
                                 </View>
                             </View>
                             {activeElections.length === 0 ? (
                                 <View style={tw`bg-white p-6 rounded-xl border border-slate-100 items-center justify-center shadow-sm`}>
                                     <MaterialIcons name="inventory-2" size={40} color="#cbd5e1" />
-                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>Bu toplulukta şu an aktif seçim yok.</Text>
+                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>{t('communityDetail.noActive')}</Text>
                                 </View>
                             ) : (
                                 activeElections.map((election: any) => (
@@ -323,24 +329,23 @@ export const CommunityDetailScreen = () => {
                             {activeElections.length > 0 && (
                                 <View style={tw`flex-row items-center justify-center gap-2 mt-4 mb-8 opacity-60`}>
                                     <MaterialIcons name="security" size={18} color="#94a3b8" />
-                                    <Text style={tw`text-xs text-slate-400 font-medium`}>ElectionGuard ile güvenli</Text>
+                                    <Text style={tw`text-xs text-slate-400 font-medium`}>{t('communityDetail.secureFooter')}</Text>
                                 </View>
                             )}
                         </>
                     )}
 
-                    {/* ARŞİV */}
-                    {activeTab === 'Arşiv' && (
+                    {activeTab === t('communityDetail.tab.archive') && (
                         <>
                             <View style={tw`flex-row items-center justify-between mb-4`}>
-                                <Text style={tw`text-slate-900 text-lg font-bold`}>Arşivlenmiş Seçimler</Text>
+                                <Text style={tw`text-slate-900 text-lg font-bold`}>{t('communityDetail.archiveHeader')}</Text>
                             </View>
                             {archivedLoading ? (
                                 <View style={tw`p-8 items-center`}><ActivityIndicator color="#1162d4" /></View>
                             ) : archivedElections.length === 0 ? (
                                 <View style={tw`bg-white p-6 rounded-xl border border-slate-100 items-center justify-center shadow-sm`}>
                                     <MaterialIcons name="archive" size={40} color="#cbd5e1" />
-                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>Henüz arşivlenmiş seçim bulunmuyor.</Text>
+                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>{t('communityDetail.noArchive')}</Text>
                                 </View>
                             ) : (
                                 archivedElections.map((election: any) => (
@@ -354,19 +359,18 @@ export const CommunityDetailScreen = () => {
                         </>
                     )}
 
-                    {/* ÜYELER (owner only) */}
-                    {activeTab === 'Üyeler' && (
+                    {activeTab === t('communityDetail.tab.members') && (
                         <>
                             <View style={tw`flex-row items-center justify-between mb-4`}>
-                                <Text style={tw`text-slate-900 text-lg font-bold`}>Üyeler</Text>
-                                <Text style={tw`text-slate-500 text-sm`}>{community.memberCount ?? 0} kişi</Text>
+                                <Text style={tw`text-slate-900 text-lg font-bold`}>{t('communityDetail.membersHeader')}</Text>
+                                <Text style={tw`text-slate-500 text-sm`}>{t('communityDetail.membersCount', { count: community.memberCount ?? 0 })}</Text>
                             </View>
                             {membersLoading ? (
                                 <View style={tw`p-8 items-center`}><ActivityIndicator color="#1162d4" /></View>
                             ) : members.length === 0 ? (
                                 <View style={tw`bg-white p-6 rounded-xl border border-slate-100 items-center justify-center shadow-sm`}>
                                     <MaterialIcons name="group-off" size={40} color="#cbd5e1" />
-                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>Üye listesi yüklenemedi.</Text>
+                                    <Text style={tw`mt-2 text-slate-500 text-sm font-medium text-center`}>{t('communityDetail.membersLoadFail')}</Text>
                                 </View>
                             ) : (
                                 <View style={tw`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
@@ -382,7 +386,7 @@ export const CommunityDetailScreen = () => {
                                                 <Text style={tw`text-slate-900 font-semibold`}>
                                                     {member.displayName || `#${String(member.userId).slice(-8).toUpperCase()}`}
                                                 </Text>
-                                                <Text style={tw`text-slate-400 text-xs`}>Katılım: {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('tr-TR') : '-'}</Text>
+                                                <Text style={tw`text-slate-400 text-xs`}>{t('communityDetail.joined', { date: member.joinedAt ? new Date(member.joinedAt).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR') : '-' })}</Text>
                                             </View>
                                             <View style={tw`px-2 py-0.5 rounded-full ${member.role === 'OWNER' ? 'bg-amber-100' : member.role === 'ADMIN' ? 'bg-blue-100' : 'bg-slate-100'}`}>
                                                 <Text style={tw`text-xs font-bold ${member.role === 'OWNER' ? 'text-amber-700' : member.role === 'ADMIN' ? 'text-blue-700' : 'text-slate-500'}`}>
@@ -396,22 +400,21 @@ export const CommunityDetailScreen = () => {
                         </>
                     )}
 
-                    {/* HAKKINDA */}
-                    {activeTab === 'Hakkında' && (
+                    {activeTab === t('communityDetail.tab.about') && (
                         <View style={tw`gap-4`}>
                             {community.description ? (
                                 <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm`}>
-                                    <Text style={tw`text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2`}>Açıklama</Text>
+                                    <Text style={tw`text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2`}>{t('communityDetail.aboutDescription')}</Text>
                                     <Text style={tw`text-slate-700 leading-relaxed`}>{community.description}</Text>
                                 </View>
                             ) : null}
 
                             <View style={tw`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
                                 {[
-                                    { icon: 'group', label: 'Üye Sayısı', value: `${community.memberCount ?? 0} üye` },
-                                    { icon: 'visibility', label: 'Görünürlük', value: community.visibility === 'PUBLIC' ? 'Herkese Açık' : 'Gizli' },
-                                    { icon: 'calendar-today', label: 'Oluşturulma', value: community.createdAt ? new Date(community.createdAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '-' },
-                                    { icon: 'edit', label: 'Ad Değişikliği', value: community.nameChangeCount != null ? `${community.nameChangeCount} defa değiştirildi` : '-' },
+                                    { icon: 'group', label: t('communityDetail.aboutMemberCount'), value: t('communityDetail.aboutMemberCountValue', { count: community.memberCount ?? 0 }) },
+                                    { icon: 'visibility', label: t('communityDetail.aboutVisibility'), value: community.visibility === 'PUBLIC' ? t('communityDetail.visibility.public') : t('communityDetail.visibility.private') },
+                                    { icon: 'calendar-today', label: t('communityDetail.aboutCreatedAt'), value: community.createdAt ? new Date(community.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '-' },
+                                    { icon: 'edit', label: t('communityDetail.aboutNameChanges'), value: community.nameChangeCount != null ? t('communityDetail.aboutNameChangesValue', { count: community.nameChangeCount }) : '-' },
                                 ].map((item, idx, arr) => (
                                     <View key={item.label} style={tw`flex-row items-center gap-3 px-4 py-3 ${idx < arr.length - 1 ? 'border-b border-slate-100' : ''}`}>
                                         <MaterialIcons name={item.icon as any} size={20} color="#1162d4" />

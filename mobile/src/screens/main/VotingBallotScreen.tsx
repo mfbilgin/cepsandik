@@ -4,6 +4,8 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
+import { buildElectionGuardPlaintextJson, encryptTransitPayloadBase64 } from '../../utils/ballotEncrypt';
 
 export const VotingBallotScreen = () => {
     const route = useRoute<any>();
@@ -15,6 +17,7 @@ export const VotingBallotScreen = () => {
     const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isCasting, setIsCasting] = useState(false);
+    const { t } = useI18n();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -34,7 +37,7 @@ export const VotingBallotScreen = () => {
             setElection(electRes.data?.data || null);
         } catch (e) {
             console.error(e);
-            Alert.alert('Hata', 'Adaylar/Seçenekler yüklenemedi.');
+            Alert.alert(t('voting.loadErrorTitle'), t('voting.loadErrorBody'));
         } finally {
             setIsLoading(false);
         }
@@ -42,17 +45,17 @@ export const VotingBallotScreen = () => {
 
     const confirmVote = () => {
         if (!selectedOptionId) {
-            Alert.alert('Hata', 'Lütfen bir seçenek işaretleyin.');
+            Alert.alert(t('voting.selectRequiredTitle'), t('voting.selectRequiredBody'));
             return;
         }
         const option = options.find((o) => o.id === selectedOptionId);
 
         Alert.alert(
-            'Güvenli Oy Onayı',
-            `"${option?.name || option?.text}" seçeneğine oy veriyorsunuz. Bu işlem geri alınamaz ve oyunuz kriptografik olarak şifrelenecektir. Onaylıyor musunuz?`,
+            t('voting.confirmTitle'),
+            t('voting.confirmBody', { option: option?.name || option?.text || '' }),
             [
-                { text: 'İptal', style: 'cancel' },
-                { text: 'Onayla ve Şifrele', onPress: handleCastVote, style: 'default' }
+                { text: t('common.cancel'), style: 'cancel' },
+                { text: t('voting.confirmAction'), onPress: handleCastVote, style: 'default' }
             ]
         );
     };
@@ -63,23 +66,45 @@ export const VotingBallotScreen = () => {
             // First get a vote token
             const tokenRes = await api.post(`/elections/${electionId}/votes/token`);
             const voteToken = tokenRes.data?.data?.token || tokenRes.data?.token;
+            const candidateId = selectedOptionId!;
+            const castBody: {
+                voteToken: string;
+                candidateId: number;
+                rsaEncryptedPayload?: string;
+            } = { voteToken, candidateId };
 
-            // Then cast the vote
-            const voteRes = await api.post(`/elections/${electionId}/votes`, {
-                voteToken,
-                selectedOptionId,
-                idempotencyKey: `vote-${electionId}-${Date.now()}`
-            });
+            if (election?.encryptedVotingEnabled) {
+                const pemRes = await api.get('/elections/crypto/transit-rsa-public-key');
+                const pem = pemRes.data?.data?.rsaPublicKeyPem as string | undefined;
+                if (!pem?.trim()) {
+                    throw new Error(t('voting.pemMissing'));
+                }
+                const plaintext = buildElectionGuardPlaintextJson(electionId, options, candidateId);
+                castBody.rsaEncryptedPayload = encryptTransitPayloadBase64(pem, plaintext);
+            }
 
-            const trackingCode = voteRes.data?.data?.trackingCode || voteRes.data?.trackingCode;
+            const voteRes = await api.post(`/elections/${electionId}/votes`, castBody);
+
+            const payload = voteRes.data?.data;
+            const alreadyVoted = payload?.alreadyVoted === true;
+            const trackingCode: string | undefined = payload?.trackingCode;
+            const trackingLabel = trackingCode?.trim()
+                ? trackingCode
+                : t('voting.trackingNone');
 
             Alert.alert(
-                'Oy Kullanıldı 🎉',
-                'Oyunuz başarıyla şifrelendi ve sandığa atıldı! Takip Kodu (Özet): ' + trackingCode,
-                [{ text: 'Ana Sayfaya Dön', onPress: () => navigation.navigate('MainTab') }]
+                alreadyVoted ? t('voting.castIdempotentTitle') : t('voting.castSuccessTitle'),
+                alreadyVoted
+                    ? t('voting.castIdempotentBody', { trackingCode: trackingLabel })
+                    : t('voting.castSuccessBody', { trackingCode: trackingLabel }),
+                [{ text: t('voting.backHome'), onPress: () => navigation.navigate('MainTab') }]
             );
         } catch (error: any) {
-            Alert.alert('Oy Gönderilemedi', error.response?.data?.message || 'Lütfen tekrar deneyin.');
+            const msg =
+                error.response?.data?.message ||
+                (typeof error?.message === 'string' ? error.message : null) ||
+                t('voting.castErrorBody');
+            Alert.alert(t('voting.castErrorTitle'), msg);
         } finally {
             setIsCasting(false);
         }
@@ -101,7 +126,7 @@ export const VotingBallotScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={tw`p-2 -ml-2 rounded-full`}>
                         <Ionicons name="close" size={24} color="#64748b" />
                     </TouchableOpacity>
-                    <Text style={tw`text-base font-bold tracking-tight text-slate-900`}>Ballot</Text>
+                    <Text style={tw`text-base font-bold tracking-tight text-slate-900`}>{t('voting.title')}</Text>
                     <TouchableOpacity style={tw`w-10 h-10 items-center justify-center`}>
                         <Ionicons name="information-circle-outline" size={24} color="#64748b" />
                     </TouchableOpacity>
@@ -119,13 +144,13 @@ export const VotingBallotScreen = () => {
                             {election?.description && (
                                 <Text style={tw`text-base text-slate-600 mt-2 leading-relaxed`}>{election?.description}</Text>
                             )}
-                            <Text style={tw`text-sm text-slate-500 mt-2`}>Topluluk: {election?.communityId}</Text>
+                            <Text style={tw`text-sm text-slate-500 mt-2`}>{t('voting.community')}: {election?.communityId}</Text>
                         </View>
                     </View>
                     <View style={tw`mt-4 p-4 bg-[#1162d4]/5 rounded-lg border border-[#1162d4]/10 flex-row gap-3 items-start`}>
                         <Ionicons name="lock-closed" size={20} color="#1162d4" style={tw`mt-0.5`} />
                         <Text style={tw`text-sm text-slate-700 leading-relaxed pr-6`}>
-                            Lütfen <Text style={tw`text-[#1162d4] font-semibold`}>bir seçenek</Text> işaretleyin. Seçiminiz ElectionGuard ile uçtan uca şifrelenecek ve sandığa güvenle gönderilecektir.
+                            {t('voting.instructions')}
                         </Text>
                     </View>
                 </View>
@@ -149,7 +174,7 @@ export const VotingBallotScreen = () => {
                                         </View>
                                         <View style={tw`flex-1 justify-center`}>
                                             <Text style={tw`text-base font-bold text-slate-900`}>{option.name || option.text}</Text>
-                                            <Text style={tw`text-sm font-medium text-slate-500`}>Aday</Text>
+                                            <Text style={tw`text-sm font-medium text-slate-500`}>{t('voting.candidate')}</Text>
                                         </View>
                                     </>
                                 ) : election?.candidateType === 'IMAGE_OPTION' ? (
@@ -197,7 +222,7 @@ export const VotingBallotScreen = () => {
                     disabled={!selectedOptionId || isCasting}
                 >
                     <Text style={tw`text-base font-bold text-white tracking-wide`}>
-                        {isCasting ? 'Şifreleniyor...' : 'Confirm Selection'}
+                        {isCasting ? t('voting.encrypting') : t('voting.confirmSelection')}
                     </Text>
                     {!isCasting && <Ionicons name="arrow-forward" size={20} color="#fff" />}
                 </TouchableOpacity>

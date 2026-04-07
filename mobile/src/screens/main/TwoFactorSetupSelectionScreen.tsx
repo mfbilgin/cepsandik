@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const TwoFactorSetupSelectionScreen = () => {
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     return (
         <SafeAreaView style={[tw`flex-1 bg-white`]}>
@@ -20,7 +22,7 @@ export const TwoFactorSetupSelectionScreen = () => {
                         <Ionicons name="chevron-back" size={28} color="#0f172a" />
                     </TouchableOpacity>
                     <Text style={tw`text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 text-center pr-8`}>
-                        2FA Kurulumu
+                        {t('twoFactor.setup.title')}
                     </Text>
                 </View>
 
@@ -31,10 +33,10 @@ export const TwoFactorSetupSelectionScreen = () => {
                             <MaterialIcons name="shield" size={56} color="#1162d4" />
                         </View>
                         <Text style={tw`text-[24px] font-bold leading-tight text-center text-slate-900 mb-3`}>
-                            Hesabınızı Güvenceye Alın
+                            {t('twoFactor.setup.heroTitle')}
                         </Text>
                         <Text style={tw`text-base font-normal leading-relaxed text-center text-slate-600 px-4`}>
-                            İki adımlı doğrulama, CepSandık oy hesabınıza kriptografik olarak ekstra bir güvenlik katmanı ekler.
+                            {t('twoFactor.setup.heroBody')}
                         </Text>
                     </View>
 
@@ -48,13 +50,13 @@ export const TwoFactorSetupSelectionScreen = () => {
                         >
                             <View style={tw`flex-col grow`}>
                                 <View style={tw`flex-row items-center gap-1 mb-1`}>
-                                    <Text style={tw`text-base font-bold leading-normal text-slate-900`}>Kimlik Doğrulayıcı Uygulama</Text>
+                                    <Text style={tw`text-base font-bold leading-normal text-slate-900`}>{t('twoFactor.setup.authApp')}</Text>
                                     <View style={tw`px-2 py-0.5 rounded-full bg-[#1162d4]`}>
-                                        <Text style={tw`text-white text-[10px] font-bold uppercase tracking-wider`}>Önerilen</Text>
+                                        <Text style={tw`text-white text-[10px] font-bold uppercase tracking-wider`}>{t('twoFactor.setup.recommended')}</Text>
                                     </View>
                                 </View>
                                 <Text style={tw`text-sm font-normal leading-normal text-slate-600 pr-4`}>
-                                    En yüksek güvenlik seviyesi için Google Authenticator veya Microsoft Authenticator kullanın.
+                                    {t('twoFactor.setup.authAppDesc')}
                                 </Text>
                             </View>
                         </TouchableOpacity>
@@ -63,10 +65,10 @@ export const TwoFactorSetupSelectionScreen = () => {
                         <View style={tw`group relative flex-row items-start gap-4 rounded-xl border-2 border-slate-200 bg-transparent p-5 opacity-50`}>
                             <View style={tw`flex-col grow`}>
                                 <View style={tw`flex-row items-center gap-2 mb-1`}>
-                                    <Text style={tw`text-base font-bold leading-normal text-slate-900`}>E-posta Kodu</Text>
+                                    <Text style={tw`text-base font-bold leading-normal text-slate-900`}>{t('twoFactor.setup.emailCode')}</Text>
                                 </View>
                                 <Text style={tw`text-sm font-normal leading-normal text-slate-600 pr-4`}>
-                                    Kayıtlı e-posta adresinize bir doğrulama kodu alın. (Yakında)
+                                    {t('twoFactor.setup.emailCodeDesc')}
                                 </Text>
                             </View>
                         </View>
@@ -80,7 +82,7 @@ export const TwoFactorSetupSelectionScreen = () => {
                             onPress={() => navigation.navigate('TwoFactorAuthenticatorSetup')}
                             activeOpacity={0.8}
                         >
-                            <Text style={tw`text-white font-bold text-base`}>Devam Et</Text>
+                            <Text style={tw`text-white font-bold text-base`}>{t('twoFactor.setup.continue')}</Text>
                             <Ionicons name="arrow-forward" size={20} color="white" />
                         </TouchableOpacity>
                     </View>

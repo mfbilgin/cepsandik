@@ -6,11 +6,13 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
 import { api } from '../../services/api';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const TwoFactorVerificationScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { backupCodes = [] } = route.params || {};
+    const { t } = useI18n();
     const [code, setCode] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -24,14 +26,14 @@ export const TwoFactorVerificationScreen = () => {
 
     const handleVerify = async () => {
         if (code.length !== 6) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Lütfen 6 haneli doğrulama kodunu eksiksiz girin.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: t('twoFactor.verify.codeLengthError') });
             return;
         }
 
         setIsLoading(true);
         try {
             await api.post('/users/me/2fa/enable', { code });
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: '2FA kurulumu başarıyla tamamlandı.' });
+            Toast.show({ type: 'success', text1: t('auth.twoFactor.successTitle'), text2: t('twoFactor.verify.successBody') });
             setTimeout(() => {
                 if (backupCodes && backupCodes.length > 0) {
                     navigation.navigate('RecoveryCodes', { codes: backupCodes });
@@ -44,7 +46,7 @@ export const TwoFactorVerificationScreen = () => {
             }, 800);
         } catch (error: any) {
             console.error('Failed to verify 2FA code', error);
-            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'Kod doğrulanamadı. Lütfen tekrar deneyin.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: error.response?.data?.message || t('auth.twoFactor.errorVerify') });
         } finally {
             setIsLoading(false);
         }
@@ -76,7 +78,7 @@ export const TwoFactorVerificationScreen = () => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-[#1162d4]/10`}>
                     <Ionicons name="chevron-back" size={24} color="#334155" />
                 </TouchableOpacity>
-                <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>Doğrulama</Text>
+                <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>{t('twoFactor.verify.title')}</Text>
                 <View style={tw`h-10 w-10`} />
             </View>
 
@@ -88,9 +90,9 @@ export const TwoFactorVerificationScreen = () => {
 
                 {/* Heading & Instructions */}
                 <View style={tw`text-center mb-6 flex-col items-center`}>
-                    <Text style={tw`text-2xl font-bold mb-3 text-slate-900`}>2FA Doğrulaması</Text>
+                    <Text style={tw`text-2xl font-bold mb-3 text-slate-900`}>{t('twoFactor.verify.heading')}</Text>
                     <Text style={tw`text-slate-600 text-sm text-center`}>
-                        Oy hesabınızı güvenceye almak için kimlik doğrulayıcı uygulamanızdan aldığınız 6 haneli kodu girin.
+                        {t('twoFactor.verify.desc')}
                     </Text>
                 </View>
 
@@ -107,11 +109,11 @@ export const TwoFactorVerificationScreen = () => {
                         disabled={isLoading}
                         activeOpacity={0.8}
                     >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Kod Doğrulanıyor...' : 'Kimliği Doğrula'}</Text>
+                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('twoFactor.verify.loading') : t('twoFactor.verify.submit')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={tw`items-center`} onPress={() => navigation.goBack()}>
-                        <Text style={tw`text-[#1162d4] font-medium text-sm`}>Kurulumu İptal Et</Text>
+                        <Text style={tw`text-[#1162d4] font-medium text-sm`}>{t('twoFactor.verify.cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

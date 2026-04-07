@@ -8,6 +8,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const LoginScreen = () => {
     const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ export const LoginScreen = () => {
     const [isBiometricReady, setIsBiometricReady] = useState(false);
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
     const { signIn } = useAuth();
+    const { t } = useI18n();
     const navigation = useNavigation<any>();
     const passwordRef = useRef<TextInput>(null);
 
@@ -62,12 +64,12 @@ export const LoginScreen = () => {
 
                 const userData = await AuthService.getProfile();
                 await signIn(response.accessToken, response.refreshToken || null, userData);
-                Toast.show({ type: 'success', text1: 'Giriş Başarılı', text2: 'Yönlendiriliyorsunuz...' });
+                Toast.show({ type: 'success', text1: t('auth.login.successTitle'), text2: t('auth.login.successBody') });
             } else if (response.requires2FA && response.tempToken) {
                 navigation.navigate('TwoFactorLogin', { tempToken: response.tempToken });
             }
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'Giriş Başarısız', text2: error.response?.data?.message || 'E-posta veya parola hatalı.' });
+            Toast.show({ type: 'error', text1: t('auth.login.errorTitle'), text2: error.response?.data?.message || t('auth.login.errorInvalidCredentials') });
         } finally {
             setIsLoading(false);
         }
@@ -75,7 +77,7 @@ export const LoginScreen = () => {
 
     const handleLogin = () => {
         if (!email || !password) {
-            Toast.show({ type: 'error', text1: 'Eksik Bilgi', text2: 'Lütfen tüm alanları doldurun.' });
+            Toast.show({ type: 'error', text1: t('auth.login.missingTitle'), text2: t('auth.login.missingBody') });
             return;
         }
         performSignIn(email, password);
@@ -90,7 +92,7 @@ export const LoginScreen = () => {
             if (!savedEmail || !savedPassword) return;
 
             const biometricAuth = await LocalAuthentication.authenticateAsync({
-                promptMessage: 'CepSandık Uygulamasına Giriş Yap',
+                promptMessage: t('auth.login.biometricPrompt'),
                 disableDeviceFallback: false,
             });
 
@@ -98,7 +100,7 @@ export const LoginScreen = () => {
                 performSignIn(savedEmail, savedPassword);
             }
         } catch (error) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Biyometrik doğrulama sırasında bir sorun oluştu.' });
+            Toast.show({ type: 'error', text1: t('auth.login.biometricErrorTitle'), text2: t('auth.login.biometricErrorBody') });
         }
     };
 
@@ -123,7 +125,7 @@ export const LoginScreen = () => {
                         <View style={tw`items-center`}>
                             <Text style={tw`text-3xl font-bold text-slate-900 mb-2`}>CepSandık</Text>
                             <Text style={tw`text-slate-500 text-base text-center max-w-[280px]`}>
-                                Sisteme giriş yapıp şifreli oy kullanma ve sandık takibi işlemlerini güvenle gerçekleştirin.
+                                {t('auth.login.description')}
                             </Text>
                         </View>
                     </View>
@@ -132,14 +134,14 @@ export const LoginScreen = () => {
                     <View style={tw`flex-col gap-5 w-full bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
 
                         <View style={tw`flex-col gap-2`}>
-                            <Text style={tw`text-sm font-semibold text-slate-700`}>E-Posta Adresi</Text>
+                            <Text style={tw`text-sm font-semibold text-slate-700`}>{t('auth.login.emailLabel')}</Text>
                             <View style={tw`relative flex-row items-center`}>
                                 <View style={tw`absolute left-3 z-10`}>
                                     <Ionicons name="mail-outline" size={20} color="#94a3b8" />
                                 </View>
                                 <TextInput
                                     style={tw`w-full rounded-lg border border-slate-200 bg-slate-50 text-slate-900 pl-10 py-3 text-base`}
-                                    placeholder="ornek@mail.com"
+                                    placeholder="example@mail.com"
                                     placeholderTextColor="#94a3b8"
                                     value={email}
                                     onChangeText={setEmail}
@@ -154,9 +156,9 @@ export const LoginScreen = () => {
 
                         <View style={tw`flex-col gap-2`}>
                             <View style={tw`flex-row justify-between items-center`}>
-                                <Text style={tw`text-sm font-semibold text-slate-700`}>Parola</Text>
+                                <Text style={tw`text-sm font-semibold text-slate-700`}>{t('auth.login.passwordLabel')}</Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-                                    <Text style={tw`text-sm font-medium text-[#1162d4]`}>Parolanızı Mı Unuttunuz?</Text>
+                                    <Text style={tw`text-sm font-medium text-[#1162d4]`}>{t('auth.login.forgotPassword')}</Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={tw`relative flex-row items-center`}>
@@ -190,7 +192,7 @@ export const LoginScreen = () => {
                                 onPress={handleLogin}
                                 disabled={isLoading}
                             >
-                                <Text style={tw`text-white font-semibold text-base`}>{isLoading ? 'Lütfen Bekleyin...' : 'Giriş Yap'}</Text>
+                                <Text style={tw`text-white font-semibold text-base`}>{isLoading ? t('auth.login.loading') : t('auth.login.submit')}</Text>
                                 {!isLoading && <Ionicons name="log-in-outline" size={20} color="#ffffff" />}
                             </TouchableOpacity>
 
@@ -201,7 +203,7 @@ export const LoginScreen = () => {
                                     disabled={isLoading}
                                 >
                                     <Ionicons name="finger-print" size={20} color="#334155" />
-                                    <Text style={tw`text-slate-700 font-medium`}>Biyometrik Doğrulama</Text>
+                                    <Text style={tw`text-slate-700 font-medium`}>{t('auth.login.biometric')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -210,7 +212,7 @@ export const LoginScreen = () => {
                     {/* Footer */}
                     <View style={tw`flex-col items-center gap-6 pb-8`}>
                         <Text style={tw`text-slate-600 text-sm`}>
-                            Hesabınız yok mu? <Text style={tw`text-[#1162d4] font-semibold`} onPress={() => navigation.navigate('Register')}>Kayıt Ol</Text>
+                            {t('auth.login.noAccount')} <Text style={tw`text-[#1162d4] font-semibold`} onPress={() => navigation.navigate('Register')}>{t('auth.login.register')}</Text>
                         </Text>
 
                         <View style={tw`flex-row items-center gap-2 px-4 py-2 bg-slate-100 rounded-full border border-slate-200 opacity-80`}>

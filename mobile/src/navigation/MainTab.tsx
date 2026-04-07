@@ -8,10 +8,13 @@ import { HomeScreen } from '../screens/main/HomeScreen';
 import { CommunitiesScreen } from '../screens/main/CommunitiesScreen';
 import { ArchiveScreen } from '../screens/main/ArchiveScreen';
 import { ProfileScreen } from '../screens/main/ProfileScreen';
+import { useI18n } from '../i18n/LanguageContext';
 
 const Tab = createBottomTabNavigator();
 
 export const MainTab = () => {
+    const { t } = useI18n();
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -37,10 +40,10 @@ export const MainTab = () => {
                 },
             })}
         >
-            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Ana Sayfa' }} />
-            <Tab.Screen name="Communities" component={CommunitiesScreen} options={{ title: 'Topluluklar' }} />
-            <Tab.Screen name="Archive" component={ArchiveScreen} options={{ title: 'Geçmiş' }} />
-            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profil' }} />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: t('main.tab.home') }} />
+            <Tab.Screen name="Communities" component={CommunitiesScreen} options={{ title: t('main.tab.communities') }} />
+            <Tab.Screen name="Archive" component={ArchiveScreen} options={{ title: t('main.tab.archive') }} />
+            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t('main.tab.profile') }} />
         </Tab.Navigator>
     );
 };

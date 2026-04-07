@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const RegisterScreen = () => {
     const [firstName, setFirstName] = useState('');
@@ -24,6 +25,7 @@ export const RegisterScreen = () => {
     const confirmPasswordRef = useRef<TextInput>(null);
 
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -52,19 +54,25 @@ export const RegisterScreen = () => {
 
     const strengthScore = getPasswordStrength();
     const strengthColors = ['bg-transparent', 'bg-red-500', 'bg-yellow-500', 'bg-green-400', 'bg-green-600'];
-    const strengthLabels = ['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Güçlü'];
+    const strengthLabels = [
+        t('auth.register.passwordStrength.0'),
+        t('auth.register.passwordStrength.1'),
+        t('auth.register.passwordStrength.2'),
+        t('auth.register.passwordStrength.3'),
+        t('auth.register.passwordStrength.4'),
+    ];
 
     const handleRegister = async () => {
         if (!firstName || !lastName || !email || !password || !confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Eksik Bilgi', text2: 'Lütfen tüm alanları doldurun.' });
+            Toast.show({ type: 'error', text1: t('auth.register.missingTitle'), text2: t('auth.register.missingBody') });
             return;
         }
         if (password !== confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Parolalar eşleşmiyor.' });
+            Toast.show({ type: 'error', text1: t('auth.register.errorTitle'), text2: t('auth.register.passwordMismatch') });
             return;
         }
         if (!kvkkAccepted) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'KVKK ve Gizlilik politikasını onaylamalısınız.' });
+            Toast.show({ type: 'error', text1: t('auth.register.errorTitle'), text2: t('auth.register.kvkkRequired') });
             return;
         }
 
@@ -72,13 +80,13 @@ export const RegisterScreen = () => {
         Keyboard.dismiss();
         try {
             await AuthService.register({ firstName, lastName, email, password });
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Kayıt işleminiz gerçekleşti. Giriş yapabilirsiniz.' });
+            Toast.show({ type: 'success', text1: t('auth.register.successTitle'), text2: t('auth.register.successBody') });
             // add a small delay so user can read the toast
             setTimeout(() => {
                 navigation.navigate('Login');
             }, 1000);
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'Kayıt Başarısız', text2: error.response?.data?.message || 'Bir hata oluştu.' });
+            Toast.show({ type: 'error', text1: t('auth.register.failedTitle'), text2: error.response?.data?.message || t('auth.register.failedBody') });
         } finally {
             setIsLoading(false);
         }
@@ -97,7 +105,7 @@ export const RegisterScreen = () => {
                 >
                     <Ionicons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
-                <Text style={tw`text-lg font-bold text-slate-900 flex-1 text-center pr-12`}>Kayıt Ol</Text>
+                <Text style={tw`text-lg font-bold text-slate-900 flex-1 text-center pr-12`}>{t('auth.register.title')}</Text>
             </View>
 
             <ScrollView

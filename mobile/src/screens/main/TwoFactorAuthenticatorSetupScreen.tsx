@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const TwoFactorAuthenticatorSetupScreen = () => {
     const { user } = useAuth();
@@ -18,6 +19,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
     const [manualKey, setManualKey] = useState<string | null>(null);
     const [backupCodes, setBackupCodes] = useState<string[]>([]);
     const [fetchError, setFetchError] = useState<string | null>(null);
+    const { t } = useI18n();
 
     useEffect(() => {
         const generate2FA = async () => {
@@ -28,12 +30,12 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                     setManualKey(response.data.data.secretKey || response.data.data.secret || response.data.data.manualKey);
                     setBackupCodes(response.data.data.backupCodes || []);
                 } else {
-                    setFetchError('Beklenmeyen bir veri döndü.');
+                    setFetchError(t('twoFactor.authSetup.unexpectedData'));
                 }
             } catch (error: any) {
                 console.error('Failed to generate 2FA', error);
-                setFetchError(error.response?.data?.message || '2FA kodları oluşturulurken API sunucu hatası meydana geldi.');
-                Toast.show({ type: 'error', text1: 'Bağlantı Hatası', text2: '2FA servisi şu anda yanıt vermiyor.' });
+                setFetchError(error.response?.data?.message || t('twoFactor.authSetup.fetchError'));
+                Toast.show({ type: 'error', text1: t('twoFactor.authSetup.connectionErrorTitle'), text2: t('twoFactor.authSetup.connectionErrorBody') });
             } finally {
                 setIsLoading(false);
             }
@@ -45,7 +47,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
     const copyToClipboard = async () => {
         if (manualKey) {
             await Clipboard.setStringAsync(manualKey);
-            Toast.show({ type: 'success', text1: 'Kopyalandı', text2: 'Kurulum anahtarı panoya kopyalandı.' });
+            Toast.show({ type: 'success', text1: t('recovery.copySuccessTitle'), text2: t('recovery.copySuccessBody') });
         }
     };
 
@@ -61,7 +63,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                         <Ionicons name="arrow-back" size={28} color="#0f172a" />
                     </TouchableOpacity>
                     <Text style={tw`text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 text-center pr-12`}>
-                        2FA Kurulumu
+                        {t('twoFactor.setup.title')}
                     </Text>
                 </View>
 
@@ -76,26 +78,26 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                     {/* Header Content */}
                     <View style={tw`text-center mt-4`}>
                         <Text style={tw`text-2xl text-center font-bold leading-tight text-slate-900 mb-2`}>
-                            Kimlik Doğrulayıcı Uygulama
+                            {t('twoFactor.authSetup.title')}
                         </Text>
                         <Text style={tw`text-sm text-center font-normal leading-relaxed text-slate-600`}>
-                            Hesabınızı bağlamak için aşağıdaki QR kodunu (Google Authenticator veya Authy gibi) kimlik doğrulayıcı uygulamanızı kullanarak tarayın.
+                            {t('twoFactor.authSetup.desc')}
                         </Text>
                     </View>
 
                     {isLoading ? (
                         <View style={tw`flex-1 items-center justify-center`}>
                             <ActivityIndicator size="large" color="#1162d4" />
-                            <Text style={tw`mt-4 text-slate-500`}>Kodlar oluşturuluyor...</Text>
+                            <Text style={tw`mt-4 text-slate-500`}>{t('twoFactor.authSetup.loading')}</Text>
                         </View>
                     ) : fetchError ? (
                         <View style={tw`flex-1 items-center justify-center p-4`}>
                             <Ionicons name="warning-outline" size={64} color="#f43f5e" />
-                            <Text style={tw`mt-4 text-xl font-bold text-center text-slate-800`}>İşlem Başarısız</Text>
+                            <Text style={tw`mt-4 text-xl font-bold text-center text-slate-800`}>{t('twoFactor.authSetup.failedTitle')}</Text>
                             <Text style={tw`mt-2 text-sm text-center text-slate-600`}>{fetchError}</Text>
-                            <Text style={tw`mt-4 text-center text-xs text-slate-400 bg-slate-50 p-3 rounded-lg border border-slate-100`}>Backend "/auth/2fa/generate" endpoint'i hata döndürüyor. Lütfen API'nin çalışır durumda olduğundan ve endpoint'in var olduğundan emin olun.</Text>
+                            <Text style={tw`mt-4 text-center text-xs text-slate-400 bg-slate-50 p-3 rounded-lg border border-slate-100`}>{t('twoFactor.authSetup.backendHint')}</Text>
                             <TouchableOpacity style={tw`mt-6 bg-[#1162d4]/10 p-3 px-6 rounded-xl`} onPress={() => navigation.goBack()}>
-                                <Text style={tw`text-[#1162d4] font-bold`}>Geri Dön</Text>
+                                <Text style={tw`text-[#1162d4] font-bold`}>{t('twoFactor.authSetup.back')}</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -115,10 +117,10 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
 
                             {/* Manual Entry Section */}
                             <View style={tw`mt-8 flex-col gap-3`}>
-                                <Text style={tw`text-xs font-semibold uppercase tracking-wider text-center text-slate-500`}>Kodu tarayamıyor musunuz?</Text>
+                                <Text style={tw`text-xs font-semibold uppercase tracking-wider text-center text-slate-500`}>{t('twoFactor.authSetup.cantScan')}</Text>
                                 <View style={tw`flex-row items-center justify-between p-4 bg-[#1162d4]/5 rounded-xl border border-[#1162d4]/20`}>
                                     <View style={tw`flex-col`}>
-                                        <Text style={tw`text-[10px] text-[#1162d4] font-bold uppercase`}>Manuel Kurulum Anahtarı</Text>
+                                        <Text style={tw`text-[10px] text-[#1162d4] font-bold uppercase`}>{t('twoFactor.authSetup.manualKey')}</Text>
                                         <Text style={tw`font-mono font-bold tracking-widest text-slate-900 mt-1`}>
                                             {manualKey || 'XXXX XXXX XXXX XXXX'}
                                         </Text>
@@ -137,13 +139,13 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                                             const emailParam = user?.email ? `:${user.email}` : '';
                                             const otpAuthUrl = `otpauth://totp/CepSandik${emailParam}?secret=${manualKey}&issuer=CepSandik`;
                                             Linking.openURL(otpAuthUrl).catch(() => {
-                                                Toast.show({ type: 'error', text1: 'Hata', text2: 'Cihazınızda bir kimlik doğrulayıcı uygulama bulunamadı.' });
+                                                Toast.show({ type: 'error', text1: t('twoFactor.authSetup.noAppTitle'), text2: t('twoFactor.authSetup.noAppBody') });
                                             });
                                         }
                                     }}
                                 >
                                     <Ionicons name="open-outline" size={20} color="#475569" />
-                                    <Text style={tw`text-slate-700 font-bold`}>Doğrulayıcı Uygulamayı Aç</Text>
+                                    <Text style={tw`text-slate-700 font-bold`}>{t('twoFactor.authSetup.openApp')}</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -153,19 +155,19 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                                     <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
                                         <Text style={tw`text-white text-xs font-bold`}>1</Text>
                                     </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>Cihazınızda tercih ettiğiniz kimlik doğrulayıcı uygulamayı açın.</Text>
+                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step1')}</Text>
                                 </View>
                                 <View style={tw`flex-row gap-4 items-start`}>
                                     <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
                                         <Text style={tw`text-white text-xs font-bold`}>2</Text>
                                     </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>"QR Kod Tara" öğesini seçin ve kameranızı ekrana yöneltin.</Text>
+                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step2')}</Text>
                                 </View>
                                 <View style={tw`flex-row gap-4 items-start`}>
                                     <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
                                         <Text style={tw`text-white text-xs font-bold`}>3</Text>
                                     </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>Sonraki ekranda uygulama tarafından oluşturulan 6 haneli kodu girin.</Text>
+                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step3')}</Text>
                                 </View>
                             </View>
                         </>
@@ -181,11 +183,11 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                             disabled={isLoading}
                             activeOpacity={0.8}
                         >
-                            <Text style={tw`text-white font-bold text-base`}>Devam Et</Text>
+                            <Text style={tw`text-white font-bold text-base`}>{t('twoFactor.setup.continue')}</Text>
                             <Ionicons name="arrow-forward" size={20} color="white" />
                         </TouchableOpacity>
                         <Text style={tw`mt-4 text-center text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em]`}>
-                            ELECTIONGUARD İLE GÜVENCE ALTINDA
+                            {t('twoFactor.authSetup.secured')}
                         </Text>
                     </View>
                 )}

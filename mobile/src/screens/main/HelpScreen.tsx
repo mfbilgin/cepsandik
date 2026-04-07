@@ -3,15 +3,17 @@ import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
     
 export const HelpScreen = () => {
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     const faqs = [
-        { q: "Uygulamaya nasıl giriş yaparım?", a: "Sistem yöneticiniz tarafından sisteme kaydedildiyseniz hesap bilgilerinizi girerek giriş yapabilirsiniz." },
-        { q: "Parolamı unuttum, ne yapmalıyım?", a: "Giriş ekranında bulunan 'Parolamı Unuttum' bağlantısına tıklayarak kayıtlı e-posta adresinize sıfırlama linki isteyebilirsiniz." },
-        { q: "Nasıl oy kullanırım?", a: "Ana ekranda aktif seçimlerinizi görebilirsiniz. Bir seçime tıkladığınızda pusula açılacaktır. Güvenli şekilde oyunuzu iletebilirsiniz." },
-        { q: "Oylar gizli mi tutuluyor?", a: "Evet. Oylarınız veritabanımıza şifrelenerek kaydedilir. Kararınızla kimliğiniz arasında hiçbir bağ kurulamaz." },
+        { q: t('help.faq.1.q'), a: t('help.faq.1.a') },
+        { q: t('help.faq.2.q'), a: t('help.faq.2.a') },
+        { q: t('help.faq.3.q'), a: t('help.faq.3.a') },
+        { q: t('help.faq.4.q'), a: t('help.faq.4.a') },
     ];
 
     return (
@@ -20,17 +22,17 @@ export const HelpScreen = () => {
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>Yardım Merkezi</Text>
+                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('help.title')}</Text>
             </View>
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6`}>
                 <View style={tw`bg-[#1162d4] rounded-2xl p-6 shadow-md`}>
-                    <Text style={tw`text-xl font-bold text-white mb-2`}>Size nasıl yardımcı olabiliriz?</Text>
-                    <Text style={tw`text-blue-100 text-sm leading-relaxed`}>Aşağıda sıkça sorulan sorulara göz atabilir veya destek ekibiyle iletişime geçebilirsiniz.</Text>
+                    <Text style={tw`text-xl font-bold text-white mb-2`}>{t('help.heroTitle')}</Text>
+                    <Text style={tw`text-blue-100 text-sm leading-relaxed`}>{t('help.heroBody')}</Text>
                 </View>
 
                 <View style={tw`flex-col gap-4`}>
-                    <Text style={tw`text-lg font-bold text-slate-900 ml-1`}>Sıkça Sorulan Sorular</Text>
+                    <Text style={tw`text-lg font-bold text-slate-900 ml-1`}>{t('help.faqTitle')}</Text>
                     {faqs.map((faq, idx) => (
                         <View key={idx} style={tw`bg-white p-5 rounded-2xl shadow-sm border border-slate-100`}>
                             <Text style={tw`font-bold text-slate-800 text-base mb-2`}>{faq.q}</Text>
@@ -41,7 +43,7 @@ export const HelpScreen = () => {
 
                 <TouchableOpacity style={tw`mt-4 flex-row items-center justify-center gap-2 py-4 rounded-xl border-2 border-slate-200`}>
                     <Ionicons name="mail-outline" size={20} color="#64748b" />
-                    <Text style={tw`text-slate-700 font-bold text-base`}>Destek Talebi Oluştur</Text>
+                    <Text style={tw`text-slate-700 font-bold text-base`}>{t('help.createSupportRequest')}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </View>

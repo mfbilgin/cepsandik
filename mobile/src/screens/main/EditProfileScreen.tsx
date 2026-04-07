@@ -6,6 +6,7 @@ import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const EditProfileScreen = () => {
     const { user, updateUser } = useAuth();
@@ -15,6 +16,7 @@ export const EditProfileScreen = () => {
     const [lastName, setLastName] = useState(user?.lastName || '');
     const [isLoading, setIsLoading] = useState(false);
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+    const { t } = useI18n();
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -34,7 +36,7 @@ export const EditProfileScreen = () => {
 
     const handleUpdate = async () => {
         if (!firstName.trim() || !lastName.trim()) {
-            Toast.show({ type: 'error', text1: 'Eksik Bilgi', text2: 'Lütfen ad ve soyadınızı girin.' });
+            Toast.show({ type: 'error', text1: t('auth.login.missingTitle'), text2: t('editProfile.missingBody') });
             return;
         }
 
@@ -52,12 +54,12 @@ export const EditProfileScreen = () => {
                 updateUser({ ...user, firstName: updatedUser.firstName, lastName: updatedUser.lastName });
             }
 
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Profiliniz başarıyla güncellendi.' });
+            Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('editProfile.successBody') });
             setTimeout(() => {
                 navigation.goBack();
             }, 1000);
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'Profil güncellenemedi.' });
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: error.response?.data?.message || t('editProfile.errorBody') });
         } finally {
             setIsLoading(false);
         }
@@ -73,7 +75,7 @@ export const EditProfileScreen = () => {
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>Profili Düzenle</Text>
+                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('editProfile.title')}</Text>
             </View>
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 ${isKeyboardVisible ? 'pb-120' : 'pb-40'} flex-col gap-6`} keyboardShouldPersistTaps="handled">
@@ -85,10 +87,10 @@ export const EditProfileScreen = () => {
 
                 <View style={tw`flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
                     <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>Ad</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.name')}</Text>
                         <TextInput
                             style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 text-base`}
-                            placeholder="Adınız"
+                            placeholder={t('editProfile.namePlaceholder')}
                             placeholderTextColor="#94a3b8"
                             value={firstName}
                             onChangeText={setFirstName}
@@ -96,10 +98,10 @@ export const EditProfileScreen = () => {
                     </View>
 
                     <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>Soyad</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.surname')}</Text>
                         <TextInput
                             style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 text-base`}
-                            placeholder="Soyadınız"
+                            placeholder={t('editProfile.surnamePlaceholder')}
                             placeholderTextColor="#94a3b8"
                             value={lastName}
                             onChangeText={setLastName}
@@ -107,13 +109,13 @@ export const EditProfileScreen = () => {
                     </View>
 
                     <View style={tw`flex-col gap-2 opacity-50`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>E-Posta Adresi</Text>
+                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.email')}</Text>
                         <TextInput
                             style={tw`w-full rounded-xl border border-slate-200 bg-slate-100 text-slate-500 px-4 py-3.5 text-base`}
                             value={user?.email}
                             editable={false}
                         />
-                        <Text style={tw`text-xs text-slate-400 ml-1`}>Devam eden seçimlerinizin güvenliği için E-posta adresi değiştirilemez.</Text>
+                        <Text style={tw`text-xs text-slate-400 ml-1`}>{t('editProfile.emailLocked')}</Text>
                     </View>
 
                     <TouchableOpacity
@@ -121,7 +123,7 @@ export const EditProfileScreen = () => {
                         onPress={handleUpdate}
                         disabled={isLoading}
                     >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}</Text>
+                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('notifications.saving') : t('notifications.saveChanges')}</Text>
                         {!isLoading && <Ionicons name="checkmark" size={20} color="white" />}
                     </TouchableOpacity>
                 </View>

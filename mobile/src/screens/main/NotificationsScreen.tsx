@@ -4,9 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const NotificationsScreen = () => {
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
 
     const [pushEnabled, setPushEnabled] = useState(true);
     const [emailEnabled, setEmailEnabled] = useState(true);
@@ -18,7 +20,7 @@ export const NotificationsScreen = () => {
         setIsLoading(true);
         // Simulate API call
         setTimeout(() => {
-            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Bildirim tercihleriniz kaydedildi.' });
+            Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('notifications.saveSuccess') });
             setIsLoading(false);
             navigation.goBack();
         }, 800);
@@ -30,7 +32,7 @@ export const NotificationsScreen = () => {
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>Bildirim Ayarları</Text>
+                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('notifications.settingsTitle')}</Text>
             </View>
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6`} showsVerticalScrollIndicator={false}>
@@ -39,8 +41,8 @@ export const NotificationsScreen = () => {
                     {/* Push Notifications */}
                     <View style={tw`flex-row items-center justify-between p-4 border-b border-slate-100`}>
                         <View style={tw`flex-1 mr-4`}>
-                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>Anlık Bildirimler</Text>
-                            <Text style={tw`text-xs text-slate-500 leading-tight`}>Uygulama arka plandayken telefonunuza gelen bildirimler.</Text>
+                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>{t('notifications.pushTitle')}</Text>
+                            <Text style={tw`text-xs text-slate-500 leading-tight`}>{t('notifications.pushDesc')}</Text>
                         </View>
                         <Switch
                             trackColor={{ false: '#cbd5e1', true: '#1162d4' }}
@@ -54,8 +56,8 @@ export const NotificationsScreen = () => {
                     {/* Email Notifications */}
                     <View style={tw`flex-row items-center justify-between p-4 border-b border-slate-100`}>
                         <View style={tw`flex-1 mr-4`}>
-                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>E-Posta Bildirimleri</Text>
-                            <Text style={tw`text-xs text-slate-500 leading-tight`}>Seçim başlangıcı, bitişi ve önemli güncellemeler.</Text>
+                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>{t('notifications.emailTitle')}</Text>
+                            <Text style={tw`text-xs text-slate-500 leading-tight`}>{t('notifications.emailDesc')}</Text>
                         </View>
                         <Switch
                             trackColor={{ false: '#cbd5e1', true: '#1162d4' }}
@@ -69,8 +71,8 @@ export const NotificationsScreen = () => {
                     {/* SMS Notifications */}
                     <View style={tw`flex-row items-center justify-between p-4 border-b border-slate-100`}>
                         <View style={tw`flex-1 mr-4`}>
-                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>SMS Bildirimleri</Text>
-                            <Text style={tw`text-xs text-slate-500 leading-tight`}>Çok kritik durumlar ve güvenlik uyarıları için.</Text>
+                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>{t('notifications.smsTitle')}</Text>
+                            <Text style={tw`text-xs text-slate-500 leading-tight`}>{t('notifications.smsDesc')}</Text>
                         </View>
                         <Switch
                             trackColor={{ false: '#cbd5e1', true: '#1162d4' }}
@@ -84,8 +86,8 @@ export const NotificationsScreen = () => {
                     {/* Marketing Notifications */}
                     <View style={tw`flex-row items-center justify-between p-4`}>
                         <View style={tw`flex-1 mr-4`}>
-                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>Kampanya ve Bültenler</Text>
-                            <Text style={tw`text-xs text-slate-500 leading-tight`}>Yeni özellikler, anketler ve topluluk haberleri.</Text>
+                            <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>{t('notifications.marketingTitle')}</Text>
+                            <Text style={tw`text-xs text-slate-500 leading-tight`}>{t('notifications.marketingDesc')}</Text>
                         </View>
                         <Switch
                             trackColor={{ false: '#cbd5e1', true: '#1162d4' }}
@@ -103,7 +105,7 @@ export const NotificationsScreen = () => {
                     onPress={handleSave}
                     disabled={isLoading}
                 >
-                    <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}</Text>
+                    <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('notifications.saving') : t('notifications.saveChanges')}</Text>
                     {!isLoading && <Ionicons name="checkmark" size={20} color="white" />}
                 </TouchableOpacity>
 

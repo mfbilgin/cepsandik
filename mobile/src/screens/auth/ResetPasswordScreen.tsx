@@ -5,11 +5,13 @@ import { AuthService } from '../../services/auth.service';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import tw from 'twrnc';
+import { useI18n } from '../../i18n/LanguageContext';
 
 export const ResetPasswordScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const { token } = route.params || {};
+    const { t } = useI18n();
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,19 +50,25 @@ export const ResetPasswordScreen = () => {
 
     const strengthScore = getPasswordStrength();
     const strengthColors = ['bg-transparent', 'bg-red-500', 'bg-yellow-500', 'bg-green-400', 'bg-green-600'];
-    const strengthLabels = ['Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Güçlü'];
+    const strengthLabels = [
+        t('auth.reset.passwordStrength.0'),
+        t('auth.reset.passwordStrength.1'),
+        t('auth.reset.passwordStrength.2'),
+        t('auth.reset.passwordStrength.3'),
+        t('auth.reset.passwordStrength.4'),
+    ];
 
     const handleReset = async () => {
         if (!password || !confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Eksik Bilgi', text2: 'Lütfen tüm alanları doldurun.' });
+            Toast.show({ type: 'error', text1: t('auth.reset.missingTitle'), text2: t('auth.reset.missingBody') });
             return;
         }
         if (password !== confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Parolalar eşleşmiyor.' });
+            Toast.show({ type: 'error', text1: t('auth.reset.errorTitle'), text2: t('auth.reset.passwordMismatch') });
             return;
         }
         if (!token) {
-            Toast.show({ type: 'error', text1: 'Hata', text2: 'Geçersiz doğrulama kodu. Lütfen bağlantınızı kontrol edin.' });
+            Toast.show({ type: 'error', text1: t('auth.reset.errorTitle'), text2: t('auth.reset.invalidToken') });
             return;
         }
 
@@ -73,7 +81,7 @@ export const ResetPasswordScreen = () => {
                 navigation.navigate('Login');
             }, 3000);
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: 'İşlem Başarısız', text2: error.response?.data?.message || 'Bir hata oluştu. Link süresi dolmuş olabilir.' });
+            Toast.show({ type: 'error', text1: t('auth.reset.failedTitle'), text2: error.response?.data?.message || t('auth.reset.failedBody') });
         } finally {
             setIsLoading(false);
         }
@@ -101,15 +109,15 @@ export const ResetPasswordScreen = () => {
                             <View style={tw`bg-[#1162d4]/10 p-5 rounded-full mb-6 items-center justify-center`}>
                                 <MaterialIcons name="password" size={40} color="#1162d4" />
                             </View>
-                            <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>Yeni Parola Belirle</Text>
+                            <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>{t('auth.reset.title')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
-                                Hesabınız için güvenli yeni bir parola girin.
+                                {t('auth.reset.description')}
                             </Text>
                         </View>
 
                         <View style={tw`flex-1 mt-10 flex-col gap-4`}>
                             <View style={tw`flex-col w-full`}>
-                                <Text style={tw`text-sm font-semibold text-slate-700 pb-2 ml-1`}>Yeni Parola</Text>
+                                <Text style={tw`text-sm font-semibold text-slate-700 pb-2 ml-1`}>{t('auth.reset.newPassword')}</Text>
                                 <View style={tw`relative`}>
                                     <TextInput
                                         style={tw`w-full rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 focus:border-[#1162d4] h-14 pl-4 pr-12 text-base`}
@@ -145,7 +153,7 @@ export const ResetPasswordScreen = () => {
                             </View>
 
                             <View style={tw`flex-col w-full`}>
-                                <Text style={tw`text-sm font-semibold text-slate-700 pb-2 ml-1`}>Yeni Parola (Tekrar)</Text>
+                                <Text style={tw`text-sm font-semibold text-slate-700 pb-2 ml-1`}>{t('auth.reset.newPasswordAgain')}</Text>
                                 <View style={tw`relative`}>
                                     <TextInput
                                         ref={confirmPasswordRef}
@@ -175,7 +183,7 @@ export const ResetPasswordScreen = () => {
                                 disabled={isLoading}
                                 activeOpacity={0.8}
                             >
-                                <Text style={tw`text-white font-bold text-base`}>{isLoading ? 'Kaydediliyor...' : 'Parolayı Güncelle'}</Text>
+                                <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('auth.reset.saving') : t('auth.reset.updatePassword')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -185,9 +193,9 @@ export const ResetPasswordScreen = () => {
                             <View style={tw`w-24 h-24 bg-green-100 rounded-full items-center justify-center mb-8`}>
                                 <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
                             </View>
-                            <Text style={tw`text-2xl font-bold text-slate-900 mb-3 text-center`}>Parolanız Değiştirildi!</Text>
+                            <Text style={tw`text-2xl font-bold text-slate-900 mb-3 text-center`}>{t('auth.reset.successTitle')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
-                                Giriş ekranına yönlendiriliyorsunuz. Lütfen yeni parolanızla giriş yapın.
+                                {t('auth.reset.successBody')}
                             </Text>
                         </View>
                     </View>
