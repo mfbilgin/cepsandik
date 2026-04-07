@@ -1,9 +1,11 @@
 FROM openresty/openresty:alpine
 
-# Install dependencies
+# Install dependencies (openssl + curl: self-signed bootstrap + healthcheck)
 RUN apk add --no-cache \
     git \
-    openssl-dev
+    openssl \
+    openssl-dev \
+    curl
 
 # Install lua-resty-jwt manually from GitHub
 RUN cd /tmp && \
@@ -24,6 +26,11 @@ COPY html/ /usr/share/nginx/html/
 # Create log directory
 RUN mkdir -p /usr/local/openresty/nginx/logs
 
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+# Windows checkout CRLF → "exec /docker-entrypoint.sh: no such file or directory" (shebang /bin/sh\r)
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
 EXPOSE 80 443
 
+ENTRYPOINT ["/bin/sh", "/docker-entrypoint.sh"]
 CMD ["/usr/local/openresty/bin/openresty", "-g", "daemon off;"]

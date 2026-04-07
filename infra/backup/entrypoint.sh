@@ -10,6 +10,6 @@ if [ "$BACKUP_ON_START" = "true" ]; then
     /usr/local/bin/backup.sh
 fi
 
-# Cron daemon'ı başlat
-echo "✅ Cron daemon başlatıldı"
-crond -f -l 2
+# Cron: exec ile PID 1 yap (dcron / bazı ortamlarda setpgid hatasını önler)
+echo "✅ Cron daemon başlatılıyor (ön planda)"
+exec /usr/sbin/crond -f

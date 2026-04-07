@@ -12,7 +12,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
     volumes:
-      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot:ro
       - ./logs/nginx:/usr/local/openresty/nginx/logs
     depends_on:
@@ -200,10 +200,12 @@ services:
       dockerfile: Dockerfile
     container_name: backup
     restart: unless-stopped
+    init: true
     mem_limit: 128m
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
       PGPASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_HOST: db
       BACKUP_ON_START: "false"
     volumes:
       - backup_data:/backups

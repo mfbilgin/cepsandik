@@ -17,8 +17,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
     volumes:
-      # SSL certificates from Certbot
-      - ./certbot/conf:/etc/letsencrypt:ro
+      # SSL (Certbot veya entrypoint ile oluşturulan geçici sertifikalar; yazılabilir olmalı)
+      - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot:ro
       # Nginx logs
       - ./logs/nginx:/usr/local/openresty/nginx/logs
@@ -372,9 +372,11 @@ services:
       dockerfile: Dockerfile
     container_name: cepsandik-backup
     restart: unless-stopped
+    init: true
     environment:
       - POSTGRES_USER=${DATABASE_USERNAME}
       - PGPASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_HOST=postgres
       - BACKUP_ON_START=false
     volumes:
       - backup_data:/backups

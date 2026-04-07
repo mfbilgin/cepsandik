@@ -1,0 +1,49 @@
+services:
+  gateway:
+    ports:
+      # Tüm arayüzlerde dinle (telefon aynı Wi‑Fi'den PC IP + 8088 ile erişsin)
+      - "0.0.0.0:8088:80"
+    volumes:
+      - ./openresty/conf/nginx.local.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+    healthcheck:
+      disable: true
+
+  certbot:
+    profiles: ["prod-only"]
+
+  backup:
+    profiles: ["prod-only"]
+
+  user-service:
+    ports:
+      - "8080:8080"
+    healthcheck:
+      disable: true
+
+  community-service:
+    ports:
+      - "8083:8083"
+    healthcheck:
+      disable: true
+
+  election-service:
+    ports:
+      - "8082:8082"
+    healthcheck:
+      disable: true
+
+  crypto-engine:
+    ports:
+      - "50051:50051"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    ports:
+      - "5672:5672"

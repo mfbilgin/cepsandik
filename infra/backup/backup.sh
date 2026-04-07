@@ -11,7 +11,8 @@ set -e
 BACKUP_DIR="/backups"
 RETENTION_DAYS=7
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-DATABASES=("userdb" "communitydb")
+POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
+DATABASES=("userdb" "communitydb" "electiondb")
 
 # Log fonksiyonu
 log() {
@@ -29,7 +30,7 @@ for DB in "${DATABASES[@]}"; do
     
     log "📦 $DB yedekleniyor..."
     
-    pg_dump -h postgres -U "$POSTGRES_USER" -d "$DB" | gzip > "$BACKUP_FILE"
+    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$DB" | gzip > "$BACKUP_FILE"
     
     if [ $? -eq 0 ]; then
         SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
