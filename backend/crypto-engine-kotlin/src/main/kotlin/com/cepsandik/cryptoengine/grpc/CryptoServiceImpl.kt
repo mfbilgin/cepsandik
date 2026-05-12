@@ -1,6 +1,8 @@
 package com.cepsandik.cryptoengine.grpc
 
 import com.cepsandik.cryptoengine.service.BallotValidationService
+import com.cepsandik.cryptoengine.service.CreateJointKeyService
+import com.cepsandik.cryptoengine.service.DistributedTallySessionService
 import com.cepsandik.cryptoengine.service.ElectionSetupService
 import com.cepsandik.cryptoengine.service.TallyDecryptionService
 import com.cepsandik.electionservice.grpc.CryptoServiceGrpc
@@ -13,6 +15,14 @@ import com.cepsandik.electionservice.grpc.TallyElectionResponse
 import com.cepsandik.electionservice.grpc.CreateJointKeyRequest
 import com.cepsandik.electionservice.grpc.CreateJointKeyResponse
 import com.cepsandik.electionservice.grpc.DecryptWithSharesRequest
+import com.cepsandik.electionservice.grpc.FinalizeTallyDecryptionRequest
+import com.cepsandik.electionservice.grpc.GetChallengesRequest
+import com.cepsandik.electionservice.grpc.GetChallengesResponse
+import com.cepsandik.electionservice.grpc.SessionAckResponse
+import com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionRequest
+import com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionResponse
+import com.cepsandik.electionservice.grpc.SubmitChallengeResponseRequest
+import com.cepsandik.electionservice.grpc.SubmitPartialDecryptionRequest
 import io.grpc.Status
 import io.grpc.stub.StreamObserver
 import net.devh.boot.grpc.server.service.GrpcService
@@ -33,6 +43,8 @@ class CryptoServiceImpl(
     private val electionSetupService: ElectionSetupService,
     private val ballotValidationService: BallotValidationService,
     private val tallyDecryptionService: TallyDecryptionService,
+    private val createJointKeyService: CreateJointKeyService,
+    private val distributedTallySessionService: DistributedTallySessionService,
 ) : CryptoServiceGrpc.CryptoServiceImplBase() {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -89,19 +101,107 @@ class CryptoServiceImpl(
         request: CreateJointKeyRequest,
         responseObserver: StreamObserver<CreateJointKeyResponse>
     ) {
-        log.info("createJointKey STUB called: election={}", request.electionId)
-        responseObserver.onError(
-            Status.UNIMPLEMENTED.withDescription("createJointKey — Faz 2 POC v2'de port edilecek").asRuntimeException()
-        )
+        try {
+            val response = createJointKeyService.createJointKey(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("createJointKey FAILED: election={}", request.electionId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("createJointKey: ${t.message}").asRuntimeException()
+            )
+        }
     }
 
     override fun decryptWithShares(
         request: DecryptWithSharesRequest,
         responseObserver: StreamObserver<TallyElectionResponse>
     ) {
-        log.info("decryptWithShares STUB called: election={}", request.electionId)
+        log.warn("decryptWithShares DEPRECATED: election={} — gerçek E2E-V için 5-stage akışı kullan", request.electionId)
         responseObserver.onError(
-            Status.UNIMPLEMENTED.withDescription("decryptWithShares — Faz 2 POC v2'de port edilecek").asRuntimeException()
+            Status.UNIMPLEMENTED.withDescription("decryptWithShares deprecated; StartTallyDecryptionSession ile başlayan 5-stage akışı kullan").asRuntimeException()
         )
+    }
+
+    // ===== Sprint 5.C.2 — 3-round distributed decryption =====
+
+    override fun startTallyDecryptionSession(
+        request: StartTallyDecryptionSessionRequest,
+        responseObserver: StreamObserver<StartTallyDecryptionSessionResponse>
+    ) {
+        try {
+            val response = distributedTallySessionService.startSession(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("startTallyDecryptionSession FAIL: election={}", request.electionId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("startSession: ${t.message}").asRuntimeException()
+            )
+        }
+    }
+
+    override fun submitPartialDecryption(
+        request: SubmitPartialDecryptionRequest,
+        responseObserver: StreamObserver<SessionAckResponse>
+    ) {
+        try {
+            val response = distributedTallySessionService.submitPartialDecryption(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("submitPartialDecryption FAIL: session={}, guardian={}", request.sessionId, request.guardianId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("submitPartialDecryption: ${t.message}").asRuntimeException()
+            )
+        }
+    }
+
+    override fun getChallenges(
+        request: GetChallengesRequest,
+        responseObserver: StreamObserver<GetChallengesResponse>
+    ) {
+        try {
+            val response = distributedTallySessionService.getChallenges(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("getChallenges FAIL: session={}, guardian={}", request.sessionId, request.guardianId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("getChallenges: ${t.message}").asRuntimeException()
+            )
+        }
+    }
+
+    override fun submitChallengeResponse(
+        request: SubmitChallengeResponseRequest,
+        responseObserver: StreamObserver<SessionAckResponse>
+    ) {
+        try {
+            val response = distributedTallySessionService.submitChallengeResponse(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("submitChallengeResponse FAIL: session={}, guardian={}", request.sessionId, request.guardianId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("submitChallengeResponse: ${t.message}").asRuntimeException()
+            )
+        }
+    }
+
+    override fun finalizeTallyDecryption(
+        request: FinalizeTallyDecryptionRequest,
+        responseObserver: StreamObserver<TallyElectionResponse>
+    ) {
+        try {
+            val response = distributedTallySessionService.finalizeTally(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("finalizeTallyDecryption FAIL: session={}", request.sessionId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("finalizeTallyDecryption: ${t.message}").asRuntimeException()
+            )
+        }
     }
 }

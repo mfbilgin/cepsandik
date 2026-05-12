@@ -19,7 +19,37 @@ service CryptoService {
   // Dağıtık: Kamu anahtarlarını birleştirip joint key + context üretir
   rpc CreateJointKey (CreateJointKeyRequest) returns (CreateJointKeyResponse);
 
-  // Dağıtık: Deşifre paylarını toplayıp sonucu açıklar
+  // === Gerçek E2E-V Threshold Decryption (3-round) ===
+  // Sprint 5.C.2 — stateful session, server private state görmez.
+  // DecryptorDoerre'i orchestrate eder; her round'da mobile cihazlar
+  // local KMP DecryptingTrusteeDoerre ile partial/response üretir.
+
+  // Round 0: Session başlat. Server EncryptedTally hesaplar, perTrustee A list
+  //          (= encryptedTallyJson içinden mobile'ın çıkaracağı pad bileşenleri)
+  //          ile session_id döner. DecryptorDoerre arka planda başlatılır,
+  //          her trustee proxy'si decrypt() çağrısında BLOCK olur.
+  rpc StartTallyDecryptionSession (StartTallyDecryptionSessionRequest) returns (StartTallyDecryptionSessionResponse);
+
+  // Round 1: Mobile guardian lokal decrypt sonucunu submit eder.
+  //          Sunucu BlockingQueue'ye yazar, ilgili proxy'nin decrypt()
+  //          çağrısı unblocks. Quorum tamamlandığında server otomatik Fiat-Shamir
+  //          hash hesaplar, challenge'ları proxy queue'lerine yerleştirir.
+  rpc SubmitPartialDecryption (SubmitPartialDecryptionRequest) returns (SessionAckResponse);
+
+  // Round 2: Mobile guardian challenge'larını pull eder (long-poll).
+  //          Henüz hazır değilse BLOCK eder (~deadline'a kadar).
+  rpc GetChallenges (GetChallengesRequest) returns (GetChallengesResponse);
+
+  // Round 3: Mobile guardian challenge response'unu submit eder.
+  //          Quorum'da DecryptorDoerre tamamlanır, session FINAL durumuna geçer.
+  rpc SubmitChallengeResponse (SubmitChallengeResponseRequest) returns (SessionAckResponse);
+
+  // Final: Tally sonucu + proof'u pull et. Henüz hazır değilse BLOCK eder.
+  rpc FinalizeTallyDecryption (FinalizeTallyDecryptionRequest) returns (TallyElectionResponse);
+
+  // [DEPRECATED, Sprint 6'da silinecek] Legacy tek-shot RPC; gerçek E2E-V
+  // sağlamaz — mobile'ın private key share'ini sunucuya yollamasını gerektirir.
+  // Yerine yukarıdaki 5-stage akışı kullan.
   rpc DecryptWithShares (DecryptWithSharesRequest) returns (TallyElectionResponse);
 }
 
@@ -135,4 +165,57 @@ message DecryptWithSharesRequest {
 message DecryptionShare {
   string guardian_id = 1;
   string share_data = 2;    // JSON (ElectionGuard partial decryption)
+}
+
+// ==================== Sprint 5.C.2 — 3-round Threshold Decryption ====================
+
+message StartTallyDecryptionSessionRequest {
+  string election_id = 1;
+  string election_guard_context = 2;     // composite { init, config }
+  string election_manifest = 3;
+  repeated string ciphertext_ballots = 4;
+  // Bu session'a hangi guardian'lar katılıyor (quorum >= en az Q kişi).
+  // Sıralama önemli — DecryptorDoerre Lagrange interpolation için kullanır.
+  repeated string participating_guardian_ids = 5;
+}
+
+message StartTallyDecryptionSessionResponse {
+  string session_id = 1;
+  // EncryptedTally JSON — mobile guardian lokal extract eder, lokal
+  // DecryptingTrusteeDoerre.decrypt(group, listOfA)'yı çağırır.
+  string encrypted_tally_json = 2;
+}
+
+message SubmitPartialDecryptionRequest {
+  string session_id = 1;
+  string guardian_id = 2;
+  // KMP `List<PartialDecryption>` JSON — mobile lokal hesaplar.
+  string partial_decryptions_json = 3;
+}
+
+message SubmitChallengeResponseRequest {
+  string session_id = 1;
+  string guardian_id = 2;
+  // KMP `List<ChallengeResponse>` JSON — mobile lokal hesaplar.
+  string challenge_responses_json = 3;
+}
+
+message GetChallengesRequest {
+  string session_id = 1;
+  string guardian_id = 2;
+}
+
+message GetChallengesResponse {
+  // KMP `List<ChallengeRequest>` JSON — mobile lokal challenge() çağrısına verir.
+  string challenges_json = 1;
+}
+
+message FinalizeTallyDecryptionRequest {
+  string session_id = 1;
+}
+
+message SessionAckResponse {
+  bool accepted = 1;
+  string state = 2;   // örn. WAIT_PARTIAL, WAIT_CHALLENGE_RESPONSE, FINAL
+  string error = 3;
 }

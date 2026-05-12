@@ -1,6 +1,5 @@
 package com.cepsandik.cryptoengine.service
 
-import com.cepsandik.electionservice.grpc.ContestInfo
 import com.cepsandik.electionservice.grpc.GuardianRecord
 import com.cepsandik.electionservice.grpc.SetupElectionRequest
 import com.cepsandik.electionservice.grpc.SetupElectionResponse
@@ -8,10 +7,8 @@ import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.unwrap
 import electionguard.ballot.ElectionInitialized
-import electionguard.ballot.Manifest
 import electionguard.ballot.makeElectionConfig
 import electionguard.ballot.protocolVersion
-import electionguard.cli.ManifestBuilder
 import electionguard.core.GroupContext
 import electionguard.core.getSystemDate
 import electionguard.core.productionGroup
@@ -44,8 +41,8 @@ class ElectionSetupService {
 
         val group: GroupContext = productionGroup()
 
-        // 1. Proto contest list'inden Manifest inşa
-        val manifest = buildManifest(request.electionId, request.contestsList)
+        // 1. Proto contest list'inden Manifest inşa (CreateJointKey ile paylaşılır)
+        val manifest = ManifestBuildHelper.build(request.electionId, request.contestsList)
         val manifestBytes = ElectionGuardSerde.manifestToJson(manifest).encodeToByteArray()
 
         // 2. ElectionConfig
@@ -118,32 +115,4 @@ class ElectionSetupService {
         return responseBuilder.build()
     }
 
-    /**
-     * Proto'dan gelen contest listesinden KMP Manifest inşa eder.
-     * Tek bir geopolitical unit + tek bir ballot style varsayımı.
-     */
-    private fun buildManifest(electionId: String, contests: List<ContestInfo>): Manifest {
-        val builder = ManifestBuilder("election-$electionId")
-        builder.addStyle("ballot-style-1", "district-1")
-
-        contests.forEach { contestInfo ->
-            val numberElected = if (contestInfo.numberElected > 0) contestInfo.numberElected else 1
-            val voteVariation = if (numberElected == 1)
-                Manifest.VoteVariationType.one_of_m
-            else
-                Manifest.VoteVariationType.n_of_m
-
-            val cb = builder.addContest(contestInfo.contestId)
-                .setVoteVariationType(voteVariation, numberElected, numberElected)
-                .setGpunit("district-1")
-
-            contestInfo.selectionIdsList.forEach { selId ->
-                // selection_id == candidate_id varsayımı (Python tarafı da öyle yapıyordu)
-                cb.addSelection(selId, selId)
-            }
-            cb.done()
-        }
-
-        return builder.build()
-    }
 }
