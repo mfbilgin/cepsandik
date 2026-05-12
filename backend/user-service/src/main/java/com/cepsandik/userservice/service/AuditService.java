@@ -4,6 +4,7 @@ import com.cepsandik.userservice.models.AuditLog;
 import com.cepsandik.userservice.repositories.AuditLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -13,34 +14,45 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void log(UUID userId, String action, String details, String ipAddress) {
+    public void log(UUID userId, String module, String action, String status, AuditLog.LogLevel level, String details, HttpServletRequest request) {
         try {
-            AuditLog log = AuditLog.builder()
+            String ip = getClientIp(request);
+            String ua = request != null ? request.getHeader("User-Agent") : "System";
+
+            AuditLog auditEntry = AuditLog.builder()
                     .userId(userId)
+                    .module(module)
                     .action(action)
+                    .status(status)
+                    .level(level)
                     .details(details)
-                    .ipAddress(ipAddress)
+                    .ipAddress(ip)
+                    .userAgent(ua)
                     .build();
 
-            auditLogRepository.save(log);
+            auditLogRepository.save(auditEntry);
+            
+            // Konsola da kritik seviyede yazalım
+            if (level == AuditLog.LogLevel.ERROR || level == AuditLog.LogLevel.CRITICAL) {
+                log.error("[AUDIT ERROR] Module: {}, Action: {}, Status: {}, Details: {}", module, action, status, details);
+            }
         } catch (Exception e) {
-            System.err.println("Audit Log kaydı başarısız: " + e.getMessage());
+            log.error("Audit Log kaydı veritabanına yapılamadı: {}", e.getMessage());
         }
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String remoteAddr = "";
-        if (request != null) {
-            remoteAddr = request.getHeader("X-FORWARDED-FOR");
-            if (remoteAddr == null || "".equals(remoteAddr)) {
-                remoteAddr = request.getRemoteAddr();
-            }
+        if (request == null) return "127.0.0.1";
+        String remoteAddr = request.getHeader("X-FORWARDED-FOR");
+        if (remoteAddr == null || "".equals(remoteAddr)) {
+            remoteAddr = request.getRemoteAddr();
         }
         return remoteAddr;
     }

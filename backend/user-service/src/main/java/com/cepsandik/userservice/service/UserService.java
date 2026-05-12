@@ -31,6 +31,59 @@ public class UserService {
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
     private final FileUploadService fileUploadService;
+    private final com.cepsandik.userservice.repositories.NotificationPreferenceRepository notificationPreferenceRepo;
+
+    @LogAudit(action = "PUSH TOKEN UPDATE")
+    @Transactional
+    public void updatePushToken(String email, com.cepsandik.userservice.dtos.requests.UpdatePushTokenRequest req) {
+        var user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
+        
+        user.setPushToken(req.getPushToken());
+        user.setGuardianEligible(req.isGuardianEligible());
+        userRepo.save(user);
+    }
+
+    public java.util.List<com.cepsandik.userservice.models.NotificationPreference> getNotificationPreferences(String email) {
+        var user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
+        
+        var preferences = notificationPreferenceRepo.findByUser(user);
+        
+        // Eğer hiç tercih yoksa varsayılanları oluştur (Opsiyonel: İlk kayıt sırasında da yapılabilir)
+        if (preferences.isEmpty()) {
+            for (com.cepsandik.userservice.models.NotificationPreference.NotificationCategory cat : com.cepsandik.userservice.models.NotificationPreference.NotificationCategory.values()) {
+                for (com.cepsandik.userservice.models.NotificationPreference.NotificationChannel chan : com.cepsandik.userservice.models.NotificationPreference.NotificationChannel.values()) {
+                    preferences.add(notificationPreferenceRepo.save(
+                        com.cepsandik.userservice.models.NotificationPreference.builder()
+                            .user(user)
+                            .category(cat)
+                            .channel(chan)
+                            .isEnabled(true)
+                            .build()
+                    ));
+                }
+            }
+        }
+        return preferences;
+    }
+
+    @LogAudit(action = "NOTIFICATION PREFERENCE UPDATE")
+    @Transactional
+    public void updateNotificationPreference(String email, com.cepsandik.userservice.dtos.requests.UpdateNotificationPreferenceRequest req) {
+        var user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
+        
+        var pref = notificationPreferenceRepo.findByUserAndCategoryAndChannel(user, req.getCategory(), req.getChannel())
+                .orElseGet(() -> com.cepsandik.userservice.models.NotificationPreference.builder()
+                        .user(user)
+                        .category(req.getCategory())
+                        .channel(req.getChannel())
+                        .build());
+        
+        pref.setEnabled(req.getEnabled());
+        notificationPreferenceRepo.save(pref);
+    }
 
     @LogAudit(action = "PROFILE VIEWING")
     public UserResponse me(String email) {
@@ -197,5 +250,56 @@ public class UserService {
         user.setProfileImage(null);
         userRepo.save(user);
         return UserMapper.toResponse(user);
+    }
+
+    /**
+     * Verilen ID listesinden kullanıcıları getirir.
+     */
+    public java.util.List<UserResponse> getUsersByIds(java.util.List<UUID> userIds) {
+        return userRepo.findByIdIn(userIds).stream()
+                .map(UserMapper::toResponse)
+                .toList();
+    }
+
+    /**
+     * Verilen ID listesinden sadece uygun emanetçileri filtreleyip ID olarak döner.
+     */
+    public java.util.List<UUID> filterEligibleGuardians(java.util.List<UUID> ids) {
+        return userRepo.findByIdIn(ids).stream()
+                .filter(u -> u.isGuardianEligible() && u.isActive())
+                .map(com.cepsandik.userservice.models.User::getId)
+                .toList();
+    }
+
+    /**
+     * Tüm sistemden rastgele N adet uygun emanetçi seçer.
+     */
+    public java.util.List<UUID> getRandomEligibleGuardians(int limit) {
+        return userRepo.findRandomEligibleGuardians(limit).stream()
+                .map(com.cepsandik.userservice.models.User::getId)
+                .toList();
+    }
+    /**
+     * Bildirim servisi için kullanıcıların iletişim detaylarını ve tercihlerini getirir.
+     */
+    public java.util.List<com.cepsandik.userservice.dtos.responses.UserNotificationDetailsResponse> getNotificationDetails(java.util.List<UUID> userIds) {
+        return userRepo.findByIdIn(userIds).stream()
+                .map(u -> {
+                    java.util.Map<com.cepsandik.userservice.models.NotificationPreference.NotificationCategory, 
+                                 java.util.Map<com.cepsandik.userservice.models.NotificationPreference.NotificationChannel, Boolean>> prefs = new java.util.HashMap<>();
+                    
+                    for (com.cepsandik.userservice.models.NotificationPreference pref : notificationPreferenceRepo.findByUser(u)) {
+                        prefs.computeIfAbsent(pref.getCategory(), k -> new java.util.HashMap<>())
+                             .put(pref.getChannel(), pref.isEnabled());
+                    }
+
+                    return com.cepsandik.userservice.dtos.responses.UserNotificationDetailsResponse.builder()
+                            .userId(u.getId())
+                            .email(u.getEmail())
+                            .pushToken(u.getPushToken())
+                            .preferences(prefs)
+                            .build();
+                })
+                .toList();
     }
 }

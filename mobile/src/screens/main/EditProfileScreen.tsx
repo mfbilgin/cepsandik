@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const EditProfileScreen = () => {
@@ -67,11 +67,11 @@ export const EditProfileScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-[#f6f7f8]`}
+            style={tw`flex-1 bg-background`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-            <View style={tw`bg-white border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
+            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
@@ -80,12 +80,12 @@ export const EditProfileScreen = () => {
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 ${isKeyboardVisible ? 'pb-120' : 'pb-40'} flex-col gap-6`} keyboardShouldPersistTaps="handled">
                 <View style={tw`items-center justify-center py-4`}>
-                    <View style={tw`w-24 h-24 rounded-full bg-[#1162d4] items-center justify-center shadow-md mb-4`}>
+                    <View style={tw`w-24 h-24 rounded-full bg-primary items-center justify-center shadow-md mb-4`}>
                         <Text style={tw`text-5xl font-bold text-white`}>{firstName?.[0] || user?.firstName?.[0]}</Text>
                     </View>
                 </View>
 
-                <View style={tw`flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
+                <View style={tw`flex-col gap-5 bg-surface p-6 rounded-2xl shadow-sm border border-slate-100`}>
                     <View style={tw`flex-col gap-2`}>
                         <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.name')}</Text>
                         <TextInput
@@ -119,7 +119,7 @@ export const EditProfileScreen = () => {
                     </View>
 
                     <TouchableOpacity
-                        style={tw`mt-4 w-full bg-[#1162d4] flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isLoading ? 'opacity-50' : ''}`}
+                        style={tw`mt-4 w-full bg-primary flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isLoading ? 'opacity-50' : ''}`}
                         onPress={handleUpdate}
                         disabled={isLoading}
                     >

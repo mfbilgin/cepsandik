@@ -5,13 +5,19 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import Toast from 'react-native-toast-message';
 import { LanguageProvider } from './src/i18n/LanguageContext';
 
+import { UIProvider } from './src/context/UIContext';
+import { ModernDialog } from './src/components/ModernDialog';
+
 export default function App() {
   return (
     <>
             <LanguageProvider>
-                <AuthProvider>
-                    <AppNavigator />
-                </AuthProvider>
+                <UIProvider>
+                    <AuthProvider>
+                        <AppNavigator />
+                        <ModernDialog />
+                    </AuthProvider>
+                </UIProvider>
             </LanguageProvider>
             <Toast />
             <StatusBar style="dark" />

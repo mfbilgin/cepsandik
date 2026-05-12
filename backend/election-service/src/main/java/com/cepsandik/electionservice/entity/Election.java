@@ -72,11 +72,6 @@ public class Election {
     @Builder.Default
     private Boolean resultsPublic = true;
 
-    /** Anonim oylama (kim neye oy verdi gizli) */
-    @Column(name = "anonymous_voting")
-    @Builder.Default
-    private Boolean anonymousVoting = true;
-
     /** Soft delete */
     @Column(name = "is_deleted")
     @Builder.Default
@@ -96,13 +91,22 @@ public class Election {
     @Column(name = "election_public_key", columnDefinition = "TEXT")
     private String electionPublicKey;
 
-    /** Guardian record'ları (JSON array) */
+    /** Dağıtık emanetçi kayıtları (JSON) */
     @Column(name = "guardian_records", columnDefinition = "TEXT")
     private String guardianRecords;
+
+    /** Minimum emanetçi (Q) eşik değeri */
+    @Column(name = "min_guardians_threshold")
+    @Builder.Default
+    private Integer minGuardiansThreshold = 3;
 
     /** ElectionGuard Tally Decryption Proof (JSON) */
     @Column(name = "tally_proof", columnDefinition = "TEXT")
     private String tallyProof;
+
+    /** Normalized crypto tally results returned by Crypto-Engine (JSON). */
+    @Column(name = "tally_results", columnDefinition = "TEXT")
+    private String tallyResults;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

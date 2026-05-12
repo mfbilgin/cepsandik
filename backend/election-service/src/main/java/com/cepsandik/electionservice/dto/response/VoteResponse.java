@@ -15,8 +15,6 @@ public class VoteResponse {
 
     private Long electionId;
     private String electionTitle;
-    private Long candidateId;
-    private String candidateName;
     private Boolean alreadyVoted;
     private Instant votedAt;
 

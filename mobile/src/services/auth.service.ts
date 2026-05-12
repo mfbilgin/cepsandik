@@ -49,5 +49,10 @@ export const AuthService = {
     getProfile: async () => {
         const response = await api.get('/users/me');
         return response.data?.data;
+    },
+
+    resendVerification: async (email: string, password: string) => {
+        const response = await api.post('/auth/resend-verification', { email, password });
+        return response.data;
     }
 };

@@ -30,7 +30,6 @@ public class ElectionResponse {
     private Instant startTime;
     private Instant endTime;
     private Boolean resultsPublic;
-    private Boolean anonymousVoting;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -42,4 +41,7 @@ public class ElectionResponse {
 
     /** ElectionGuard kurulduysa true — mobil oy için transit RSA şifrelemesi kullanılmalı */
     private Boolean encryptedVotingEnabled;
+
+    /** ElectionGuard Election Manifest (JSON) — Bağımsız denetim için */
+    private String electionManifest;
 }

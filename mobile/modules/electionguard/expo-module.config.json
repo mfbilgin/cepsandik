@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ElectionguardModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.electionguard.ElectionguardModule"]
+  }
+}

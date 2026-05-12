@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+
+  - job_name: 'user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['user-service:8080']
+
+  - job_name: 'election-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['election-service:8082']
+
+  - job_name: 'community-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['community-service:8083']

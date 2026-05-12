@@ -16,6 +16,8 @@ import com.cepsandik.userservice.repositories.UserRepository;
 import com.cepsandik.userservice.security.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -59,6 +62,11 @@ public class AuthService {
 
         userRepository.save(user);
         emailProducer.sendVerificationEmail(user.getEmail(), user.getFirstName(), user.getVerificationToken());
+
+        MDC.put("event_type", "user_registered");
+        log.info("Yeni kullanıcı kaydı: email={}, firstName={}", user.getEmail(), user.getFirstName());
+        MDC.remove("event_type");
+
         return UserMapper.toResponse(user);
     }
 
@@ -142,6 +150,11 @@ public class AuthService {
         var access = (String) accessTokenData.get("token");
         var expireDate = (long) accessTokenData.get("expiration");
         var refresh = createRefreshToken(user);
+
+        MDC.put("event_type", "user_login_success");
+        log.info("Kullanıcı girişi başarılı: email={}, userId={}", user.getEmail(), user.getId());
+        MDC.remove("event_type");
+
         return AuthResponse.bearer(access, refresh.getToken(), expireDate);
     }
 
@@ -171,6 +184,11 @@ public class AuthService {
         var access = (String) accessTokenData.get("token");
         var expireDate = (long) accessTokenData.get("expiration");
         var refresh = createRefreshToken(user);
+
+        MDC.put("event_type", "user_login_2fa_success");
+        log.info("Kullanıcı girişi (2FA) başarılı: email={}, userId={}", user.getEmail(), user.getId());
+        MDC.remove("event_type");
+
         return AuthResponse.bearer(access, refresh.getToken(), expireDate);
     }
 
@@ -223,6 +241,10 @@ public class AuthService {
                 .build();
         resetRepository.save(prt);
         emailProducer.sendPasswordResetEmail(user.getEmail(), user.getFirstName(), token);
+
+        MDC.put("event_type", "password_reset_requested");
+        log.info("Şifre sıfırlama isteği: email={}", user.getEmail());
+        MDC.remove("event_type");
     }
 
     @Transactional
@@ -240,6 +262,10 @@ public class AuthService {
 
         prt.setUsed(true);
         resetRepository.save(prt);
+
+        MDC.put("event_type", "password_reset_completed");
+        log.info("Şifre sıfırlama tamamlandı: userId={}", user.getId());
+        MDC.remove("event_type");
     }
 
     @Transactional

@@ -6,7 +6,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 type ParamList = {
@@ -68,9 +68,9 @@ export const TwoFactorLoginScreen = () => {
         for (let i = 0; i < maxCodeLength; i++) {
             boxes.push(
                 <View key={i} style={[
-                    tw`bg-white border-2 rounded-xl flex items-center justify-center`,
+                    tw`bg-surface border-2 rounded-xl flex items-center justify-center`,
                     { width: isRecoveryMode ? 35 : 48, height: 56, marginHorizontal: isRecoveryMode ? 2 : 4 },
-                    code.length === i ? tw`border-[#1162d4]` : tw`border-slate-200`
+                    code.length === i ? tw`border-primary` : tw`border-slate-200`
                 ]}>
                     <Text style={tw`${isRecoveryMode ? 'text-xl' : 'text-2xl'} font-bold text-slate-900`}>
                         {code[i] || (code.length === i ? '' : '·')}
@@ -89,10 +89,10 @@ export const TwoFactorLoginScreen = () => {
     ];
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-[#f6f7f8]`]}>
+        <SafeAreaView style={[tw`flex-1 bg-background`]}>
             {/* Top Navigation Bar */}
-            <View style={tw`flex-row items-center justify-between px-4 py-3 bg-[#f6f7f8] border-b border-[#1162d4]/10`}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-[#1162d4]/10`}>
+            <View style={tw`flex-row items-center justify-between px-4 py-3 bg-background border-b border-primary/10`}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-primary/10`}>
                     <Ionicons name="chevron-back" size={24} color="#334155" />
                 </TouchableOpacity>
                 <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>{t('auth.twoFactor.title')}</Text>
@@ -101,8 +101,8 @@ export const TwoFactorLoginScreen = () => {
 
             <ScrollView contentContainerStyle={tw`flex-grow flex-col items-center px-6 pt-6 max-w-md w-full self-center`}>
                 {/* Icon/Logo Placeholder */}
-                <View style={tw`mb-8 p-4 bg-[#1162d4]/10 rounded-full`}>
-                    <MaterialIcons name="security" size={56} color="#1162d4" />
+                <View style={tw`mb-8 p-4 bg-primary/10 rounded-full`}>
+                    <MaterialIcons name="security" size={56} color={tw.color('primary')} />
                 </View>
 
                 {/* Heading & Instructions */}
@@ -125,7 +125,7 @@ export const TwoFactorLoginScreen = () => {
                 {/* Action Buttons */}
                 <View style={tw`w-full flex-col gap-4 mt-auto mb-2`}>
                     <TouchableOpacity
-                        style={tw`w-full bg-[#1162d4] flex-row items-center justify-center py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
+                        style={tw`w-full bg-primary flex-row items-center justify-center py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
                         onPress={handleVerify}
                         disabled={isLoading}
                         activeOpacity={0.8}
@@ -140,7 +140,7 @@ export const TwoFactorLoginScreen = () => {
                         }}
                         style={tw`py-2`}
                     >
-                        <Text style={tw`text-[#1162d4] text-center font-medium`}>
+                        <Text style={tw`text-primary text-center font-medium`}>
                             {isRecoveryMode ? t('auth.twoFactor.useAppCode') : t('auth.twoFactor.useRecoveryCode')}
                         </Text>
                     </TouchableOpacity>
@@ -154,7 +154,7 @@ export const TwoFactorLoginScreen = () => {
                         if (key.val === 'empty') return <View key={index} style={tw`w-[30%] h-12 mb-3`} />;
                         if (key.val === 'backspace') {
                             return (
-                                <TouchableOpacity key={index} onPress={() => handleKeyPress('backspace')} style={tw`w-[30%] h-12 flex items-center justify-center mb-3 rounded-lg active:bg-[#1162d4]/10`}>
+                                <TouchableOpacity key={index} onPress={() => handleKeyPress('backspace')} style={tw`w-[30%] h-12 flex items-center justify-center mb-3 rounded-lg active:bg-primary/10`}>
                                     <Ionicons name="backspace-outline" size={28} color="#475569" />
                                 </TouchableOpacity>
                             );
@@ -163,7 +163,7 @@ export const TwoFactorLoginScreen = () => {
                             <TouchableOpacity
                                 key={index}
                                 onPress={() => handleKeyPress(key.val)}
-                                style={tw`w-[30%] h-14 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm mb-3 active:bg-slate-200`}
+                                style={tw`w-[30%] h-14 flex flex-col items-center justify-center bg-surface rounded-xl shadow-sm mb-3 active:bg-slate-200`}
                             >
                                 <Text style={tw`text-2xl font-medium text-slate-900`}>{key.val}</Text>
                                 {key.letters ? (

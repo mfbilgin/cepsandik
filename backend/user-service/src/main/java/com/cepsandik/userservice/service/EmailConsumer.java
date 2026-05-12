@@ -2,6 +2,7 @@ package com.cepsandik.userservice.service;
 
 import com.cepsandik.userservice.config.RabbitMQConfig;
 import com.cepsandik.userservice.dto.EmailMessage;
+import com.cepsandik.userservice.models.AuditLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -17,11 +18,8 @@ import org.springframework.stereotype.Service;
 public class EmailConsumer {
 
     private final EmailService emailService;
+    private final AuditService auditService;
 
-    /**
-     * Kuyruktan gelen e-posta mesajlarını işler.
-     * Hata durumunda exception fırlatılır ve mesaj DLQ'ya gider.
-     */
     @RabbitListener(queues = RabbitMQConfig.EMAIL_QUEUE)
     public void processEmailMessage(EmailMessage message) {
         log.info("E-posta mesajı alındı: to={}, type={}", message.to(), message.type());
@@ -37,11 +35,17 @@ public class EmailConsumer {
                         message.firstName(),
                         message.token());
             }
-            log.info("E-posta başarıyla işlendi: to={}, type={}", message.to(), message.type());
+            
+            // Başarılı gönderimi veritabanına logla
+            auditService.log(null, "MAIL", "SEND_" + message.type(), "SUCCESS", 
+                AuditLog.LogLevel.INFO, "E-posta başarıyla gönderildi: " + message.to(), null);
+
         } catch (Exception e) {
-            log.error("E-posta işlenirken hata: to={}, type={}, error={}",
-                    message.to(), message.type(), e.getMessage());
-            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException(e); // DLQ'ya gitmesi için exception'ı fırlat
+            // Hatayı veritabanına logla
+            auditService.log(null, "MAIL", "SEND_" + message.type(), "FAILURE", 
+                AuditLog.LogLevel.ERROR, "E-posta gönderimi başarısız: " + message.to() + ". Hata: " + e.getMessage(), null);
+            
+            throw new org.springframework.amqp.AmqpRejectAndDontRequeueException(e);
         }
     }
 }

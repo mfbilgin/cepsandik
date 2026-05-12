@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const LoginScreen = () => {
@@ -69,7 +69,25 @@ export const LoginScreen = () => {
                 navigation.navigate('TwoFactorLogin', { tempToken: response.tempToken });
             }
         } catch (error: any) {
-            Toast.show({ type: 'error', text1: t('auth.login.errorTitle'), text2: error.response?.data?.message || t('auth.login.errorInvalidCredentials') });
+            const errorMsg = error.response?.data?.message;
+            const status = error.response?.status;
+            
+            // 403 Forbidden ve doğrulama hatası mesajı varsa (Türkçe ve İngilizce kontrolü)
+            const isVerificationError = status === 403 && (
+                errorMsg?.toLowerCase().includes('verify') || 
+                errorMsg?.toLowerCase().includes('aktif') ||
+                errorMsg?.toLowerCase().includes('doğrula')
+            );
+
+            if (isVerificationError) {
+                navigation.navigate('VerificationPending', { email, password });
+            } else {
+                Toast.show({ 
+                    type: 'error', 
+                    text1: t('auth.login.errorTitle'), 
+                    text2: errorMsg || t('auth.login.errorInvalidCredentials') 
+                });
+            }
         } finally {
             setIsLoading(false);
         }
@@ -107,7 +125,7 @@ export const LoginScreen = () => {
     return (
 
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-[#f6f7f8]`}
+            style={tw`flex-1 bg-background`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
@@ -119,8 +137,8 @@ export const LoginScreen = () => {
                 <View style={tw`w-full max-w-[400px] flex-col gap-6`}>
                     {/* Header Logo */}
                     <View style={tw`flex-col items-center gap-4 pt-8 pb-4`}>
-                        <View style={tw`w-24 h-24 rounded-2xl bg-[#1162d4]/10 items-center justify-center border border-[#1162d4]/20`}>
-                            <Ionicons name="checkbox" size={48} color="#1162d4" />
+                        <View style={tw`w-24 h-24 rounded-2xl bg-primary/10 items-center justify-center border border-primary/20`}>
+                            <Ionicons name="checkbox" size={48} color={tw.color('primary')} />
                         </View>
                         <View style={tw`items-center`}>
                             <Text style={tw`text-3xl font-bold text-slate-900 mb-2`}>CepSandık</Text>
@@ -131,7 +149,7 @@ export const LoginScreen = () => {
                     </View>
 
                     {/* Login Form */}
-                    <View style={tw`flex-col gap-5 w-full bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
+                    <View style={tw`flex-col gap-5 w-full bg-surface p-6 rounded-2xl shadow-sm border border-slate-100`}>
 
                         <View style={tw`flex-col gap-2`}>
                             <Text style={tw`text-sm font-semibold text-slate-700`}>{t('auth.login.emailLabel')}</Text>
@@ -158,7 +176,7 @@ export const LoginScreen = () => {
                             <View style={tw`flex-row justify-between items-center`}>
                                 <Text style={tw`text-sm font-semibold text-slate-700`}>{t('auth.login.passwordLabel')}</Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-                                    <Text style={tw`text-sm font-medium text-[#1162d4]`}>{t('auth.login.forgotPassword')}</Text>
+                                    <Text style={tw`text-sm font-medium text-primary`}>{t('auth.login.forgotPassword')}</Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={tw`relative flex-row items-center`}>
@@ -188,7 +206,7 @@ export const LoginScreen = () => {
                         {/* Actions */}
                         <View style={tw`pt-2 flex-col gap-3`}>
                             <TouchableOpacity
-                                style={tw`w-full bg-[#1162d4] h-12 rounded-lg flex-row items-center justify-center gap-2 ${isLoading ? 'opacity-50' : ''}`}
+                                style={tw`w-full bg-primary h-12 rounded-lg flex-row items-center justify-center gap-2 ${isLoading ? 'opacity-50' : ''}`}
                                 onPress={handleLogin}
                                 disabled={isLoading}
                             >
@@ -198,7 +216,7 @@ export const LoginScreen = () => {
 
                             {isBiometricSupported && isBiometricReady && (
                                 <TouchableOpacity
-                                    style={tw`w-full bg-white border border-slate-200 h-12 rounded-lg flex-row items-center justify-center gap-2`}
+                                    style={tw`w-full bg-surface border border-slate-200 h-12 rounded-lg flex-row items-center justify-center gap-2`}
                                     onPress={handleBiometricLogin}
                                     disabled={isLoading}
                                 >
@@ -212,7 +230,7 @@ export const LoginScreen = () => {
                     {/* Footer */}
                     <View style={tw`flex-col items-center gap-6 pb-8`}>
                         <Text style={tw`text-slate-600 text-sm`}>
-                            {t('auth.login.noAccount')} <Text style={tw`text-[#1162d4] font-semibold`} onPress={() => navigation.navigate('Register')}>{t('auth.login.register')}</Text>
+                            {t('auth.login.noAccount')} <Text style={tw`text-primary font-semibold`} onPress={() => navigation.navigate('Register')}>{t('auth.login.register')}</Text>
                         </Text>
 
                         <View style={tw`flex-row items-center gap-2 px-4 py-2 bg-slate-100 rounded-full border border-slate-200 opacity-80`}>

@@ -29,8 +29,7 @@ POST /api/v1/elections
   "maxSelections": 1,
   "startTime": "2026-03-01T09:00:00",
   "endTime": "2026-03-02T18:00:00",
-  "resultsPublic": true,
-  "anonymousVoting": true
+  "resultsPublic": true
 }
 ```
 
@@ -216,8 +215,13 @@ POST /api/v1/elections/{electionId}/votes
 **Request Body:**
 ```json
 {
-  "voteToken": "550e8400-e29b-41d4-a716-446655440000",
-  "candidateId": 2
+  "ballotId": "ballot_8f0a...",
+  "credential": "blind-issued-credential",
+  "credentialSignature": "issuer-signature",
+  "nullifierHash": "sha256-nullifier",
+  "encryptedBallot": "{...ElectionGuard CiphertextBallot JSON...}",
+  "zkpProof": "{...ElectionGuard proof JSON...}",
+  "trackingCode": "tracking-code"
 }
 ```
 
@@ -338,7 +342,6 @@ Tüm hata yanıtları aşağıdaki formattadır:
 |-----|----------|
 | `SINGLE_CHOICE` | Tek aday seçimi |
 | `MULTIPLE_CHOICE` | Birden fazla aday seçimi |
-| `RANKED_CHOICE` | Sıralı tercih oylaması |
 
 ## Katılımcı Türleri
 

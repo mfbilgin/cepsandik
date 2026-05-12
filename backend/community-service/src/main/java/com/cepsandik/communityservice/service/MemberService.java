@@ -27,7 +27,34 @@ import java.util.List;
 public class MemberService {
 
     private final CommunityMemberRepository memberRepository;
+    private final com.cepsandik.communityservice.repository.CommunityRepository communityRepository;
     private final MemberMapper memberMapper;
+    private final com.cepsandik.communityservice.client.UserServiceClient userServiceClient;
+
+    @Transactional
+    public MemberResponse joinCommunity(Long communityId, String userId) {
+        com.cepsandik.communityservice.entity.Community community = communityRepository.findByIdAndIsDeletedFalse(communityId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Topluluk bulunamadı."));
+
+        if (memberRepository.existsByCommunityIdAndUserId(communityId, userId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Zaten bu topluluğun bir üyesisiniz veya beklemedesiniz.");
+        }
+
+        CommunityMember newMember = new CommunityMember();
+        newMember.setCommunityId(communityId);
+        newMember.setUserId(userId);
+        newMember.setRole(MemberRole.MEMBER);
+
+        if (community.getVisibility() == com.cepsandik.communityservice.enums.CommunityVisibility.PUBLIC) {
+            newMember.setStatus(MemberStatus.APPROVED);
+        } else {
+            newMember.setStatus(MemberStatus.PENDING);
+        }
+
+        CommunityMember savedMember = memberRepository.save(newMember);
+        log.info("Yeni katılım isteği: communityId={}, userId={}, status={}", communityId, userId, savedMember.getStatus());
+        return memberMapper.toResponse(savedMember);
+    }
 
     public PageResponse<MemberResponse> getMembers(Long communityId, String userId, int page, int size) {
         validateAdminOrOwner(communityId, userId);
@@ -36,7 +63,7 @@ public class MemberService {
         Page<CommunityMember> memberPage = memberRepository.findByCommunityIdAndStatus(
                 communityId, MemberStatus.APPROVED, pageable);
 
-        List<MemberResponse> members = memberMapper.toResponseList(memberPage.getContent());
+        List<MemberResponse> members = enrichMembers(memberPage.getContent());
         return PageResponse.of(members, page, size, memberPage.getTotalElements());
     }
 
@@ -47,8 +74,26 @@ public class MemberService {
         Page<CommunityMember> memberPage = memberRepository.findByCommunityIdAndStatus(
                 communityId, MemberStatus.PENDING, pageable);
 
-        List<MemberResponse> members = memberMapper.toResponseList(memberPage.getContent());
+        List<MemberResponse> members = enrichMembers(memberPage.getContent());
         return PageResponse.of(members, page, size, memberPage.getTotalElements());
+    }
+
+    private List<MemberResponse> enrichMembers(List<CommunityMember> content) {
+        List<MemberResponse> responses = memberMapper.toResponseList(content);
+        if (responses.isEmpty()) return responses;
+
+        List<String> userIds = responses.stream().map(MemberResponse::getUserId).toList();
+        java.util.Map<String, com.cepsandik.communityservice.client.UserServiceClient.UserResponse> userMap = userServiceClient.getUsersBatch(userIds);
+
+        for (MemberResponse response : responses) {
+            com.cepsandik.communityservice.client.UserServiceClient.UserResponse user = userMap.get(response.getUserId());
+            if (user != null) {
+                response.setFirstName(user.getFirstName());
+                response.setLastName(user.getLastName());
+                response.setProfileImage(user.getProfileImage());
+            }
+        }
+        return responses;
     }
 
     @Transactional

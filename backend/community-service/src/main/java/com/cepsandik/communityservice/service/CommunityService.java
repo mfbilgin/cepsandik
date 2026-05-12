@@ -12,6 +12,7 @@ import com.cepsandik.communityservice.exception.ApiException;
 import com.cepsandik.communityservice.mapper.CommunityMapper;
 import com.cepsandik.communityservice.repository.CommunityMemberRepository;
 import com.cepsandik.communityservice.repository.CommunityRepository;
+import org.slf4j.MDC;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,7 +55,9 @@ public class CommunityService {
         ownerMember.setStatus(MemberStatus.APPROVED);
         memberRepository.save(ownerMember);
 
+        MDC.put("event_type", "community_created");
         log.info("Topluluk oluşturuldu: id={}, name={}, owner={}", saved.getId(), saved.getName(), userId);
+        MDC.remove("event_type");
 
         return buildCommunityResponse(saved, userId);
     }
@@ -98,8 +101,9 @@ public class CommunityService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Topluluk bulunamadı"));
 
         // Üyelik kontrolü
-        if (!memberRepository.existsByCommunityIdAndUserId(communityId, userId)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Bu topluluğun üyesi değilsiniz");
+        boolean isMember = memberRepository.existsByCommunityIdAndUserId(communityId, userId);
+        if (!isMember && community.getVisibility() == com.cepsandik.communityservice.enums.CommunityVisibility.PRIVATE) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Bu gizli topluluğun üyesi değilsiniz");
         }
 
         return buildCommunityResponse(community, userId);
@@ -128,6 +132,9 @@ public class CommunityService {
         }
         if (request.getVisibility() != null) {
             community.setVisibility(request.getVisibility());
+        }
+        if (request.getCoverImageUrl() != null) {
+            community.setCoverImageUrl(request.getCoverImageUrl());
         }
 
         Community updated = communityRepository.save(community);
@@ -173,5 +180,19 @@ public class CommunityService {
                 .orElse(null);
 
         return communityMapper.toResponse(community, memberCount, member);
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${UNSPLASH_ACCESS_KEY:}")
+    private String unsplashAccessKey;
+
+    public Object searchUnsplashImages(String query) {
+        org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+        String url = "https://api.unsplash.com/search/photos?query=" + query + "&per_page=15&client_id=" + unsplashAccessKey;
+        try {
+            return restTemplate.getForObject(url, Object.class);
+        } catch (Exception e) {
+            log.error("Error fetching Unsplash images: ", e);
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Resimler yüklenemedi");
+        }
     }
 }

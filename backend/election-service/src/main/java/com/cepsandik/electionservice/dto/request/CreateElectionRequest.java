@@ -44,7 +44,4 @@ public class CreateElectionRequest {
 
     /** Sonuçların herkese açık olup olmadığı */
     private Boolean resultsPublic = false;
-
-    /** Anonim oylama */
-    private Boolean anonymousVoting = true;
 }

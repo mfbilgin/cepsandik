@@ -24,4 +24,5 @@ public class CommunityResponse {
     private Integer nameChangeCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String coverImageUrl;
 }

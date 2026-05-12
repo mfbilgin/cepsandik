@@ -18,4 +18,6 @@ public class UpdateCommunityRequest {
     private String description;
 
     private CommunityVisibility visibility;
+
+    private String coverImageUrl;
 }

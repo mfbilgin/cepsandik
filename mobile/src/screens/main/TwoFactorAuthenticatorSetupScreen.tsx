@@ -6,7 +6,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -52,7 +52,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
     };
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-[#f6f7f8]`]}>
+        <SafeAreaView style={[tw`flex-1 bg-background`]}>
             <View style={tw`flex-1 w-full max-w-md mx-auto flex-col overflow-hidden`}>
                 {/* Top Navigation */}
                 <View style={tw`flex-row items-center px-4 py-4 justify-between bg-transparent`}>
@@ -69,9 +69,9 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
 
                 {/* Progress Indicator */}
                 <View style={tw`flex w-full flex-row items-center justify-center gap-3 py-4`}>
-                    <View style={tw`h-2 w-2 rounded-full bg-[#1162d4]/20`} />
-                    <View style={tw`h-2 w-8 rounded-full bg-[#1162d4]`} />
-                    <View style={tw`h-2 w-2 rounded-full bg-[#1162d4]/20`} />
+                    <View style={tw`h-2 w-2 rounded-full bg-primary/20`} />
+                    <View style={tw`h-2 w-8 rounded-full bg-primary`} />
+                    <View style={tw`h-2 w-2 rounded-full bg-primary/20`} />
                 </View>
 
                 <ScrollView contentContainerStyle={tw`flex-grow px-6 pb-50`} showsVerticalScrollIndicator={false}>
@@ -87,7 +87,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
 
                     {isLoading ? (
                         <View style={tw`flex-1 items-center justify-center`}>
-                            <ActivityIndicator size="large" color="#1162d4" />
+                            <ActivityIndicator size="large" color={tw.color('primary')} />
                             <Text style={tw`mt-4 text-slate-500`}>{t('twoFactor.authSetup.loading')}</Text>
                         </View>
                     ) : fetchError ? (
@@ -96,8 +96,8 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                             <Text style={tw`mt-4 text-xl font-bold text-center text-slate-800`}>{t('twoFactor.authSetup.failedTitle')}</Text>
                             <Text style={tw`mt-2 text-sm text-center text-slate-600`}>{fetchError}</Text>
                             <Text style={tw`mt-4 text-center text-xs text-slate-400 bg-slate-50 p-3 rounded-lg border border-slate-100`}>{t('twoFactor.authSetup.backendHint')}</Text>
-                            <TouchableOpacity style={tw`mt-6 bg-[#1162d4]/10 p-3 px-6 rounded-xl`} onPress={() => navigation.goBack()}>
-                                <Text style={tw`text-[#1162d4] font-bold`}>{t('twoFactor.authSetup.back')}</Text>
+                            <TouchableOpacity style={tw`mt-6 bg-primary/10 p-3 px-6 rounded-xl`} onPress={() => navigation.goBack()}>
+                                <Text style={tw`text-primary font-bold`}>{t('twoFactor.authSetup.back')}</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -105,7 +105,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                             {/* QR Code Container */}
                             {qrCodeUrl && (
                                 <View style={tw`mt-8 flex-col items-center`}>
-                                    <View style={tw`p-6 bg-white rounded-2xl shadow-sm border border-slate-200`}>
+                                    <View style={tw`p-6 bg-surface rounded-2xl shadow-sm border border-slate-200`}>
                                         <Image
                                             source={{ uri: qrCodeUrl.startsWith('data:image') ? qrCodeUrl : `data:image/png;base64,${qrCodeUrl}` }}
                                             style={tw`w-48 h-48`}
@@ -118,18 +118,18 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                             {/* Manual Entry Section */}
                             <View style={tw`mt-8 flex-col gap-3`}>
                                 <Text style={tw`text-xs font-semibold uppercase tracking-wider text-center text-slate-500`}>{t('twoFactor.authSetup.cantScan')}</Text>
-                                <View style={tw`flex-row items-center justify-between p-4 bg-[#1162d4]/5 rounded-xl border border-[#1162d4]/20`}>
+                                <View style={tw`flex-row items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/20`}>
                                     <View style={tw`flex-col`}>
-                                        <Text style={tw`text-[10px] text-[#1162d4] font-bold uppercase`}>{t('twoFactor.authSetup.manualKey')}</Text>
+                                        <Text style={tw`text-[10px] text-primary font-bold uppercase`}>{t('twoFactor.authSetup.manualKey')}</Text>
                                         <Text style={tw`font-mono font-bold tracking-widest text-slate-900 mt-1`}>
                                             {manualKey || 'XXXX XXXX XXXX XXXX'}
                                         </Text>
                                     </View>
                                     <TouchableOpacity
                                         onPress={copyToClipboard}
-                                        style={tw`flex items-center justify-center h-10 w-10 hover:bg-[#1162d4]/10 rounded-lg`}
+                                        style={tw`flex items-center justify-center h-10 w-10 hover:bg-primary/10 rounded-lg`}
                                     >
-                                        <Ionicons name="copy-outline" size={24} color="#1162d4" />
+                                        <Ionicons name="copy-outline" size={24} color={tw.color('primary')} />
                                     </TouchableOpacity>
                                 </View>
                                 <TouchableOpacity
@@ -152,19 +152,19 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
                             {/* Instructions List */}
                             <View style={tw`mt-8 flex-col gap-4`}>
                                 <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
+                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
                                         <Text style={tw`text-white text-xs font-bold`}>1</Text>
                                     </View>
                                     <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step1')}</Text>
                                 </View>
                                 <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
+                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
                                         <Text style={tw`text-white text-xs font-bold`}>2</Text>
                                     </View>
                                     <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step2')}</Text>
                                 </View>
                                 <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1162d4]`}>
+                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
                                         <Text style={tw`text-white text-xs font-bold`}>3</Text>
                                     </View>
                                     <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step3')}</Text>
@@ -176,9 +176,9 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
 
                 {/* Sticky Bottom Button */}
                 {!fetchError && (
-                    <View style={tw`absolute bottom-0 w-full p-6 bg-[#f6f7f8] border-t border-slate-200 z-10`}>
+                    <View style={tw`absolute bottom-0 w-full p-6 bg-background border-t border-slate-200 z-10`}>
                         <TouchableOpacity
-                            style={tw`w-full h-14 bg-[#1162d4] flex-row items-center justify-center gap-2 rounded-xl shadow-lg ${isLoading ? 'opacity-50' : ''}`}
+                            style={tw`w-full h-14 bg-primary flex-row items-center justify-center gap-2 rounded-xl shadow-lg ${isLoading ? 'opacity-50' : ''}`}
                             onPress={() => navigation.navigate('TwoFactorVerification', { backupCodes })}
                             disabled={isLoading}
                             activeOpacity={0.8}

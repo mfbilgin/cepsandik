@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const CreateCommunityScreen = () => {
@@ -64,18 +64,18 @@ export const CreateCommunityScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-[#f6f7f8]`}
+            style={tw`flex-1 bg-background`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-            <View style={tw`w-full bg-white flex-1 flex-col relative`}>
+            <View style={tw`w-full bg-surface flex-1 flex-col relative`}>
                 {/* Top App Bar (iOS Style) */}
-                <View style={tw`flex-row items-center px-4 pt-14 pb-2 bg-white border-b border-slate-100 z-10`}>
+                <View style={tw`flex-row items-center px-4 pt-14 pb-2 bg-surface border-b border-slate-100 z-10`}>
                     <TouchableOpacity
                         style={tw`w-10 h-10 -ml-2 items-center justify-center rounded-full`}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="chevron-back" size={28} color="#1162d4" />
+                        <Ionicons name="chevron-back" size={28} color={tw.color('primary')} />
                     </TouchableOpacity>
                     <Text style={tw`text-lg font-bold flex-1 text-center pr-8`}>{t('createCommunity.title')}</Text>
                 </View>
@@ -92,11 +92,11 @@ export const CreateCommunityScreen = () => {
                             <View style={tw`w-28 h-28 rounded-full bg-slate-100 items-center justify-center border-2 border-dashed border-slate-300 overflow-hidden relative`}>
                                 <Ionicons name="camera-outline" size={36} color="#94a3b8" />
                             </View>
-                            <View style={tw`absolute bottom-0 right-0 bg-[#1162d4] rounded-full p-1.5 shadow-md border-2 border-white items-center justify-center`}>
+                            <View style={tw`absolute bottom-0 right-0 bg-primary rounded-full p-1.5 shadow-md border-2 border-white items-center justify-center`}>
                                 <Ionicons name="add" size={16} color="white" />
                             </View>
                         </TouchableOpacity>
-                        <Text style={tw`mt-3 text-sm font-medium text-[#1162d4]`}>{t('createCommunity.uploadLogo')}</Text>
+                        <Text style={tw`mt-3 text-sm font-medium text-primary`}>{t('createCommunity.uploadLogo')}</Text>
                     </View>
 
                     {/* Form Fields */}
@@ -136,16 +136,16 @@ export const CreateCommunityScreen = () => {
 
                         {/* Privacy Toggle Section */}
                         <View style={tw`pt-2`}>
-                            <View style={tw`p-4 rounded-xl border border-slate-200 bg-white shadow-sm`}>
+                            <View style={tw`p-4 rounded-xl border border-slate-200 bg-surface shadow-sm`}>
                                 <View style={tw`flex-row items-center justify-between mb-2`}>
                                     <View style={tw`flex-row items-center gap-3`}>
-                                        <View style={tw`bg-[#1162d4]/10 p-2 rounded-full`}>
-                                            <Ionicons name="lock-closed" size={20} color="#1162d4" />
+                                        <View style={tw`bg-primary/10 p-2 rounded-full`}>
+                                            <Ionicons name="lock-closed" size={20} color={tw.color('primary')} />
                                         </View>
                                         <Text style={tw`font-semibold text-slate-900`}>{t('createCommunity.privateTitle')}</Text>
                                     </View>
                                     <Switch
-                                        trackColor={{ false: '#cbd5e1', true: '#1162d4' }}
+                                        trackColor={{ false: '#cbd5e1', true: '#41431B' }}
                                         thumbColor={Platform.OS === 'ios' ? '#ffffff' : isPrivate ? '#ffffff' : '#f8fafc'}
                                         ios_backgroundColor="#cbd5e1"
                                         onValueChange={setIsPrivate}
@@ -161,9 +161,9 @@ export const CreateCommunityScreen = () => {
                 </ScrollView>
 
                 {/* Sticky Footer Button */}
-                <View style={tw`absolute bottom-0 left-0 w-full p-4 bg-white border-t border-slate-100 pb-8`}>
+                <View style={tw`absolute bottom-0 left-0 w-full p-4 bg-surface border-t border-slate-100 pb-8`}>
                     <TouchableOpacity
-                        style={tw`w-full bg-[#1162d4] flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-md ${isLoading ? 'opacity-50' : ''}`}
+                        style={tw`w-full bg-primary flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-md ${isLoading ? 'opacity-50' : ''}`}
                         onPress={handleCreate}
                         disabled={isLoading}
                         activeOpacity={0.8}

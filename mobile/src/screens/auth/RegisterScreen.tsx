@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const RegisterScreen = () => {
@@ -94,11 +94,11 @@ export const RegisterScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-[#f6f7f8]`}
+            style={tw`flex-1 bg-background`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-            <View style={tw`flex-row items-center bg-[#f6f7f8] p-4 pb-2 justify-between z-10 top-0 pt-10`}>
+            <View style={tw`flex-row items-center bg-background p-4 pb-2 justify-between z-10 top-0 pt-10`}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={tw`w-12 h-12 items-center justify-center rounded-full bg-slate-200/50`}
@@ -118,9 +118,9 @@ export const RegisterScreen = () => {
                     <ImageBackground
                         source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAX2-poEMyGbMXK2iBzCjdXCAiRHAMz1wj4appX0z83DUkaSUhYim50orTciiI-liphMM1cZzjr5hByBZjWhMP5AIr8-ZHaNLOBjudErO2TUXFFRqRShDUwam9m1HhmQ6JXjRRaXd9LMxqsh2mkE-0Qy_K4E2XZglWZTbZ7x-rM0zvwQdubDGOAJBjgP2aEGaeMb_YtHnyrGPgBmrjqrO-Ix5eYi4Py4dX1lUBTbsFl98ntJeGJ1dOSBJ30ZhwOqGzWMuyIMBZ1Gfq' }}
                         style={tw`relative flex-col justify-end overflow-hidden rounded-xl min-h-[160px] shadow-sm`}
-                        imageStyle={tw`opacity-80 bg-[#1162d4]`}
+                        imageStyle={tw`opacity-80 bg-primary`}
                     >
-                        <View style={tw`absolute inset-0 bg-[#1162d4]/60`} />
+                        <View style={tw`absolute inset-0 bg-primary/60`} />
                         <View style={tw`absolute top-4 right-4 opacity-50`}>
                             <Ionicons name="shield-checkmark" size={60} color="white" />
                         </View>
@@ -142,7 +142,7 @@ export const RegisterScreen = () => {
                         <View style={tw`flex-1 flex-col`}>
                             <Text style={tw`text-sm font-medium text-slate-700 pb-2`}>Ad</Text>
                             <TextInput
-                                style={tw`w-full rounded-lg border border-slate-300 bg-white text-slate-900 h-12 px-3 text-base`}
+                                style={tw`w-full rounded-lg border border-slate-300 bg-surface text-slate-900 h-12 px-3 text-base`}
                                 placeholder="Adınız"
                                 placeholderTextColor="#94a3b8"
                                 value={firstName}
@@ -156,7 +156,7 @@ export const RegisterScreen = () => {
                             <Text style={tw`text-sm font-medium text-slate-700 pb-2`}>Soyad</Text>
                             <TextInput
                                 ref={lastNameRef}
-                                style={tw`w-full rounded-lg border border-slate-300 bg-white text-slate-900 h-12 px-3 text-base`}
+                                style={tw`w-full rounded-lg border border-slate-300 bg-surface text-slate-900 h-12 px-3 text-base`}
                                 placeholder="Soyadınız"
                                 placeholderTextColor="#94a3b8"
                                 value={lastName}
@@ -174,7 +174,7 @@ export const RegisterScreen = () => {
                         <View style={tw`relative`}>
                             <TextInput
                                 ref={emailRef}
-                                style={tw`w-full rounded-lg border border-slate-300 bg-white text-slate-900 h-12 pl-3 pr-10 text-base`}
+                                style={tw`w-full rounded-lg border border-slate-300 bg-surface text-slate-900 h-12 pl-3 pr-10 text-base`}
                                 placeholder="isim@ornek.com"
                                 placeholderTextColor="#94a3b8"
                                 value={email}
@@ -197,7 +197,7 @@ export const RegisterScreen = () => {
                         <View style={tw`relative`}>
                             <TextInput
                                 ref={passwordRef}
-                                style={tw`w-full rounded-lg border border-slate-300 bg-white text-slate-900 h-12 pl-3 pr-10 text-base`}
+                                style={tw`w-full rounded-lg border border-slate-300 bg-surface text-slate-900 h-12 pl-3 pr-10 text-base`}
                                 placeholder="••••••••"
                                 placeholderTextColor="#94a3b8"
                                 secureTextEntry={!isPasswordVisible}
@@ -235,7 +235,7 @@ export const RegisterScreen = () => {
                         <View style={tw`relative`}>
                             <TextInput
                                 ref={confirmPasswordRef}
-                                style={tw`w-full rounded-lg border border-slate-300 bg-white text-slate-900 h-12 pl-3 pr-10 text-base`}
+                                style={tw`w-full rounded-lg border border-slate-300 bg-surface text-slate-900 h-12 pl-3 pr-10 text-base`}
                                 placeholder="••••••••"
                                 placeholderTextColor="#94a3b8"
                                 secureTextEntry={!isConfirmPasswordVisible}
@@ -260,12 +260,12 @@ export const RegisterScreen = () => {
                             onPress={() => setKvkkAccepted(!kvkkAccepted)}
                             activeOpacity={0.8}
                         >
-                            <View style={tw`w-5 h-5 rounded border ${kvkkAccepted ? 'border-[#1162d4] bg-[#1162d4]' : 'border-slate-300 bg-white'} items-center justify-center mt-0.5`}>
+                            <View style={tw`w-5 h-5 rounded border ${kvkkAccepted ? 'border-primary bg-primary' : 'border-slate-300 bg-surface'} items-center justify-center mt-0.5`}>
                                 {kvkkAccepted && <Ionicons name="checkmark" size={14} color="white" />}
                             </View>
                             <Text style={tw`flex-1 text-sm leading-tight text-slate-600`}>
-                                <Text style={tw`font-medium text-[#1162d4] underline`}>Gizlilik Politikası</Text> ve{' '}
-                                <Text style={tw`font-medium text-[#1162d4] underline`}>KVKK Metnini</Text>
+                                <Text style={tw`font-medium text-primary underline`}>Gizlilik Politikası</Text> ve{' '}
+                                <Text style={tw`font-medium text-primary underline`}>KVKK Metnini</Text>
                                 {' '}okudum, onaylıyorum.
                             </Text>
                         </TouchableOpacity>
@@ -274,7 +274,7 @@ export const RegisterScreen = () => {
                     {/* Submit Button */}
                     <View style={tw`pt-4 pb-20`}>
                         <TouchableOpacity
-                            style={tw`w-full bg-[#1162d4] flex-row items-center justify-center gap-2 py-3.5 rounded-lg shadow-sm ${isLoading ? 'opacity-50' : ''}`}
+                            style={tw`w-full bg-primary flex-row items-center justify-center gap-2 py-3.5 rounded-lg shadow-sm ${isLoading ? 'opacity-50' : ''}`}
                             onPress={handleRegister}
                             disabled={isLoading}
                         >
@@ -286,7 +286,7 @@ export const RegisterScreen = () => {
                         <View style={tw`text-center mt-6 flex-row items-center justify-center`}>
                             <Text style={tw`text-slate-500 text-sm`}>
                                 Zaten hesabınız var mı?{' '}
-                                <Text style={tw`font-semibold text-[#1162d4]`} onPress={() => navigation.navigate('Login')}>
+                                <Text style={tw`font-semibold text-primary`} onPress={() => navigation.navigate('Login')}>
                                     Giriş Yap
                                 </Text>
                             </Text>

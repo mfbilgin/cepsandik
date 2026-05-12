@@ -76,4 +76,13 @@ public class CommunityController {
         PageResponse<CommunityResponse> communities = communityService.searchCommunities(query, page, size);
         return ResponseEntity.ok(ApiResponse.success(communities));
     }
+
+    @GetMapping("/unsplash")
+    public ResponseEntity<ApiResponse<Object>> searchUnsplashImages(
+            @RequestParam(defaultValue = "community") String query,
+            @RequestHeader("X-User-Id") String userId) {
+        
+        Object response = communityService.searchUnsplashImages(query);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

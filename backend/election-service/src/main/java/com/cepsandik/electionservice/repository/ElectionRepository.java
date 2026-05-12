@@ -37,9 +37,14 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
        List<Election> findElectionsToStart(@Param("scheduled") ElectionStatus scheduled,
                      @Param("now") Instant now);
 
-       /** Bitmesi gereken seçimleri bul (ACTIVE → CLOSED) */
+       /**
+        * Bitmesi gereken seçimleri bul (ACTIVE → CLOSED).
+        * `tallyProof IS NULL` filter'ı autoTally idempotency için: aynı seçim
+        * için autoTally bir kere yazdıktan sonra bu sorgu onu döndürmez.
+        */
        @Query("SELECT e FROM Election e WHERE e.status = :active " +
-                     "AND e.endTime <= :now AND e.isDeleted = false")
+                     "AND e.endTime <= :now AND e.isDeleted = false " +
+                     "AND e.tallyProof IS NULL")
        List<Election> findElectionsToEnd(@Param("active") ElectionStatus active,
                      @Param("now") Instant now);
 

@@ -16,6 +16,7 @@ export const AppNavigator = () => {
         config: {
             screens: {
                 ResetPassword: 'auth/reset-password/:token',
+                CommunityDetail: 'c/:id',
             }
         }
     };

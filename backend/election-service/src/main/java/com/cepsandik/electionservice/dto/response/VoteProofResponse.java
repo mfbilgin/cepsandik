@@ -11,8 +11,9 @@ import lombok.NoArgsConstructor;
 @Builder
 public class VoteProofResponse {
     private Long electionId;
-    private String voteToken;
+    private String ballotId;
     private String trackingCode;
     private String encryptedBallot;
     private String zkpProof;
+    private String ballotHash;
 }

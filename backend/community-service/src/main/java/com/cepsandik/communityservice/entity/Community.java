@@ -50,4 +50,7 @@ public class Community {
     @Column(name = "name_change_count", nullable = false)
     private Integer nameChangeCount = 0;
 
+    @Column(name = "cover_image_url")
+    private String coverImageUrl;
+
 }

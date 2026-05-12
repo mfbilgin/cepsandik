@@ -22,4 +22,6 @@ public class CreateCommunityRequest {
 
     @NotNull(message = "Görünürlük alanı zorunludur")
     private CommunityVisibility visibility;
+
+    private String coverImageUrl;
 }

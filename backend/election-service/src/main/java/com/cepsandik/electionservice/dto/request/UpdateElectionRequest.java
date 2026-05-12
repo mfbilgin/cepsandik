@@ -31,6 +31,4 @@ public class UpdateElectionRequest {
     private Instant endTime;
 
     private Boolean resultsPublic;
-
-    private Boolean anonymousVoting;
 }

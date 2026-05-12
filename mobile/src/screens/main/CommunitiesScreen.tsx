@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, ImageBackg
 import { api } from '../../services/api';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const CommunitiesScreen = () => {
@@ -65,57 +65,57 @@ export const CommunitiesScreen = () => {
     }, [searchQuery, communities]);
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8] relative`}>
+        <View style={tw`flex-1 bg-background relative`}>
             {/* Header Section */}
-            <View style={tw`bg-white border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30`}>
+            <View style={tw`bg-surface border-b border-background pt-14 pb-3 px-5 shadow-sm z-30`}>
                 <View style={tw`flex-row items-center justify-between mb-3`}>
                     {!isSearchOpen ? (
                         <>
-                            <Text style={tw`text-2xl font-bold tracking-tight text-slate-900`}>{t('communities.title')}</Text>
+                            <Text style={tw`text-2xl font-bold tracking-tight text-primary`}>{t('communities.title')}</Text>
                             <View style={tw`flex-row items-center gap-2`}>
-                                <TouchableOpacity style={tw`p-2 rounded-full bg-slate-50`} onPress={() => setIsSearchOpen(true)}>
-                                    <Ionicons name="search" size={22} color="#475569" />
+                                <TouchableOpacity style={tw`p-2 rounded-full bg-secondary/20`} onPress={() => setIsSearchOpen(true)}>
+                                    <Ionicons name="search" size={22} color={tw.color('primary') as string} />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={tw`p-2 rounded-full bg-slate-50`} onPress={() => navigation.navigate('NotificationInbox')}>
-                                    <Ionicons name="notifications-outline" size={22} color="#475569" />
+                                <TouchableOpacity style={tw`p-2 rounded-full bg-secondary/20`} onPress={() => navigation.navigate('NotificationInbox')}>
+                                    <Ionicons name="notifications-outline" size={22} color={tw.color('primary') as string} />
                                 </TouchableOpacity>
                             </View>
                         </>
                     ) : (
-                        <View style={tw`flex-row items-center flex-1 bg-slate-100 rounded-full px-4 py-2 mt-1 mb-1`}>
-                            <Ionicons name="search" size={20} color="#94a3b8" />
+                        <View style={tw`flex-row items-center flex-1 bg-background rounded-full px-4 py-2 mt-1 mb-1 border border-primary/10`}>
+                            <Ionicons name="search" size={20} color={tw.color('secondary') as string} />
                             <TextInput
-                                style={tw`flex-1 h-10 px-3 text-slate-900 text-base`}
+                                style={tw`flex-1 h-10 px-3 text-primary text-base`}
                                 placeholder={t('communities.searchPlaceholder')}
-                                placeholderTextColor="#94a3b8"
+                                placeholderTextColor={tw.color('secondary') as string}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                                 autoFocus
                             />
                             <TouchableOpacity onPress={() => { setIsSearchOpen(false); setSearchQuery(''); }} style={tw`p-1`}>
-                                <Ionicons name="close-circle" size={20} color="#cbd5e1" />
+                                <Ionicons name="close-circle" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
                         </View>
                     )}
                 </View>
 
                 {/* Segmented Control Tabs */}
-                <View style={tw`flex-row p-1 bg-slate-100 rounded-lg mt-1`}>
+                <View style={tw`flex-row p-1 bg-background rounded-lg mt-1 border border-primary/10`}>
                     <TouchableOpacity
-                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'memberships' ? 'bg-white shadow-sm' : 'bg-transparent'}`}
+                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'memberships' ? 'bg-surface shadow-sm' : 'bg-transparent'}`}
                         onPress={() => setActiveTab('memberships')}
                         activeOpacity={0.8}
                     >
-                        <Text style={tw`text-center text-sm ${activeTab === 'memberships' ? 'font-bold text-[#1162d4]' : 'font-semibold text-slate-500'}`}>
+                        <Text style={tw`text-center text-sm ${activeTab === 'memberships' ? 'font-bold text-primary' : 'font-semibold text-textSecondary'}`}>
                             {t('communities.tab.memberships')}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'managed' ? 'bg-white shadow-sm' : 'bg-transparent'}`}
+                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'managed' ? 'bg-surface shadow-sm' : 'bg-transparent'}`}
                         onPress={() => setActiveTab('managed')}
                         activeOpacity={0.8}
                     >
-                        <Text style={tw`text-center text-sm ${activeTab === 'managed' ? 'font-bold text-[#1162d4]' : 'font-semibold text-slate-500'}`}>
+                        <Text style={tw`text-center text-sm ${activeTab === 'managed' ? 'font-bold text-primary' : 'font-semibold text-textSecondary'}`}>
                             {t('communities.tab.managed')}
                         </Text>
                     </TouchableOpacity>
@@ -127,47 +127,53 @@ export const CommunitiesScreen = () => {
                 style={tw`flex-1`}
                 contentContainerStyle={tw`p-5 pb-24 flex-col gap-5`}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1162d4']} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[tw.color('primary') as string]} />
                 }
             >
                 {isLoading ? (
-                    <ActivityIndicator size="large" color="#1162d4" style={tw`mt-10`} />
+                    <ActivityIndicator size="large" color={tw.color('primary')} style={tw`mt-10`} />
                 ) : filteredCommunities.length === 0 ? (
-                    <View style={tw`flex-col items-center justify-center p-8 mt-10 bg-white rounded-2xl border border-slate-100 shadow-sm`}>
-                        <Ionicons name="people-outline" size={64} color="#e2e8f0" />
-                        <Text style={tw`text-slate-500 font-medium mt-4 text-center`}>
+                    <View style={tw`flex-col items-center justify-center p-8 mt-10 bg-surface rounded-2xl border border-primary/10 shadow-sm`}>
+                        <Ionicons name="people-outline" size={64} color={tw.color('secondary') as string} />
+                        <Text style={tw`text-textSecondary font-medium mt-4 text-center`}>
                             {searchQuery ? t('communities.searchEmpty') : t('communities.empty')}
                         </Text>
                     </View>
                 ) : (
                     filteredCommunities.map((comm) => (
-                        <TouchableOpacity key={comm.id} style={tw`flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100`} activeOpacity={0.8} onPress={() => navigation.navigate('CommunityDetail', { id: comm.id })}>
-                            {/* Banner placeholder */}
-                            <View style={tw`h-24 w-full bg-[#1162d4]`} />
+                        <TouchableOpacity key={comm.id} style={tw`flex-col overflow-hidden bg-surface rounded-2xl shadow-sm border border-primary/10`} activeOpacity={0.8} onPress={() => navigation.navigate('CommunityDetail', { id: comm.id })}>
+                            {/* Banner Image */}
+                            {comm.coverImageUrl ? (
+                                <ImageBackground source={{ uri: comm.coverImageUrl }} style={tw`h-24 w-full bg-primary`}>
+                                    <View style={tw`absolute inset-0 bg-primary/20`} />
+                                </ImageBackground>
+                            ) : (
+                                <View style={tw`h-24 w-full bg-primary`} />
+                            )}
 
                             <View style={tw`flex-col p-5 pt-0`}>
                                 <View style={tw`flex-row justify-between items-start`}>
                                     <View style={tw`-mt-8 mb-3`}>
-                                        <View style={tw`h-16 w-16 rounded-2xl border-4 border-white bg-slate-50 overflow-hidden shadow-sm items-center justify-center`}>
-                                            <Text style={tw`text-3xl font-black text-[#1162d4]`}>{comm.name?.[0]}</Text>
+                                        <View style={tw`h-16 w-16 rounded-2xl border-4 border-surface bg-background overflow-hidden shadow-sm items-center justify-center`}>
+                                            <Text style={tw`text-3xl font-black text-primary`}>{comm.name?.[0]}</Text>
                                         </View>
                                     </View>
                                 </View>
 
-                                <Text style={tw`text-xl font-bold text-slate-900 leading-tight`}>{comm.name}</Text>
-                                <Text style={tw`text-sm text-slate-500 mt-1.5 leading-relaxed`} numberOfLines={2}>
+                                <Text style={tw`text-xl font-bold text-primary leading-tight`}>{comm.name}</Text>
+                                <Text style={tw`text-sm text-textSecondary mt-1.5 leading-relaxed`} numberOfLines={2}>
                                     {comm.description || t('communities.noDescription')}
                                 </Text>
 
-                                <View style={tw`mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4`}>
+                                <View style={tw`mt-4 flex-row items-center justify-between border-t border-primary/10 pt-4`}>
                                     <View style={tw`flex-row items-center gap-2`}>
-                                        <View style={tw`bg-[#1162d4]/10 p-1.5 rounded-lg`}>
-                                            <Ionicons name="people" size={16} color="#1162d4" />
+                                        <View style={tw`bg-primary/10 p-1.5 rounded-lg`}>
+                                            <Ionicons name="people" size={16} color={tw.color('primary') as string} />
                                         </View>
-                                        <Text style={tw`text-sm font-semibold text-slate-700`}>{t('communities.member')}</Text>
+                                        <Text style={tw`text-sm font-semibold text-textSecondary`}>{t('communities.member')}</Text>
                                     </View>
-                                    <View style={tw`w-8 h-8 rounded-full bg-slate-50 items-center justify-center`}>
-                                        <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+                                    <View style={tw`w-8 h-8 rounded-full bg-secondary/20 items-center justify-center`}>
+                                        <Ionicons name="chevron-forward" size={18} color={tw.color('primary') as string} />
                                     </View>
                                 </View>
                             </View>
@@ -176,9 +182,8 @@ export const CommunitiesScreen = () => {
                 )}
             </ScrollView>
 
-            {/* Floating Action Button */}
             <TouchableOpacity
-                style={tw`absolute bottom-6 right-5 h-14 w-14 bg-[#1162d4] rounded-full shadow-lg items-center justify-center z-40 border-2 border-white`}
+                style={tw`absolute bottom-6 right-5 h-14 w-14 bg-primary rounded-full shadow-lg items-center justify-center z-40 border-2 border-surface`}
                 onPress={() => navigation.navigate('CreateCommunity')}
                 activeOpacity={0.8}
             >

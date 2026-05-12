@@ -25,7 +25,6 @@ public class ElectionPreviewResponse {
     private ParticipantType participantType;
     private Instant startTime;
     private Instant endTime;
-    private Boolean anonymousVoting;
     private Boolean resultsPublic;
     private Integer candidateCount;
     private Integer accessCodeCount;

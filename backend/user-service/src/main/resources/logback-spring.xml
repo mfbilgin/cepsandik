@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Get service name from application.properties -->
+    <springProperty scope="context" name="SERVICE_NAME" source="spring.application.name" defaultValue="user-service"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Include service name in every log -->
+            <customFields>{"service_name":"${SERVICE_NAME}"}</customFields>
+            
+            <!-- Standardize field names -->
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <level>level</level>
+                <levelValue>[ignore]</levelValue>
+                <version>[ignore]</version>
+                <message>message</message>
+            </fieldNames>
+            
+            <!-- Pretty print is false for production aggregation, but we keep it default for stdout -->
+        </encoder>
+    </appender>
+
+    <!-- Environment-specific configuration could go here (e.g., local console colored logging) -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!-- Specifically enable logging for our package -->
+    <logger name="com.cepsandik" level="INFO" />
+</configuration>

@@ -15,26 +15,22 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/elections/{electionId}/votes")
 @RequiredArgsConstructor
-@Tag(name = "Voting", description = "Oy verme işlemleri API'leri")
+@Tag(name = "Voting", description = "E2E-V anonymous voting APIs")
 public class VoteController {
 
     private final VoteService voteService;
 
-    // ==================== Erişim Kodu Doğrulama ====================
-
-    @Operation(summary = "Erişim kodunu doğrular ve seçim bilgilerini döndürür")
+    @Operation(summary = "Verify an access code and return election data")
     @PostMapping("/verify-access")
     public ResponseEntity<ApiResponse<AccessVerificationResponse>> verifyAccessCode(
             @PathVariable Long electionId,
             @Valid @RequestBody VerifyAccessCodeRequest request) {
 
         AccessVerificationResponse response = voteService.verifyAccessCode(electionId, request.getCode());
-        return ResponseEntity.ok(ApiResponse.success("Erişim kodu doğrulandı", response));
+        return ResponseEntity.ok(ApiResponse.success("Erisim kodu dogrulandi", response));
     }
 
-    // ==================== Vote Token ====================
-
-    @Operation(summary = "Oy kullanmak için tek kullanımlık token alır")
+    @Operation(summary = "Issue an eligibility credential for the current voter")
     @PostMapping("/token")
     public ResponseEntity<ApiResponse<VoteTokenResponse>> generateVoteToken(
             @PathVariable Long electionId,
@@ -42,31 +38,35 @@ public class VoteController {
 
         VoteTokenResponse response = voteService.generateVoteToken(electionId, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Oy token'ı oluşturuldu", response));
+                .body(ApiResponse.success("Oy kullanma belgesi olusturuldu", response));
     }
 
-    // ==================== Oy Verme ====================
+    @Operation(summary = "Issue an anonymous voting credential")
+    @PostMapping("/credentials/blind-issue")
+    public ResponseEntity<ApiResponse<VoteTokenResponse>> issueBlindCredential(
+            @PathVariable Long electionId,
+            @RequestHeader("X-User-Id") String userId) {
 
-    @Operation(summary = "Oy kullanır (idempotent - aynı token ile tekrar istek yapılabilir)")
+        VoteTokenResponse response = voteService.generateVoteToken(electionId, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Anonim oy kullanma belgesi olusturuldu", response));
+    }
+
+    @Operation(summary = "Cast an anonymous encrypted ballot")
     @PostMapping
     public ResponseEntity<ApiResponse<VoteResponse>> castVote(
             @PathVariable Long electionId,
             @Valid @RequestBody CastVoteRequest request) {
 
         VoteResponse response = voteService.castVote(electionId, request);
-
         if (response.getAlreadyVoted()) {
-            // İdempotent: daha önce oy kullanılmış, mevcut oyu döndür
-            return ResponseEntity.ok(ApiResponse.success("Daha önce oy kullanılmış", response));
+            return ResponseEntity.ok(ApiResponse.success("Bu anonim nullifier daha once kullanilmis", response));
         }
-
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Oyunuz başarıyla kaydedildi", response));
+                .body(ApiResponse.success("Sifreli oyunuz kaydedildi", response));
     }
 
-    // ==================== Oy Durumu ====================
-
-    @Operation(summary = "Kullanıcının bu seçimdeki oy durumunu kontrol eder")
+    @Operation(summary = "Return credential issuance status; does not reveal ballot status")
     @GetMapping("/my-status")
     public ResponseEntity<ApiResponse<VoteResponse>> getMyVoteStatus(
             @PathVariable Long electionId,
@@ -76,21 +76,27 @@ public class VoteController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // ==================== İspat (Zero Knowledge Proof) ====================
-
-    @Operation(summary = "Kullanıcının bu seçimdeki şifrelenmiş oyunun kriptografik kanıtlarını döndürür")
+    @Operation(summary = "Disabled in E2E-V mode; use tracking-code bulletin lookup")
     @GetMapping("/my-proof")
     public ResponseEntity<ApiResponse<VoteProofResponse>> getMyVoteProof(
             @PathVariable Long electionId,
             @RequestHeader("X-User-Id") String userId) {
 
         VoteProofResponse response = voteService.getMyVoteProof(electionId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Kriptografik oylama kanıtları getirildi", response));
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // ==================== İstatistikler ====================
+    @Operation(summary = "Return public ballot proof by tracking code")
+    @GetMapping("/bulletin/ballots/{trackingCode}")
+    public ResponseEntity<ApiResponse<VoteProofResponse>> getVoteProofByTrackingCode(
+            @PathVariable Long electionId,
+            @PathVariable String trackingCode) {
 
-    @Operation(summary = "Seçim oy istatistiklerini döndürür (CLOSED/ARCHIVED seçimler veya seçim sahibi için)")
+        VoteProofResponse response = voteService.getVoteProofByTrackingCode(electionId, trackingCode);
+        return ResponseEntity.ok(ApiResponse.success("Public bulletin oy kaniti getirildi", response));
+    }
+
+    @Operation(summary = "Return high-level election stats")
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<ElectionStatsResponse>> getElectionStats(
             @PathVariable Long electionId,

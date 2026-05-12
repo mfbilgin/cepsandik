@@ -1,49 +1,189 @@
+version: "3.8"
+
 services:
   gateway:
+    image: cepsandik-gateway:local
+    build:
+      context: ./openresty
+      dockerfile: Dockerfile
     ports:
-      # Tüm arayüzlerde dinle (telefon aynı Wi‑Fi'den PC IP + 8088 ile erişsin)
       - "0.0.0.0:8088:80"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
     volumes:
       - ./openresty/conf/nginx.local.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-    healthcheck:
-      disable: true
-
-  certbot:
-    profiles: ["prod-only"]
-
-  backup:
-    profiles: ["prod-only"]
+    networks:
+      - app-network
 
   user-service:
+    build:
+      context: ../backend/user-service
     ports:
       - "8080:8080"
-    healthcheck:
-      disable: true
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - SPRING_DATA_REDIS_HOST=redis
+      - APP_JWT_SECRET=${JWT_SECRET}
+      - APP_JWT_TTL_SECONDS=${JWT_TTL_SECONDS}
+      - APP_INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+      - SPRING_MAIL_HOST=${MAIL_HOST}
+      - SPRING_MAIL_PORT=${MAIL_PORT}
+      - SPRING_MAIL_USERNAME=${MAIL_USERNAME}
+      - SPRING_MAIL_PASSWORD=${MAIL_PASSWORD}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=${MAIL_SMTP_AUTH}
+      - SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=${MAIL_SMTP_STARTTLS_ENABLE}
+      - APP_MAIL_FROM=${MAIL_FROM}
+      - APP_MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - APP_FRONTEND_URL=${FRONTEND_URL}
+      - SPRING_MAIL_PROPERTIES_MAIL_DEBUG=true
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+    networks:
+      - app-network
 
   community-service:
+    build:
+      context: ../backend/community-service
     ports:
       - "8083:8083"
-    healthcheck:
-      disable: true
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/communitydb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+    depends_on:
+      - postgres
+    networks:
+      - app-network
 
   election-service:
+    build:
+      context: ../backend/election-service
     ports:
       - "8082:8082"
-    healthcheck:
-      disable: true
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/electiondb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - APP_CRYPTO_ENGINE_HOST=crypto-engine-kotlin
+      - APP_CRYPTO_ENGINE_PORT=50051
+      - APP_GUARDIAN_COUNT=5
+      - APP_GUARDIAN_QUORUM=3
+      - APP_GUARDIAN_DEV_BYPASS=true
+      - APP_BULLETIN_BOARD_URL=http://bulletin-board-service:8085
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+    depends_on:
+      - postgres
+      - rabbitmq
+      - crypto-engine-kotlin
+      - bulletin-board-service
+    networks:
+      - app-network
 
-  crypto-engine:
+  bulletin-board-service:
+    build:
+      context: ../backend/bulletin-board-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/bulletindb
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  notification-service:
+    build:
+      context: ../backend/notification-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - EXPO_PUSH_API_URL=https://exp.host/--/api/v2/push/send
+      - APP_USER_SERVICE_URL=http://user-service:8080
+    depends_on:
+      - rabbitmq
+    networks:
+      - app-network
+
+  crypto-engine-kotlin:
+    build:
+      context: ../backend/crypto-engine-kotlin
     ports:
       - "50051:50051"
+    networks:
+      - app-network
 
   postgres:
+    image: postgres:15-alpine
     ports:
       - "5432:5432"
-
-  redis:
-    ports:
-      - "6379:6379"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
+    image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  app-network:
+    driver: bridge

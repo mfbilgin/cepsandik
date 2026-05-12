@@ -4,7 +4,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const ForgotPasswordScreen = () => {
@@ -51,7 +51,7 @@ export const ForgotPasswordScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-white`}
+            style={tw`flex-1 bg-surface`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
@@ -75,8 +75,8 @@ export const ForgotPasswordScreen = () => {
                     <View style={tw`flex-1 flex-col`}>
                         {/* Header Content */}
                         <View style={tw`flex-col items-center text-center mt-4`}>
-                            <View style={tw`bg-[#1162d4]/10 p-5 rounded-full mb-6 items-center justify-center`}>
-                                <MaterialIcons name="lock-reset" size={40} color="#1162d4" />
+                            <View style={tw`bg-primary/10 p-5 rounded-full mb-6 items-center justify-center`}>
+                                <MaterialIcons name="lock-reset" size={40} color={tw.color('primary')} />
                             </View>
                             <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>{t('auth.forgot.title')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
@@ -110,7 +110,7 @@ export const ForgotPasswordScreen = () => {
                         {/* Footer / Action */}
                         <View style={tw`mt-auto pb-6`}>
                             <TouchableOpacity
-                                style={tw`w-full flex-row items-center justify-center bg-[#1162d4] py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
+                                style={tw`w-full flex-row items-center justify-center bg-primary py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
                                 onPress={handleReset}
                                 disabled={isLoading}
                                 activeOpacity={0.8}
@@ -147,7 +147,7 @@ export const ForgotPasswordScreen = () => {
 
                             <View style={tw`flex-row items-center justify-center mt-6 gap-2`}>
                                 <Text style={tw`text-xs font-medium text-slate-500`}>
-                                    {t('auth.forgot.notReceived')} <Text style={tw`text-[#1162d4] font-semibold`} onPress={handleReset}>{t('auth.forgot.resend')}</Text>
+                                    {t('auth.forgot.notReceived')} <Text style={tw`text-primary font-semibold`} onPress={handleReset}>{t('auth.forgot.resend')}</Text>
                                 </Text>
                             </View>
                         </View>

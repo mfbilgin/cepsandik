@@ -30,3 +30,18 @@ design/
 req_spec.txt
 MOBILE_UI*
 mobile/node_modules
+
+# Local agent / tooling state
+.claude/
+__pycache__/
+backend/election-service/cepsandik.db
+
+# Build outputs (Gradle, Expo, etc.)
+**/build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/modules/*/android/build/
+mobile/modules/*/ios/build/

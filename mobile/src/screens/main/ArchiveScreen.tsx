@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
 import { api } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const ArchiveScreen = () => {
@@ -68,17 +68,17 @@ export const ArchiveScreen = () => {
     }, [searchQuery, sortAsc, archived]);
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8]`}>
+        <View style={tw`flex-1 bg-background`}>
             {/* Header / Navigation */}
-            <View style={tw`bg-white border-b border-slate-200 px-5 pt-14 pb-4 shadow-sm z-30`}>
+            <View style={tw`bg-surface border-b border-slate-200 px-5 pt-14 pb-4 shadow-sm z-30`}>
                 <View style={tw`flex-row items-center justify-between mb-4`}>
                     <Text style={tw`text-3xl font-bold tracking-tight text-slate-900`}>{t('archive.title')}</Text>
                     <TouchableOpacity
-                        style={tw`p-2 rounded-full ${sortAsc ? 'bg-[#1162d4]/10' : 'bg-slate-50'}`}
+                        style={tw`p-2 rounded-full ${sortAsc ? 'bg-primary/10' : 'bg-slate-50'}`}
                         onPress={() => setSortAsc(!sortAsc)}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name={sortAsc ? "arrow-up" : "arrow-down"} size={22} color={sortAsc ? "#1162d4" : "#475569"} />
+                        <Ionicons name={sortAsc ? "arrow-up" : "arrow-down"} size={22} color={sortAsc ? "#41431B" : "#475569"} />
                     </TouchableOpacity>
                 </View>
 
@@ -106,13 +106,13 @@ export const ArchiveScreen = () => {
             <ScrollView
                 style={tw`flex-1`}
                 contentContainerStyle={tw`px-5 pt-6 pb-24 flex-col gap-4`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1162d4']} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#41431B']} />}
             >
                 {isLoading ? (
-                    <ActivityIndicator size="large" color="#1162d4" style={tw`mt-10`} />
+                    <ActivityIndicator size="large" color={tw.color('primary')} style={tw`mt-10`} />
                 ) : filteredArchived.length === 0 ? (
                     <View style={tw`flex-col items-center justify-center pt-20 pb-8`}>
-                        <View style={tw`w-20 h-20 bg-white rounded-full items-center justify-center mb-4 shadow-sm border border-slate-100`}>
+                        <View style={tw`w-20 h-20 bg-surface rounded-full items-center justify-center mb-4 shadow-sm border border-slate-100`}>
                             <Ionicons name="documents-outline" size={36} color="#94a3b8" />
                         </View>
                         <Text style={tw`text-base text-slate-500 font-medium`}>
@@ -123,13 +123,13 @@ export const ArchiveScreen = () => {
                     filteredArchived.map((item: any, index: number) => (
                         <TouchableOpacity
                             key={index}
-                            style={tw`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden`}
+                            style={tw`bg-surface rounded-2xl shadow-sm border border-slate-100 overflow-hidden`}
                             onPress={() => navigation.navigate('ElectionDetail', { electionId: item.electionId })}
                             activeOpacity={0.8}
                         >
                             <View style={tw`p-5 flex-row gap-4`}>
-                                <View style={tw`w-12 h-12 rounded-full bg-[#1162d4]/10 items-center justify-center`}>
-                                    <Ionicons name="archive" size={24} color="#1162d4" />
+                                <View style={tw`w-12 h-12 rounded-full bg-primary/10 items-center justify-center`}>
+                                    <Ionicons name="archive" size={24} color={tw.color('primary')} />
                                 </View>
                                 <View style={tw`flex-1`}>
                                     <View style={tw`flex-row justify-between items-start`}>
@@ -150,8 +150,8 @@ export const ArchiveScreen = () => {
                                             <Text style={tw`text-xs font-bold text-green-700`}>{t('archive.voted')}</Text>
                                         </View>
                                         <View style={tw`flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200`}>
-                                            <Ionicons name="shield-checkmark" size={12} color="#1162d4" />
-                                            <Text style={tw`text-[10px] font-bold text-[#1162d4] uppercase tracking-wide`}>{t('archive.verified')}</Text>
+                                            <Ionicons name="shield-checkmark" size={12} color={tw.color('primary')} />
+                                            <Text style={tw`text-[10px] font-bold text-primary uppercase tracking-wide`}>{t('archive.verified')}</Text>
                                         </View>
                                     </View>
                                 </View>

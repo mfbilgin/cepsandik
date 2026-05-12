@@ -1,0 +1,788 @@
+%% ============================================================
+%%  Cep Sandik -- JISA Submission (cas-sc template)
+%%  Overleaf: pdfLaTeX + BibTeX + pdfLaTeX + pdfLaTeX
+%% ============================================================
+\documentclass[a4paper,fleqn]{cas-sc}
+
+%% Karakter kodlamasi (UTF-8 Turkce icin)
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+%% Gerekli paketler
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{xcolor} % Kod tabaniyla uyumsuz iddialari kirmizi ile isaretlemek icin
+
+\begin{document}
+
+%% --- Makale Bilgileri ---
+\title{Pallot/Vocket: Secure and End-to-End Verifiable Mobile Voting System using ElectionGuard}
+
+\author[1]{Muhammet Fethullah Bilgin}
+\ead{mf.bilgin0@hotmail.com}
+
+\author[1]{Samet Tonyali}\corref{cor1}
+\ead{samet.tonyali@gumushane.edu.tr}
+
+\address[1]{Gümüşhane University,
+  Faculty of Engineering and Natural Sciences,
+  Department of Software Engineering,
+  Gümüşhane 29001, Türkiye}
+
+\cortext[cor1]{Corresponding Author.
+  \textit{E-mail:} samet.tonyali@gumushane.edu.tr}
+
+\shorttitle{Pallot/Vocket: Secure and E2E-V Mobile Voting System using ElectionGuard}
+\shortauthors{Bilgin and Tonyali}
+
+%% --- Abstract ---
+\begin{abstract}
+Dijital seçim sistemleri, seçmen gizliliğini korurken
+sonuçların doğrulanabilirliğini sağlamak konusunda
+kritik bir güven sorunuyla karşı karşıyadır.
+Bu çalışma, Microsoft tarafından geliştirilen
+\textcolor{red}{ElectionGuard 2.1.0 protokolünü}
+(\textcolor{green}{üretim kriptografi motoru ElectionGuard 1.4.0 Python SDK'sını kullanmakta olup v2.1.0 spesifikasyonu yalnızca referans olarak alınmaktadır})
+temel alan, çok katmanlı
+mikroservis mimarisine sahip \emph{Pallot/Vocket} adlı uçtan
+uca doğrulanabilir (E2E-V) bir mobil oylama sistemini sunmaktadır.
+Sistem, homomorfik şifreleme ve sıfır-bilgi kanıtları
+kullanarak seçmen gizliliğini garanti altına alırken
+her seçmenin oyunun sandığa doğru şekilde
+yansıtıldığını matematiksel olarak
+doğrulayabilmesine olanak tanır.
+\end{abstract}
+
+%% --- Keywords ---
+\begin{keywords}
+E-Voting \sep ElectionGuard \sep Homomorphic Encryption \sep
+end-to-End Verifiability \sep Microservice Architecture \sep
+Mobile Security
+\end{keywords}
+
+\maketitle
+
+%%============================================================
+%%  BOLUM 1: GIRIS
+%%============================================================
+\section{Introduction}
+\label{sec:introduction}
+
+%Demokratik süreçlerin temel taşı olan seçimler, modern toplumlarda güvenilir, şeffaf ve manipülasyona karşı dirençli bir altyapıya ihtiyaç duymaktadır. Geleneksel kağıt bazlı oy verme sistemleri, yüzyıllar boyunca bu güven ilişkisinin somut bir ifadesini oluşturmuştur. Bununla birlikte, toplumların dijital dönüşümle birlikte artan mobil bağlantısallığı ve uzaktan hizmet talepleri, seçim süreçlerinin de elektronik ortamlara taşınması yönünde güçlü bir baskı yaratmaktadır. Elektronik oylama (\emph{e-voting}) sistemleri, seçmene zaman ve mek\^{a}n bağımsızlığı sunmanın yanı sıra sayım hatalarını ve bürokratik maliyetleri önemli ölçüde azaltabilmektedir~\cite{Gibson2016}. Ancak bu avantajlar, beraberinde geleneksel seçim sistemlerinde var olmayan ya da çok daha sınırlı kalan bir dizi kritik güvenlik sorununu da gündeme taşımaktadır.
+
+Elections, the cornerstone of democratic processes, require a reliable, transparent, and manipulation-resistant infrastructure in modern societies. Traditional paper-based voting systems have represented a tangible expression of this trust for centuries. However, the increasing mobile connectivity and remote service demands of societies due to digital transformation are creating strong pressure to move election processes to electronic environments. Electronic voting systems offer voters independence from time and place, as well as significantly reducing counting errors and bureaucratic costs~\cite{Gibson2016}. However, these advantages also bring to the forefront a number of critical security issues that are either absent or much more limited in traditional election systems.
+
+%Elektronik oylama sistemleri tasarımında karşılaşılan en köklü güçlük, birbiriyle doğrudan çelişen iki temel gereksinimi aynı anda sağlamak zorunda olmaktır: \emph{gizlilik} ve \emph{doğrulanabilirlik}. Bir yanda, seçmenin tercihinin hiçbir koşulda üçüncü taraflarca öğrenilememesi anlamına gelen oy gizliliği ilkesi yer almaktadır; öte yanda, seçmenin oyunun gerçekten kayıt altına alınıp alınmadığını ve sayımın doğru yapılıp yapılmadığını bağımsız olarak doğrulayabilmesini sağlayan şeffaflık zorunluluğu bulunmaktadır. Bu iki gereksinimin aynı anda karşılanması, klasik bilgi-işlem güvenliği paradigmalarında kolay sağlanamayan ve ancak gelişmiş kriptografik protokollerle çözüme kavuşturulabilen derin bir teorik problemi oluşturmaktadır~\cite{Bernhard2012}.
+
+The most fundamental challenge in designing electronic voting systems is having to simultaneously meet two fundamentally contradictory requirements: confidentiality and verifiability. On the one hand, there is the principle of voter secrecy, meaning that a voter's choice must under no circumstances be learned by third parties; on the other hand, there is the necessity of transparency, which allows the voter to independently verify whether their vote has been actually recorded and whether the counting has been done correctly. Meeting these two requirements simultaneously constitutes a profound theoretical problem that is not easily achieved in classical information security paradigms and can only be solved with advanced cryptographic protocols~\cite{Bernhard2012}.
+
+%Uçtan uca doğrulanabilirlik (\emph{End-to-End Verifiability}, E2E-V), bu problemi çözmek üzere geliştirilmiş olan en kapsamlı kriptografik çerçevedir. E2E-V protokollerinde iki temel özelliğin bir arada sağlanması hedeflenmektedir: bireysel doğrulanabilirlik (\emph{individual verifiability}), yani seçmenin kendi oyunun eksiksiz kaydedildiğini bağımsız olarak teyit edebilmesi; ve evrensel doğrulanabilirlik (\emph{universal verifiability}), yani herhangi bir gözlemcinin tüm kayıtlı oyların doğru biçimde sayıldığını doğrulayabilmesi~\cite{EGSpec2024}. Bu çerçevenin temel kriptografik araçları arasında homomorfik şifreleme, sıfır-bilgi kanıtları (\emph{Zero-Knowledge Proofs}, ZKP) ve eşik şifre çözme (\emph{threshold decryption}) protokolleri yer almaktadır.
+
+End-to-end verifiability (E2E-V) is the most comprehensive cryptographic framework developed to solve this problem. E2E-V protocols aim to provide two fundamental properties simultaneously: individual verifiability, meaning that a voter can independently verify that their vote has been recorded correctly; and universal verifiability, meaning that any observer can verify that all recorded votes have been correctly counted. The core cryptographic tools of this framework include homomorphic encryption, zero-knowledge proofs (ZKP), and threshold decryption protocols~\cite{Wu2023,Farzaliyev2025}.
+
+%Homomorfik şifreleme, oyların şifreli h\^{a}ldeyken toplanmasına olanak tanıyan özel bir şifreleme biçimidir. Bu sayede bireysel oy tercihleri hiçbir zaman açık metin olarak işlenmez; yalnızca birleşik toplam, yeterli sayıda anahtara sahip taraflarca çözümlenir. ElGamal şifreleme sistemi, bu amaçla yaygın biçimde kullanılan ve toplama üzerinden homomorfik bir özellik sunan başlıca kriptografik yapılardan birini oluşturmaktadır. Sıfır-bilgi kanıtları ise bir seçmenin gerçekten geçerli bir oy kullandığını açıklamaksızın ispatlayabildiği protokollerdir. Bu iki mekanizmanın bütünleşik kullanımı, şifreli oyların bütünlüğünü garanti altına alırken içeriklerini gizli tutmayı mümkün kılmaktadır~\cite{Chaum1992}.
+
+Homomorphic encryption is a special type of encryption that allows votes to be collected while they are encrypted~\cite{Rivest1978}. Individual voter preferences are never processed in plaintext; only the combined total is deciphered by parties possessing a sufficient number of keys. The ElGamal encryption system~\cite{ElGamal1985} is one of the leading cryptographic structures widely used for this purpose, offering a homomorphic property through summation. Zero-knowledge proofs~\cite{Goldwasser1989} are protocols that can prove a voter has actually cast a valid vote without explicitly stating it. The integrated use of these two mechanisms makes it possible to guarantee the integrity of encrypted votes while keeping their contents 
+confidential~\cite{Chaum1992}.
+
+
+%Bu teorik altyapının pratikte uygulanabilir bir seçim sistemi olarak hayata geçirilmesinde öne çıkan en önemli girişimlerden biri \emph{ElectionGuard} olmaktadır. Microsoft'ın \emph{Defending Democracy} programı çerçevesinde 2019 yılında duyurulan ElectionGuard, E2E-V seçimler gerçekleştirilmesine olanak tanıyan açık kaynaklı bir yazılım geliştirme kiti (SDK) olarak tasarlanmıştır~\cite{ElectionGuard2019}. Sistemin temel ilkesi, kriptografik katmanı mevcut oylama altyapılarından bağımsız biçimde oluşturmak ve böylece herhangi bir seçim sistemi üreticisinin E2E-V desteğini kendi platformına kolaylıkla entegre etmesini sağlamaktır. Bu ayrıştırma yaklaşımı, güvenlik uzmanlarının kriptografik bileşenleri bağımsız olarak tasarlayıp geliştirebilmesine, mevcut seçim altyapısının yeniden yapılandırılmasına gerek kalmaksızın uygulama yapılabilmesine imk\^{a}n tanımaktadır~\cite{Benaloh2024}.
+
+One of the most important initiatives in bringing this theoretical framework to life as a practically applicable electoral system is ElectionGuard. Announced in 2019 as part of Microsoft's Defending Democracy program, ElectionGuard is designed as an open-source software development kit (SDK) that enables E2E-V elections~\cite{ElectionGuard2019}. The system's fundamental principle is to create the cryptographic layer independently of existing voting infrastructures, thus allowing any electoral system manufacturer to easily integrate E2E-V support into their platform. This decoupling approach allows security experts to independently design and develop cryptographic components, enabling implementation without the need to restructure the existing electoral infrastructure~\cite{Benaloh2024}.
+
+%ElectionGuard'ın işleyişi dört temel bileşen üzerine inşa edilmiştir. \emph{(1) Anahtar töreni:} Seçim öncesinde \emph{guardian} adı verilen güvenilir taraflar bir anahtar oluşturma töreni (\emph{Key Ceremony}) gerçekleştirir. Her guardian kendi kısmi gizli-açık anahtar çiftini üretir ve guardianlar iş birliği yaparak oyların şifrelenmesinde kullanılacak ortak bir açık anahtar (\emph{Joint Public Key}) meydana getirir~\cite{EGSpec2024}. \emph{(2) Oy şifreleme:} Oylama süreçinde her seçmenin tercihi ElGamal homomorfik şifreleme yöntemiyle şifrelenir ve oy pusulasının iyi biçimli (\emph{well-formed}) olduğunu kanıtlayan Chaum--Pedersen sıfır-bilgi kanıtları üretilir. \emph{(3) Homomorfik birleştirme:} Tüm şifreli oy pusulalarının homomorfik olarak bir araya getirilmesiyle birleşik şifreli sayım elde edilir. \emph{(4) Eşikli şifre çözme:} En az eşik sayıda (\emph{quorum}) guardian kısmi şifre çözüm payını sağlayarak nihai seçim sonuçlarını ortaya çıkarır. Bu mimari sayesinde, hiçbir tek yönetici ya da guardian grubunun bütünsel şifre çözme yetkisini tekeline alamaması sağlanmakta; güven dağıtık bir yapıda tutulmaktadır~\cite{EGSpec2024}.
+
+ElectionGuard's operation is built on four core components:
+
+\begin{enumerate}
+    \item \textbf{Key Ceremony:} Before the election, trusted parties called guardians perform a key generation ceremony. Each guardian generates its own partial private-public key pair, and the guardians cooperate to create a common public key (Joint Public Key) used to encrypt the votes.
+    \item \textbf{Vote Encryption:} During the voting process, each voter's choice is encrypted using the ElGamal homomorphic encryption method, and Chaum--Pedersen zero-knowledge proofs are generated, demonstrating the well-formed nature of the ballot.
+    \item \textbf{Homomorphic Combination:} A combined encrypted count is obtained by homomorphically combining all encrypted ballots.
+    \item \textbf{Threshold Decryption:} The minimum threshold number (quorum) of guardians provides the partial decryption share, revealing the final election results.
+\end{enumerate}
+This architecture ensures that no single administrator or group of guardians can monopolize the entire decryption process; trust is maintained in a distributed structure~\cite{EGSpec2024}.
+
+%Seçmene iade edilen \emph{onay kodu} (\emph{confirmation code}), bireysel doğrulanabilirliğin temel aracını oluşturmaktadır. Seçmen, oyunu kullandıktan sonra bu kodu bülten panosunda (\emph{bulletin board}) sorgulayarak oyunun değiştirilmeden kayıt altına alındığını doğrulayabilmektedir. Çok sayıda oyun zincirleme karma (\emph{hash chaining}) yapısıyla birbirine bağlanması, bülten panosuna herhangi bir oyun gizlice eklenmesini ya da silinmesini de tespit edilebilir kılar~\cite{EGSpec2024}. ElectionGuard'ın özellikle öne çıkardığı yenilik, kriptografik araçları seçim sisteminin temel mekaniklerinden ve kullanıcı arayüzünden ayrıştırmasıdır; bu sayede güvenlik uzmanları kriptografi katmanı üzerinde odaklanabilirken seçim sistemi üreticileri aşina oldukları altyapıyı koruyabilmektedir~\cite{Benaloh2024}. Nitekim ElectionGuard, ABD'nin Wisconsin, Idaho, Maryland ve Utah eyaletlerinde gerçek seçimlerde pilot uygulamalarla test edilmiştir~\cite{EAC2022}.
+
+The verification code returned to the voter forms the core tool for individual verifiability. After casting their vote, voters can verify that their vote has been recorded without alteration by querying this code on the bulletin board. The hash-chaining of numerous votes makes it possible to detect any secret additions or deletions of votes from the bulletin board. ElectionGuard's key innovation is its separation of cryptographic tools from the core mechanics and user interface of the election system; this allows security experts to focus on the cryptography layer while election system manufacturers maintain the familiar infrastructure~\cite{Benaloh2024}. Owing to this, ElectionGuard has been piloted in real elections in the US states of Wisconsin, Idaho, Maryland, and Utah~\cite{EAC2022}.
+
+%Mobil cihazlar üzerinden oylama ise E2E-V protokollerinin uygulamasında yeni bir karmaşıklık katmanı eklemektedir. Akıllı telefonların hesaplama kapasitesi ve güvenilir donanım desteği, masaüstü ya da özel seçim ekipmanlarına kıyasla sınırlı olabilmektedir; bu durum büyük kriptografik işlemlerin doğrudan mobil istemcide yürütülmesini ciddi biçimde kısıtlamaktadır~\cite{Peter2022}. Bunun yanı sıra mobil ağ bağlantısının güvenilirliği, ağ gecikmelerinden kaynaklanan güvenlik açıkları ve cihaz başına farklılaşan donanım güvenlik kapasitesi, hem bireysel performans hem de sistem düzeyinde ölçeklenebilirlik açısından araştırılmayı gerektiren özgün sorunlar ortaya koymaktadır.
+
+Voting via mobile devices adds a new layer of complexity to the implementation of E2E-V protocols. The computational capacity and reliable hardware support of smartphones can be limited compared to desktop or dedicated election equipment. This severely restricts the execution of large cryptographic operations directly on the mobile client~\cite{Peter2022}. In addition, the reliability of the mobile network connection, vulnerabilities arising from network latency, and varying hardware security capabilities per device present unique problems that require investigation in terms of both individual performance and system-level scalability.
+
+%Mevcut E2E-V sistemlerinin büyük çoğunluğunun kurumsal ya da web-merkezli ortamları hedef aldığı ve mobil kullanıcı senaryolarını yeterince ele almadığı görülmektedir. Helios~\cite{Adida2008}, IACR seçimleri ve üniversite seçimleri gibi belirli nitelikli seçimlerde başarıyla kullanılmış bir web-tabanlı sistem olmakla birlikte, yerel mobil entegrasyon eksikliği ve bütünleşik bir asenkron denetim mekanizmasının yokluğu nedeniyle geniş ölçekli ve mobil odaklı uygulamalar için yetersiz kalmaktadır. Belenios~\cite{Cortier2019}, Helios'ın kriptografik mimarisi üzerine inşa edilmiş olup özellikle bülten panosu manipülasyonuna karşı güçlü doğrulanabilirlik özellikleri sunmakta; ancak yine de yerel mobil bir mimariden yoksun kalmaktadır. Blockchain tabanlı çözümler ise ademi-merkeziyetcilik ve izlenebilirlik gibi avantajlar öne sürmekle birlikte, hesaplama yoğunluğu ve ölçeklenebilirlik sorunları nedeniyle büyük ölçekli seçim uygulamaları için kısıtlı kalmaktadır~\cite{Zaghloul2021}.
+
+The vast majority of existing E2E-V systems target corporate or web-centric environments and fail to adequately address mobile user scenarios. While Helios~\cite{Adida2008}, a web-based system, has been successfully used in certain qualified elections such as the IACR (The International Association for Cryptologic Research) elections and university elections, it falls short for large-scale and mobile-focused applications due to a lack of native mobile integration and an integrated asynchronous auditing mechanism. Belenios~\cite{Cortier2019}, built on Helios' cryptographic architecture, offers strong verifiability features, particularly against bulletin board manipulation; however, it also lacks a native mobile architecture. Blockchain-based solutions, while offering advantages such as decentralization and traceability, are limited for large-scale election applications due to computational intensity and scalability issues~\cite{Zaghloul2021}.
+
+%Mevcut literatürde gözlenen temel boşluk, E2E-V kriptografik garantilerini gerçek zamanlı bir denetim altyapısıyla ve \emph{cloud-native} bir mikroservis mimarisiyle bir araya getiren, yerel mobil erişimi birincil kanal olarak ele alan bütünleşik bir sistemin eksikliğidir. Kriptografik motor, iş mantığı servisleri ve denetim katmanının aynı monolitik ya da yarı-merkezi yapı içinde barındırıldığı mevcut yaklaşımlar; ölçeklenebilirlik, servis izolasyonu ve kriptografik hesaplama verimliliği konularında ciddi sınırlamalar sergilemektedir.
+
+The main gap observed in the current literature is the lack of an integrated system that combines E2E-V cryptographic guarantees with a real-time auditing infrastructure and a cloud-native microservice architecture, treating native mobile access as the primary channel. Existing approaches, where the cryptographic engine, business logic services, and auditing layer are housed within the same monolithic or semi-centralized structure, exhibit significant limitations in terms of scalability, service isolation, and cryptographic computation efficiency.
+
+%Bu motivasyondan hareketle, \emph{Pallot/Vocket} adlı sistem, ElectionGuard SDK'sını çok katmanlı bir mikroservis mimarisine entegre ederek hem E2E-V özellikli hem de mobil-öncelikli bir oylama çözümü sunmaktadır. Bu çalışmanın başlıca katkıları şu şekilde özetlenebilir:
+
+Driven by this motivation, the Pallot/Vocket system integrates the ElectionGuard SDK into a multi-layered microservice architecture, offering both E2E-V-enabled and mobile-first voting solutions. The main contributions of this work can be summarized as follows:
+
+\begin{itemize}
+  \item[(i)] %Transit güvenlik için RSA-OAEP ile kalıcı oy kaydı için ElGamal homomorfik şifrelemeyi ve Chaum--Pedersen ZKP üretimini bütünleştiren hibrit bir kriptografik protokolün tasarımı ve uygulaması.
+               \textcolor{red}{Design and implementation of a hybrid cryptographic protocol integrating RSA-OAEP for transit security, ElGamal homomorphic encryption for persistent vote recording, and Chaum-Pedersen ZKP generation,}
+               (\textcolor{green}{Transit güvenliği için hibrit RSA-OAEP + AES-256-GCM (256~bayttan büyük yüklerde RSA ile sarmalanmış AES anahtarı + 12~bayt IV + ciphertext + 16~bayt GCM etiketi), kalıcı oy kaydı için ElGamal homomorfik şifreleme ve Chaum--Pedersen sıfır-bilgi kanıtı üretimini bir araya getiren hibrit bir kriptografik protokolün tasarımı ve uygulaması,})
+  \item[(ii)]  %Yatay ölçeklenmeyi doğrudan destekleyen, durumsuz (\emph{stateless}) bir kriptografik motor mimarisi.
+                A stateless cryptographic engine architecture that directly supports horizontal scaling,
+  \item[(iii)] %RabbitMQ mesaj kuyruğu aracılığıyla gerçek zamanlı olarak güncellenen, ana oylama akışından bağımsız bir asenkron denetim bülten panosu servisi.
+                An asynchronous moderation bulletin board service independent of the main voting stream, that updates in real-time via the RabbitMQ message queue,
+  \item[(iv)]  %React Native tabanlı mobil istemcinin E2E-V protokolüyle tam entegrasyonu ve onay kodu tabanlı bireysel doğrulama akışının gerçekleştirilmesi.
+                Full integration of the React Native-based mobile client with the E2E-V protocol and implementation of an individual verification code-based flow.
+\end{itemize}
+
+%Bu makalenin geri kalan bölümleri şu şekilde düzenlenmiştir: Bölüm~\ref{sec:relatedwork} ilgili çalışmaları incelemekte; Bölüm~3 sistem mimarisini ve kriptografik protokolü ayrıntılarıyla sunmakta; Bölüm~4 uygulama detaylarını aktarmakta; Bölüm~5 güvenlik analizini ele almakta; Bölüm~6 performans değerlendirmesini sunmakta; Bölüm~7 ise sonuçları tartışmaktadır.
+
+The remainder of this article is structured as follows: Section~\ref{sec:relatedwork} reviews the relevant studies. Section 3 details the system architecture and cryptographic protocol. Section 4 details the implementation, and Section 5 addresses the security analysis. Section 6 presents the performance evaluation, and finally, Section 7 discusses the conclusions.
+
+%%============================================================
+%%  BOLUM 2: ILGILI CALISMALAR
+%%============================================================
+%\section{İlgili Çalışmalar}
+\section{Related Work}
+\label{sec:relatedwork}
+
+%Elektronik oylama alanındaki akademik çalışmalar, son yirmi yıl içinde hem kriptografik protokol tasarımı hem de sistem mimarisi açılarından önemli bir derinlik kazanmıştır. Bu bölümde, Cep Sandık sisteminin tasarım kararlarıyla doğrudan ilişkili olan başlıca çalışmalar incelenmektedir. İlgili literatür genel olarak web-tabanlı E2E-V sistemleri, blockchain tabanlı yaklaşımlar, mobil oylama çalışmaları ve kriptografik protokol geliştirmeleri olmak üzere dört ana başlık altında değerlendirilebilir.
+
+Academic studies in the field of electronic voting have gained significant depth over the last two decades, both in terms of cryptographic protocol design and system architecture. This section examines the main studies directly related to the design decisions of the Pallot/Vocket system. The relevant literature can generally be categorized under four main headings: web-based E2E-V systems, blockchain-based approaches, mobile voting studies, and cryptographic protocol developments.
+
+%\subsection{Web-Tabanlı E2E-V Oylama Sistemleri}
+\subsection{Web-Based E2E-V Voting Systems}
+
+%E2E-V özellikli oylama sistemleri alanındaki en etkili çalışmalardan birini Ben Adida'ın 2008 yılında geliştirdiği Helios sistemi oluşturmaktadır~\cite{Adida2008}. Helios, herkese erişilebilen, tamamen web-tabanlı ve açık denetimli (\emph{open-audit}) yapısıyla kriptografik olarak denetlenebilir seçimlerin geniş kitlelere sunulmasına öncülük etmiştir. Sistem, ElGamal tabanlı homomorfik şifreleme kullanarak seçmenlerin şifreli oylarını tarayıcı üzerinden göndermesine ve oy pusulalarının kamuya açık bir bülten panosunda yayımlanmasına imk\^{a}n tanımaktadır. IACR, ACM ve çeşitli üniversite seçimlerinde başarıyla uygulanmıştır. Bununla birlikte Helios, merkezi yapısı nedeniyle bülten panosu manipülasyonuna karşı güçlü garantiler sunamamaktadır; ayrıca yerel mobil entegrasyon ve gerçek zamanlı denetim mekanizmalarından yoksundur. Bernhard ve diğerleri~\cite{Bernhard2012}, Helios'ın sıfır-bilgi kanıtlarının Fiat-Shamir buluşsal yöntemine dayalı uygulamasındaki zayıflıkları belgeleyerek önemli bir teorik katkı sağlamıştır.
+
+One of the most influential works in the field of E2E-V voting systems is the Helios system, developed by Ben Adida in 2008~\cite{Adida2008}. Helios pioneered the introduction of cryptographically verifiable elections to a wide audience with its fully web-based, open-audit structure accessible to everyone. Using ElGamal-based homomorphic encryption, the system allows voters to submit their encrypted ballots via a browser and publish the ballots on a publicly accessible bulletin board. It has been successfully implemented in IACR, ACM, and various university elections. However, due to its centralized structure, Helios cannot offer strong guarantees against bulletin board manipulation; it also lacks local mobile integration and real-time auditing mechanisms. Bernhard et al.~\cite{Bernhard2012} made a significant theoretical contribution by documenting the weaknesses in Helios' implementation of zero-knowledge proofs based on the Fiat-Shamir heuristic.
+
+%Cortier ve diğerleri tarafından geliştirilen Belenios sistemi~\cite{Cortier2019}, Helios'ın yetersizliklerini gidermek amacıyla tasarlanmış gelişmiş bir E2E-V mimarisini temsil etmektedir. Belenios, seçmenlerin kimlik bilgilerinin ayrı bir kimlik yetkilisince yönetildiği dağıtık bir yapı benimseyerek bülten panosunun sahte oy eklemesini ya da geçerli oyları değiştirmesini önlemektedir. Sistem, disjunktif Chaum--Pedersen kanıtları kullanarak oy pusulasının geçerliliğini kriptografik olarak ispatlayabilmekte ve evrensel doğrulanabilirlik güvencelerini güçlendirmektedir. Cortier ve diğerlerinin 2018 tarihli çalışması~\cite{Cortier2018}, Belenios'ın gizlilik ve doğrulanabilirlik özelliklerini makine-kontrollü ispatlarla doğrulamış; protokolün biçimsel güvenlik analizine katkıda bulunmuştur. Bununla birlikte Belenios, web-merkezli sunucu mimarisini sürdürmekte; yerel mobil entegrasyon ve \emph{cloud-native} ölçeklenebilirlik konularında belirgin kısıtlamalar sergilemektedir.
+
+The Belenios system, developed by Cortier et al.~\cite{Cortier2019}, represents an advanced E2E-V architecture designed to address the shortcomings of Helios. Belenios prevents the bulletin board from adding fraudulent votes or altering valid ballots by adopting a distributed structure where voter credentials are managed by a separate identity authority. The system can cryptographically prove the validity of ballots using disjunctive Chaum--Pedersen proofs and strengthens universal verifiability assurances. Cortier et al.~\cite{Cortier2018} validated Belenios' privacy and verifiability features with machine-controlled proofs and contributed to a formal security analysis of the protocol. However, Belenios maintains a web-centric server architecture and exhibits significant limitations in terms of native mobile integration and cloud-native scalability.
+
+%ElectionGuard~\cite{ElectionGuard2019,Benaloh2024}, Helios ve Belenios'ın tersine, bağımsız ve eksiksiz bir oylama sistemi olarak konumlanmamakta; bunun yerine mevcut oylama sistemlerine E2E-V desteği eklemek üzere modüler bir kriptografik araç takımı sunmaktadır. Benaloh ve diğerleri, ElectionGuard v2.1.0 Tasarım Spesifikasyonu'nda~\cite{EGSpec2024} ayrıntılı biçimde açıklandığı üzere sistem; guardian-tabanlı dağıtık anahtar üretimi, homomorfik oy toplamı, Chaum--Pedersen sıfır-bilgi kanıtları ve karma-zinciri tabanlı onay kodları mekanizmalarını entegre etmektedir. Sistemin gerçek seçimlerde kullanılabildiği, Wisconsin eyaletindeki Fulton kasabasında (2020) ve Idaho Franklin İlçesi'nde (2022) gerçekleştirilen pilot uygulamalarla doğrulanmıştır~\cite{EAC2022}. Cep Sandık, ElectionGuard'ı temel kriptografik motor olarak benimseyerek bunu \emph{cloud-native} mikroservis mimarisi ve yerel mobil istemci entegrasyonuyla genişletmektedir.
+
+In contrast with Helios and Belenios, ElectionGuard~\cite{ElectionGuard2019,Benaloh2024} is not positioned as a standalone, complete voting system; instead, it offers a modular cryptographic toolkit to add E2E-V support to existing voting systems. As detailed in the ElectionGuard v2.1.0 Design Specification~\cite{EGSpec2024}, the system integrates guardian-based distributed key generation, homomorphic vote aggregation, Chaum--Pedersen zero-knowledge proofs, and hash-chain based verification codes. The system's usability in real elections has been validated through pilot applications in Fulton, Wisconsin (2020) and Franklin County, Idaho (2022)~\cite{EAC2022}. Pallot/Vocket adopts ElectionGuard as its core cryptographic engine, extending it with a cloud-native microservice architecture and native mobile client integration.
+
+%\subsection{Klasik E2E-V Sistem Tasarımları}
+\subsection{Traditional E2E-V System Designs}
+
+%Bell ve diğerleri tarafından Texas seçimleri için tasarlanan STAR-Vote~\cite{Bell2013}, kağıt tabanlı denetim izini (\emph{paper audit trail}) homomorfik şifrelemeyle bütünleştiren hibrit bir modeldir. Hem fiziksel güvenliği hem de matematiksel ispatları tek çatı altında sunan bu sistem, Risk-Limiting Audit (RLA) uygulamaları için referans alınmaktadır. ElectionGuard'ın RLA desteği kısmen STAR-Vote'un bu yaklaşımından esinlenmiştir; Pallot/Vocket ise fiziksel denetim ihtiyacını tamamen ortadan kaldıran dijital-önce bir mimari izlemektedir.
+
+STAR-Vote~\cite{Bell2013}, designed by Bell et al. for the Texas elections, is a hybrid model that integrates a paper-based audit trail with homomorphic encryption. Offering both physical security and mathematical proofs under a single roof, this system is a reference for Risk-Limiting Audit (RLA) applications. ElectionGuard's RLA support is partly inspired by this STAR-Vote approach. Pallot/Vocket, on the other hand, follows a digital-first architecture that completely eliminates the need for physical auditing.
+
+%Clarkson, Chong ve Myers tarafından önerilen Civitas~\cite{Clarkson2008}, zorlamaya karşı direnç (\emph{coercion-resistance}) konusunda literatürdeki en kapsamlı teorik katkılardan birini sunmaktadır. Mix-net teknolojisi ve sahte kimlik bilgileri (\emph{dummy credentials}) kullanarak baskı altında verilen oyların sayıma dahil edilmemesini sağlayan Civitas, yüksek güvenlik düzeyi nedeniyle teknik karmaşıklığı artırmakta ve mobil kullanım için pratik optimizasyonu güçleştirmektedir. Pallot/Vocket, zorlamaya karşı direnci mevcut tasarımında tam olarak çözmemekte; bu konuyu gelecek çalışmalar için açık bir araştırma sorusu olarak bırakmaktadır.
+
+Civitas~\cite{Clarkson2008}, proposed by Clarkson, Chong, and Myers, offers one of the most comprehensive theoretical contributions to the literature on coercion resistance. By using mix-net technology and dummy credentials to prevent votes cast under duress from being counted, Civitas increases technical complexity due to its high security level and makes practical optimization for mobile use difficult. Pallot/Vocket does not fully resolve coercion resistance in its current design. This leaves it an open research question for future studies.
+
+%Ryan ve Teague tarafından geliştirilen Selene~\cite{Ryan2016}, seçmenlere oylarının doğru sayıldığını kontrol edebilecekleri yenilikçi bir takip kodu (\emph{tracker code}) mekanizması sunmaktadır. Selene'in asıl katkısı, bireysel doğrulanabilirliği sağlarken oy satılmasını (\emph{vote buying}) engelleyen kriptografik önlemleri içermesidir. Cep Sandık'taki onay kodu mekanizması Selene'in yaklaşımından ilham alarak tam anlamıyla makbuz-özgürlüğünü (\emph{receipt-freeness}) garanti altına almaktadır.
+
+Selene~\cite{Ryan2016}, developed by Ryan, Rønne, and Iovino, offers voters an innovative tracker code mechanism to verify that their votes have been counted correctly. Selene's main contribution is that it incorporates cryptographic measures to prevent vote buying while ensuring individual verifiability. The verification code mechanism in Pallot/Vocket is inspired by Selene's approach and guarantees complete receipt-freeness.
+
+%Ryan ve ekibinin önerdiği Pr\^{e}t \`{a} Voter~\cite{Ryan2009}, karışık pusula (\emph{randomised candidate order}) tekniğiyle seçmene fiziksel kağıt ortamında da doğrulanabilirlik sunan karma bir sistem olarak tasarlanmıştır. Kriptografik denetim izini kağıt belgelerle bütünleştirmesi açısından özgün olan bu sistem, E2E-V kavramının standart formülasyonuna temel oluşturmuştur.
+
+Pr\^{e}t \`{a} Voter~\cite{Ryan2009}, proposed by Ryan et al., is designed as a hybrid system that offers verifiability to voters in a physical paper environment using a randomized candidate order technique. Unique in its integration of cryptographic control traces with paper documents, this system formed the basis for the standard formulation of the E2E-V concept.
+
+%Gj\o{}steen tarafından analiz edilen Norveç İnternet Oylama Sistemi~\cite{Gjosteen2010}, ulusal düzeyde uygulamaya konulmuş nadir E2E-V örneklerinden birini temsil etmektedir. Sistem, seçmene e-posta/SMS yoluyla gönderilen kontrol kodlarıyla bireysel doğrulanabilirlik sağlamış; ancak zorlamaya karşı direnç ve ölçeklenebilirlik sorunları nedeniyle 2014'te kullanımdan kaldırılmıştır. Bu deneyim, gerçek dünya seçim sistemlerindeki karmaşıklığa ve mobil/internet ortamlarında güven modelinin ne denli kritik olduğuna dair önemli dersler sunmaktadır.
+
+The Norwegian Internet Voting System~\cite{Gjosteen2010}, analyzed by Gj\o{}steen, represents one of the rare examples of E2E-V implemented at the national level. The system provided individual verifiability through verification codes sent to voters via email/SMS. However, it was discontinued in 2014 due to resistance to enforcement and scalability issues. This experience offers important lessons about the complexity of real-world election systems and the critical importance of trust models in mobile/Internet environments.
+
+%\subsection{Blockchain Tabanlı E-Oylama Yaklaşımları}
+\subsection{Blockchain-Based E-Voting Approaches}
+
+%Blockchain teknolojisi, ademi-merkeziyetçi güven modeli ve değişmez kayıt yapısı sayesinde elektronik oylama alanında giderek artan bir ilgiyle karşılanmaktadır. Panja ve Roy~\cite{Panja2021}, blockchain ve bulut sunucusunu bir araya getiren uçtan uca doğrulanabilir bir e-oylama sistemi önererek bu kombinasyonun güvenlik garantilerini biçimsel olarak analiz etmiştir. Çalışma, blockchain'ın bütünlük ve izlenebilirlik konularındaki katkılarını ortaya koyarken özellikle büyük ölçekli seçimlerde gecikme ve ölçeklenebilirlik sorunlarına dikkat çekmiştir. Zaghloul ve diğerleri~\cite{Zaghloul2021} ise anonim ve dağıtık bir blockchain tabanlı mobil e-oylama sistemi olan D-BAME'yi sunmuşlardır; bu çalışma, mobil cihazlarda anonimlik ve izlenebilirlik gereksinimlerini dengeleyebilmenin mümkün olduğunu ortaya koymuştur. Ancak her iki yaklaşım da kriptografik E2E-V garantilerini ElectionGuard düzeyinde içermemekte; kanıt oluşturma vedoğrulama mekanizmaları bakımından sınırlı kalmaktadır.
+
+Blockchain technology is attracting increasing interest in the field of electronic voting due to its decentralized trust model and immutable record structure. Panja and Roy~\cite{Panja2021} formally analyzed the security guarantees of this combination by proposing an E2E-V e-voting system that combines blockchain and cloud servers. Their work highlighted the contributions of blockchain in terms of integrity and traceability, while drawing attention to latency and scalability issues, particularly in large-scale elections. Zaghloul et al.~\cite{Zaghloul2021} presented D-BAME, an anonymous and distributed blockchain-based mobile e-voting system. Their work demonstrated that it is possible to balance anonymity and traceability requirements on mobile devices. However, both approaches lack cryptographic E2E-V guarantees at the ElectionGuard level and remain limited in terms of proof-building and verification mechanisms.
+
+%\subsection{Mobil E-Oylama Çalışmaları}
+\subsection{Mobile E-Voting Studies}
+
+%Seçim sistemlerinin akıllı telefonlara taşınması hem pratik hem de güvenlik boyutlarıyla araştırmacıların ilgisini çekmiştir. Peter ve diğerleri~\cite{Peter2022}, oltalama (\emph{phishing}) saldırılarını engellemeye yönelik üç aşamalı güvenlik doğrulama mekanizması entegre eden bir mobil e-oylama uygulaması geliştirmiştir. Sistem, erişim güvenliğini güçlendirme açısından somut katkılar sunarken kriptografik doğrulanabilirlik konusuna değinmemektedir. Devi ve Bansal~\cite{Devi2023}, çeşitli e-oylama sistemlerini güvenlik özellikleri açısından kapsamlı biçimde karşılaştırmış; mobil odaklı çalışmalarda E2E-V kanıtlarının sistematik olarak ele alınmadığını ortaya koymuştur. Bu bulgu, mobil kullanıcı kolaylığıyla kriptografik güvenceler arasındaki açığı kapatmaya yönelik bütünleşik yaklaşımların önemine işaret etmektedir.
+
+The transfer of election systems to smartphones has attracted the attention of researchers due to both practical and security considerations. Peter et al.~\cite{Peter2022} developed a mobile e-voting application integrating a three-stage security verification mechanism to prevent phishing attacks. While the system offers tangible contributions in terms of strengthening access security, it does not address the issue of cryptographic verifiability. Devi and Bansal~\cite{Devi2023} comprehensively compared various e-voting systems in terms of their security features and revealed that E2E-V proofs are not systematically addressed in mobile-focused studies. This finding points to the importance of integrated approaches to bridging the gap between mobile user convenience and cryptographic assurances.
+
+%\subsection{Kriptografik Protokol ve Altyapı Geliştirmeleri}
+\subsection{Cryptographic Protocol and Infrastructure Developments}
+
+%Seçim kriptografisinin teorik altyapısına önemli katkılar sağlayan çeşitli çalışmalar da ilgili literatür içinde değerlendirilmelidir. Chaum ve Pedersen~\cite{Chaum1992}, homomorfik şifreleme ve gözlemci tabanlı gizlilik modellerine ilişkin temel ilkeleri ortaya koymuş; Chaum--Pedersen protokolü günümüzde ElGamal bazlı oylama sistemlerinde oy pusulasının geçerliliğini ispatlayan standart bir ZKP yapısı olarak yaygın biçimde kullanılmaktadır. Farzaliyev ve diğerleri~\cite{Farzaliyev2023}, kuantum sonrası dönem için kafes tabanlı karıştırma ağlarını (\emph{lattice-based mix-nets}) araştırmış; standart ElGamal şifrelemeye dayalı sistemlerin kuantum hesaplamaya karşı kırılgan olduğunu göstermiştir. Bu bulgu, Pallot/Vocket'in mevcut ElGamal uygulaması için gelecekte ele alınması gereken önemli bir araştırma yönüne işaret etmektedir.
+
+Several studies that have made significant contributions to the theoretical foundation of election cryptography should also be considered within the relevant literature. Chaum and Pedersen~\cite{Chaum1992} laid out the fundamental principles of homomorphic encryption and observer-based privacy models. The Chaum-Pedersen protocol is widely used today as a standard ZKP structure for proving the validity of ballots in ElGamal-based voting systems. Farzaliyev et al.~\cite{Farzaliyev2023} investigated lattice-based mix-nets for the post-quantum era and showed that systems based on standard ElGamal encryption are vulnerable to quantum computing. This finding points to an important research direction that should be addressed in the future for the current ElGamal implementation of Pallot/Vocket.
+
+%Benaloh ve diğerleri~\cite{EAC2022}, ElectionGuard teknolojisinin gerçek seçim ortamlarında çalışan üreticilerle iş birliği içinde uygulanmasından edinilen deneyimleri belgeleyerek E2E-V sistemlerin pratikte benimsenmesinde karşılaşılan kurumsal, yasal ve kullanışlılık engellerini geniş bir perspektiften ele almıştır. Bu çalışma, kriptografik garantiler sunmanın tek başına yeterli olmadığını ve yasal uyumluluk gereksinimlerinin de kritik bir rol üstlendiğini vurgulamaktadır. Daraghmi ve diğerleri~\cite{Daraghmi2025}, mikroservis ve IoT tabanlı e-oylama mimarileri üzerine gerçekleştirdikleri araştırmada dağıtık oylama sistemlerinde servis katmanlarının birbirinden ayrıştırılmasının güvenlik ve ölçeklenebilirlik açısından sağladığı avantajları ortaya koymuştur; ancak kriptografik ZKP kanıtlarını ve gerçek zamanlı denetim mekanizmalarını içeren bir sistem mimarisi sunamamaktadır.
+
+Benaloh et al.~\cite{EAC2022}, by documenting experiences gained from implementing ElectionGuard technology in collaboration with manufacturers operating in real election environments, addressed the institutional, legislative, and usability barriers encountered in the practical adoption of E2E-V systems from a broad perspective. This work emphasizes that providing cryptographic guarantees alone is insufficient and that legal compliance requirements also play a critical role. Daraghmi et al.~\cite{Daraghmi2025}, in their research on microservice and IoT-based e-voting architectures, demonstrated the advantages of separating service layers in distributed voting systems in terms of security and scalability. However, they failed to provide a system architecture that included cryptographic ZKP proofs and real-time auditing mechanisms.
+
+%İncelenen çalışmalar, e-oylama alanında kayda değer ilerlemeler kaydedildiğini göstermektedir. Helios ve Belenios, E2E-V kriptografik protokollerinin web ortamında çalışır kılınabileceğini kanıtlamıştır. ElectionGuard, modüler ve açık kaynaklı bir kriptografik araç takımı sunarak bu alanda paradigmatik bir adım atmıştır. Blockchain tabanlı yaklaşımlar, ademi-merkeziyetcilik konusunda özgün çözümler üretmiştir. Bununla birlikte, E2E-V güvencelerini gerçek zamanlı asenkron denetim altyapısıyla bütünleştiren, yerel mobil erişimi birincil kanal olarak ele alan ve kriptografik motoru iş mantığı servislerinden izole biçimde barındıran \emph{cloud-native} bir mikroservis mimarisine sahip bir sistemin literatürde eksik kaldığı açıkça görülmektedir. Pallot/Vocket, tam da bu boşluğu kapatmayı hedefleyen özgün bir katkı olarak konumlanmaktadır.
+
+The studies reviewed show that significant progress has been made in the field of e-voting. Helios and Belenios have proven that E2E-V cryptographic protocols can be implemented in a web environment. ElectionGuard has taken a paradigmatic step in this area by offering a modular and open-source cryptographic toolkit. Blockchain-based approaches have produced unique solutions regarding decentralization. However, it is clear that a system with a cloud-native microservice architecture that integrates E2E-V assurances with a real-time asynchronous audit infrastructure, treats native mobile access as the primary channel, and houses the cryptographic engine in isolation from business logic services is lacking in the literature. Pallot/Vocket is positioned as a unique contribution aiming to fill precisely this gap.
+
+%%============================================================
+%%  BÖLÜM 3: SİSTEM MİMARİSİ
+%%============================================================
+\section{System Architecture}
+\label{sec:architecture}
+
+Pallot/Vocket,
+\textcolor{red}{ElectionGuard 2.1.0 protokolünü temel alan,}
+(\textcolor{green}{ElectionGuard 1.4.0 Python SDK'sı üzerine inşa edilmiş; v2.1.0 spesifikasyonu yalnızca referans olarak alınmakta, üretim motorunda kullanılan SDK sürümü 1.4.0'dır,})
+katmanlı ve
+mikroservis tabanlı bir uçtan uca doğrulanabilir mobil oylama platformudur.
+Sistemin tasarım felsefesi, kriptografik bileşenleri iş mantığından,
+denetim altyapısını ise oylama akışından izole etmek üzerine kuruludur.
+Bu sayede her katman bağımsız olarak ölçeklenebilir, güncellenebilir ve
+denetlenebilir hâle gelmektedir.
+Sistemin temel özelliği, oy şifrelemenin tamamen istemci tarafında
+gerçekleştirilmesidir; sunucu tarafı hiçbir noktada seçmenin tercihini
+düz metin olarak görmez.
+
+\subsection{High-Level Architecture}
+\label{subsec:highlevel}
+
+Sistem, birbirinden işlevsel olarak ayrılmış altı katmandan oluşmaktadır.
+Tablo~\ref{tab:layers} bu katmanları, bileşenlerini ve birincil
+sorumluluklarını özetlemektedir.
+
+\begin{table}[ht]
+\centering
+\caption{Sistem Katmanları ve Sorumlulukları}
+\label{tab:layers}
+\begin{tabular}{lll}
+\toprule
+\textbf{Katman} & \textbf{Bileşen} & \textbf{Sorumluluk} \\
+\midrule
+Client       & React Native / Expo        & Oy şifreleme, ZKP, transit şifreleme \\
+Edge         & OpenResty (Nginx + Lua)    & TLS sonlandırma, JWT doğrulama, hız sınırı \\
+Application  & 5 × Spring Boot servisi    & İş mantığı, seçim yaşam döngüsü \\
+Crypto       & Python gRPC + Kotlin POC   & ElectionGuard işlemleri \\
+Persistence  & PostgreSQL, MongoDB, Redis & İlişkisel veri, denetim defteri, önbellek \\
+Observability & Prometheus + Loki + Grafana & Metrik, log, gösterge paneli \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Şekil~\ref{fig:arch_overview}, katmanlar arasındaki veri akışını ve
+protokol sınırlarını göstermektedir.
+
+% ---------------------------------------------------------------
+% Şekil 1: Yüksek seviyeli mimari diyagramı
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §1.2
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/arch_overview.pdf
+  \includegraphics[width=\linewidth]{figures/arch_overview}
+  \caption{Pallot/Vocket sistem mimarisinin yüksek seviyeli görünümü.
+           Mobil istemciden kalıcılık katmanına (persistence layer) kadar olan veri akışı ve
+           protokol sınırları gösterilmektedir.}
+  \label{fig:arch_overview}
+\end{figure}
+
+Mobil istemci, HTTPS/TLS~1.2/1.3 üzerinden yalnızca OpenResty API
+Gateway'e bağlanır. Her istekle birlikte \texttt{X-Correlation-ID} (UUID~v4)
+ve \texttt{X-Device-ID} başlıkları taşınır; bu başlıklar, dağıtık
+izlenebilirliği sağlamak amacıyla tüm servislerin günlük kayıtlarına
+eklenir.
+Gateway, public JWT'yi doğruladıktan sonra kısa ömürlü (TTL 30 s) bir
+internal JWT üretir ve bunu \texttt{X-Internal-Auth} başlığıyla uygulama
+servislerine iletir.
+Böylece bir servisin ele geçirilmesi durumunda saldırgan, diğer servislere
+geçerli kimlik bilgisi üretemez.
+
+\subsection{Application Layer: Microservices}
+\label{subsec:microservices}
+
+Uygulama katmanı, her biri kendi PostgreSQL veritabanına sahip ve
+birbirinin veri depolama alanına doğrudan erişemeyen beş Spring Boot
+servisinden oluşmaktadır. Tüm servisler Java~21, JPA/Hibernate,
+Spring Security ve Actuator (\texttt{/actuator/health},
+\texttt{/actuator/prometheus}) kullanır; durumsuz (stateless) ve yatay
+ölçeklenebilir biçimde tasarlanmıştır.
+
+\subsubsection{user-service (8080)}
+
+Kimlik doğrulama, kullanıcı profili yönetimi, iki faktörlü kimlik
+doğrulama (2FA/TOTP), parola sıfırlama ve denetim günlüğü işlevlerini
+üstlenir.
+Spring Boot~3.5.5, jjwt~0.12.5 ve Bucket4j kütüphanelerini kullanan
+servis; Redis'i token/oturum önbelleği, AWS~S3'ü avatar depolama ve
+AWS~SES'i e-posta gönderimi için kullanır.
+Başarılı kayıt ve parola sıfırlama gibi olaylar RabbitMQ
+\texttt{email.exchange} (Direct) kuyruğuna bırakılır; servis bu kuyruğu
+aynı zamanda kendi tüketerek e-posta gönderimini tetikler.
+Kritik kullanıcı eylemleri, \texttt{X-Correlation-ID} ile ilişkilendirilmiş
+\texttt{audit\_logs} tablosuna kaydedilir.
+
+\subsubsection{community-service (8083)}
+
+Topluluk oluşturma, üyelik yönetimi (OWNER / MODERATOR / MEMBER),
+davet kodu üretimi ve istatistik işlevlerini sağlar.
+Servis, \texttt{InternalCommunityController} aracılığıyla yalnızca
+gateway tarafından imzalanmış internal JWT'ye yanıt veren dahili
+uç noktalar sunar.
+\texttt{election-service}, bir seçmen katılım hakediyor mu diye
+doğrulamak amacıyla bu uç noktaları sorgular.
+
+\subsubsection{election-service (8082)}
+
+Sistemin merkezi orkestratörüdür. Spring Boot~3.4.3, gRPC~1.62.2
+ve Protobuf~3.25.3 kullanan bu servis, kriptografi motoruyla gRPC,
+diğer servislerle REST üzerinden iletişim kurar.
+Seçim yaşam döngüsü, Şekil~\ref{fig:state_machine}'de gösterilen
+durum makinesiyle yönetilir.
+
+% ---------------------------------------------------------------
+% Şekil 2: Seçim durum makinesi
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §2.3
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/state_machine.pdf
+  \fbox{\rule{0pt}{4cm}\rule{0.7\linewidth}{0pt}}
+  \caption{Seçim durum makinesi. \texttt{DRAFT} durumundan
+           \texttt{ARCHIVED} durumuna kadar beş aşama ve geçiş
+           koşulları gösterilmektedir.}
+  \label{fig:state_machine}
+\end{figure}
+
+\texttt{Election} varlığı (entity); \texttt{electionGuardContext} (JSON),
+\texttt{electionManifest}, \texttt{electionPublicKey} (birleşik
+ElGamal anahtarı) ve \texttt{minGuardiansThreshold} ($Q$) alanlarını
+barındırır.
+\texttt{Vote} varlığı ise yalnızca \texttt{encryptedBallot}
+(CiphertextBallot JSON), \texttt{zkpProof}, \texttt{ballotHash}
+(SHA-256) ve \texttt{trackingCode} saklayacak şekilde tasarlanmıştır.
+Çift oy önleme, anonim bir \texttt{VoteNullifier} kaydı
+aracılığıyla gerçekleştirilir; bu yapı, seçmen kimliğini oy içeriğiyle
+ilişkilendirmeksizin yinelenmiş girişimleri engeller.
+
+\subsubsection{bulletin-board-service (8085)}
+
+Şeffaf ve kurcalamaya karşı dayanıklı (tamper-evident) kamuya açık
+denetim defterini yönetir.
+Her kayıt türü (\texttt{BALLOT}, \texttt{TALLY}, \texttt{METADATA})
+için hash zinciri şu formülle hesaplanır:
+
+\begin{equation}
+  h_i = \text{SHA-256}(\,\mathit{electionId}
+        \mathbin{\|} \mathit{recordType}
+        \mathbin{\|} \mathit{trackingCode}
+        \mathbin{\|} \mathit{ballotHash}
+        \mathbin{\|} h_{i-1}
+        \mathbin{\|} \mathit{payload}\,)
+  \label{eq:hashchain}
+\end{equation}
+
+Bu yapı, bülten panosuna gizlice ekleme ya da silme yapılmasını
+kriptografik olarak tespit edilebilir kılar.
+Herhangi bir bağımsız doğrulayıcı, zinciri başından sonuna tarayarak
+tutarsızlıkları saptayabilir.
+Depolama için MongoDB tercih edilmiştir; ekleme-yoğun (append-only) ve
+belge merkezli erişim kalıbı, hash zincirinin doğal modeli olan bu
+veritabanında verimli biçimde desteklenmektedir.
+
+\subsubsection{notification-service (8084)}
+
+Durumsuz bir mesaj tüketicisi olarak çalışır.
+RabbitMQ \texttt{notification.exchange} (Topic) üzerindeki
+
+\texttt{notification.election.queue}'yu dinler.
+Guardian ataması, seçim başlangıç/bitiş ve oy gönderim olaylarını
+tüketerek kullanıcının tercihine göre (\texttt{NotificationPreference})
+Expo Push API üzerinden mobil bildirim ya da AWS SES üzerinden
+HTML e-posta gönderir.
+Başarısız mesajlar Dead Letter Queue'ya (\texttt{notification.election.dlq})
+yönlendirilir; böylece geçici ağ hatalarında mesaj kaybı önlenir.
+
+\subsection{Cryptographic Engine}
+\label{subsec:cryptoengine}
+
+Kriptografik hesaplamaların iş mantığından izole edilmesi, Pallot/Vocket
+mimarisinin temel tasarım ilkelerinden birini oluşturmaktadır.
+Bu tasarım kararının temel gerekçesi, ElectionGuard işlemlerinin
+hesaplama yoğunluğu ve bağımlılık ağacının geniş kapsamıdır;
+kriptografi motorunu bağımsız tutmak, her iki tarafın da bağımsız olarak
+ölçeklenmesine ve güncellenmesine imkân tanır.
+
+\subsubsection{Python Crypto Engine (Üretim)}
+
+Python~3.10 üzerinde çalışan ve port~50051'de dinleyen servis,
+ElectionGuard~1.4.0 Python SDK'sını
+GitHub deposunun \texttt{v1.4.0} etiketinden kurar; PyPI'deki sürüm
+bazı üst-seviye yardımcı modülleri içermediğinden doğrudan kaynak
+deposu kullanılmaktadır.
+Servis beş gRPC prosedürünü gerçekleştirir:
+\texttt{SetupElection}, \texttt{ValidateBallot}, \texttt{CreateJointKey},
+\texttt{TallyElection} ve \texttt{DecryptWithShares}.
+
+Servisin en önemli mimari özelliği \textbf{durumsuz} olmasıdır: her gRPC
+çağrısı, manifest, şifreleme bağlamı, oy pusulası ve guardian kayıtları
+dahil tüm bağlamı kendi payload'ında taşır; servis, bellek veya disk
+üzerinde hiçbir veri saklamaz.
+Bu tasarım sayesinde crypto engine podları, bir yük dengeleyicinin
+arkasında kolaylıkla yatay olarak ölçeklendirilebilir.
+
+\paragraph{ElectionGuard Hash Zinciri.}
+ElectionGuard spesifikasyonu, şifreleme bağlamını türetmek için hiyerarşik
+bir karma (hash) zinciri tanımlar.
+SDK'nın v1.4.0 sürümünde bazı üst-seviye yardımcılar eksik olduğundan bu
+zincir, \texttt{crypto\_servicer.py} içinde şekil~\ref{fig:hashchain}'de
+gösterildiği gibi manuel olarak inşa edilmektedir:
+
+\begin{equation}
+  H_{\text{base}} = \text{hash\_elems}(N,\; Q,\; H_{\text{manifest}})
+  \label{eq:base_hash}
+\end{equation}
+\begin{equation}
+  H_{\text{ext}} = \text{hash\_elems}(H_{\text{base}},\; H_{\text{commit}})
+  \label{eq:ext_hash}
+\end{equation}
+
+burada $N$ toplam guardian sayısını, $Q$ quorum eşiğini,
+$H_{\text{manifest}} = \texttt{Manifest.crypto\_hash()}$ seçim yapısının
+özetini ve $H_{\text{commit}} = \texttt{hash\_elems}(\text{tüm guardian
+taahhütleri})$ değerini göstermektedir.
+Elde edilen $H_{\text{ext}}$ (\texttt{crypto\_extended\_base\_hash}), hem
+oy pusulası şifreleme hem de Chaum--Pedersen ZKP doğrulamasında referans
+noktası olarak kullanılır.
+
+% ---------------------------------------------------------------
+% Şekil 3: ElectionGuard hash zinciri
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §3.3
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/hash_chain.pdf
+  \fbox{\rule{0pt}{4.5cm}\rule{0.85\linewidth}{0pt}}
+  \caption{ElectionGuard kriptografik hash zinciri türetimi.
+           \texttt{crypto\_extended\_base\_hash}, oy şifreleme ve
+           ZKP doğrulamasında ortak referans noktasını oluşturur.}
+  \label{fig:hashchain}
+\end{figure}
+
+\paragraph{Guardian Anahtar Töreni.}
+Sistem iki guardian ceremony modunu destekler.
+Geliştirme ve test ortamlarında kullanılan Mod~1, tüm guardian anahtar
+çiftlerini tek bir süreçte merkezi olarak oluşturur; üretim ortamında
+kullanılmaz.
+Üretim için tasarlanmış Mod~2'de her guardian, private anahtarını kendi
+mobil cihazında üretir ve sunucuya yalnızca açık anahtarını (\textit{public
+key}), polinom taahhütlerini (\textit{commitments}) ve Schnorr katsayı
+kanıtlarını iletir.
+Private key hiçbir zaman ağ üzerinden geçmez.
+\texttt{distributed\_ceremony.create\_joint\_key()} fonksiyonu her
+guardian'ın Schnorr kanıtını \texttt{is\_valid(commit\_key)} çağrısıyla
+doğrular, ardından joint key'i
+$K_{\text{joint}} = \prod_{i=1}^{N} K_i \pmod{p}$
+formülüyle hesaplar.
+Sayım aşamasında her guardian kendi kısmi şifre çözüm payını
+$d_i = T^{s_i} \pmod{p}$ biçiminde hesaplar; en az $Q$ paydan Lagrange
+interpolasyonu ile düz metin sayım elde edilir.
+
+\paragraph{Chaum--Pedersen ZKP.}
+Her seçimin $(\alpha, \beta)$ ElGamal şifreli metni için bir aralık
+kanıtı üretilir.
+Bu kanıt, doğrulayıcının düz metin tercih içeriğini bilmeksizin şu iki
+iddiayı teyit etmesine olanak tanır: (1)~şifreli seçim $\{0, 1\}$
+kümesinde geçerli bir değer içermektedir; (2)~seçim sayı sınırı
+aşılmamıştır (örneğin tek tercihli bir yarışmada en fazla bir aday
+seçilmiştir).
+ElectionGuard SDK'sı, tüm kanıtları toplu olarak şu çağrıyla doğrular:
+
+\begin{verbatim}
+ballot.is_valid_encryption(
+    manifest_hash, elgamal_public_key,
+    crypto_extended_base_hash)
+\end{verbatim}
+
+Şifreli oy üzerinde herhangi bir değişiklik yapılması bu kanıtı geçersiz
+kılar ve böylece kötü niyetli müdahaleler matematiksel olarak tespit
+edilebilir hâle gelir~\cite{EGSpec2024}.
+
+
+\subsubsection{Kotlin Crypto Engine (POC)}
+
+Çapraz gerçekleştirim doğrulaması amacıyla, aynı gRPC sözleşmesini
+\texttt{votingworks/electionguard-kotlin-multiplatform}~(EGK~2.0)
+üzerinde uygulayan ikinci bir servis geliştirilmiştir.
+Spring Boot~3.2.5 ve Kotlin~1.9.22 kullanan bu servis port~50052'de
+dinler; \texttt{SetupElection} ve \texttt{ValidateBallot} prosedürleri
+işlevseldir, \texttt{TallyElection}, \texttt{CreateJointKey} ve
+\texttt{DecryptWithShares} ise henüz uygulanmamıştır (UNIMPLEMENTED).
+Üretim trafiği Python motorundan geçerken Kotlin POC, paralel akışları
+dinleyerek tutarlılık testlerinde kullanılmaktadır.
+Bu yapının uzun vadeli amacı, aynı KMP kitaplığını hem sunucu hem de
+mobil native modül olarak kullanarak tek tip bir kriptografi yığını
+oluşturmaktır.
+
+\subsection{Mobile Client}
+\label{subsec:mobileclient}
+
+İstemci katmanı, React Native~0.83.6 ve Expo~55.0.23 çerçevesinde
+TypeScript ile geliştirilmiştir.
+Oy şifreleme, \texttt{node-forge}~1.4.0 kütüphanesi ve Android'de
+Kotlin native modülü olarak entegre edilmiş \texttt{ElectionGuardClient}
+aracılığıyla cihaz üzerinde gerçekleştirilir; iOS için aynı KMP
+modülünün derlenmesi üçüncü aşama çalışma olarak planlanmaktadır.
+JWT erişim tokeni ve guardian secret anahtarı, işletim sistemi tarafından
+şifrelenen \texttt{expo-secure-store}'da saklanır; bu değerler düz metin
+olarak uygulama belleğinde asla tutulmaz.
+
+\paragraph{Kimlik Doğrulama ve Token Yönetimi.}
+\texttt{AuthContext}, erişim tokeni (TTL~900~s) ve yenileme tokeni
+çiftini SecureStore'da yönetir.
+\texttt{axios} istek kesicisi (\textit{interceptor}) her isteğe
+\texttt{X-Correlation-ID} (UUID~v4), \texttt{X-Device-ID},
+\texttt{X-App-Version} ve \texttt{X-Platform} başlıklarını ekler.
+Yanıt kesicisi 401 hatalarını \texttt{failedQueue} mekanizmasıyla
+sıraya alarak eş zamanlı 401 durumlarında yalnızca tek bir yenileme
+isteği gönderilmesini sağlar; yenileme başarısız olursa
+\texttt{DeviceEventEmitter} üzerinden oturum kapatma olayı yayınlanır.
+
+\paragraph{Oy Verme Akışı.}
+Şekil~\ref{fig:voting_flow}, uçtan uca oy verme sıra diyagramını
+göstermektedir.
+
+% ---------------------------------------------------------------
+% Şekil 4: Uçtan uca oy verme sıra diyagramı
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §10
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/voting_flow.pdf
+  \fbox{\rule{0pt}{9cm}\rule{0.95\linewidth}{0pt}}
+  \caption{Uçtan uca oy verme akışı. Anahtar töreni, oy gönderimi ve
+           eşikli sayım aşamaları sırayla gösterilmektedir.}
+  \label{fig:voting_flow}
+\end{figure}
+
+İstemci önce \texttt{GET /elections/\{id\}/encryption-params} uç
+noktasından \texttt{electionGuardContext}, \texttt{electionManifest} ve
+\texttt{jointPublicKey} değerlerini alır.
+Ardından \texttt{POST /votes/token} ile bir \texttt{VoteToken} (uygunluk
+belgesi) edinir.
+Seçmen tercihini yerel olarak oluşturup \texttt{ElectionGuardClient\-.en\-crypt\-Ballot()} çağrısını tetikler;
+bu çağrı \texttt{CiphertextBallot}, \texttt{zkpProof} ve bir onay kodu
+(\textit{tracking code}) döndürür.
+Öte yandan istemci, çift oy saldırılarını önlemek amacıyla
+$\texttt{nullifierHash} = \text{SHA-256}(\mathit{token} \mathbin{\|}
+\mathit{ballot\_structure})$
+formülüyle anonim bir nullifier üretir.
+Son adımda \texttt{CiphertextBallot}, hibrit RSA-OAEP+AES-GCM ile
+şifrelenerek sunucuya iletilir.
+Sunucu düz metin tercihi hiçbir zaman görmez; yalnızca şifreli oy ve ZKP
+kanıtı işlenir.
+
+\paragraph{Guardian Modülü.}
+Guardian rolündeki kullanıcı,
+\textcolor{red}{\texttt{guardian\_crypto.ts}}
+(\textcolor{green}{\texttt{guardianCrypto.ts}; kaynak ağacındaki gerçek dosya adı camelCase'dir: \texttt{mobile/src/utils/guardianCrypto.ts}})
+modülü
+aracılığıyla 256-bit bir $s$ secret değeri üretir ve SecureStore'a kaydeder.
+Açık anahtar $K = g^s \bmod p$ (4096-bit ElectionGuard temel grubu),
+Schnorr kanıtı $\{h, c, v\}$ ve $c = \text{SHA-256}(G \| K \| h) \bmod q$,
+$v = (k + c \cdot s) \bmod q$ biçiminde hesaplanır.
+Bu değerler \texttt{POST /guardians/\{u\}/keys} ile sunucuya iletilir;
+private key cihazı hiçbir zaman terk etmez.
+Sayım aşamasında guardian, \texttt{decryptionShare} $= T^s \bmod p$'yi
+hesaplayıp gönderir; bu işlemde de private key yalnızca anlık bellekte
+bulunur ve ağa asla çıkmaz.
+
+\subsection{API Gateway}
+\label{subsec:gateway}
+
+OpenResty (Nginx + LuaJIT), sistemin dış sınırında tek giriş noktası
+işlevi görür.
+Lua betikleri, JWT doğrulama, hız sınırlama ve korelasyon kimliği
+yönetimi gibi işlevleri gerçekleştirir.
+
+\paragraph{Yönlendirme ve Hız Sınırlaması.}
+\texttt{POST /v1/auth/*} uç noktaları için kimlik doğrulama gerekmeksizin
+IP başına dakikada 10 istek, korumalı uç noktalar için ise kullanıcı
+başına dakikada 60 istek sınırı uygulanmaktadır.
+Sınır aşıldığında \texttt{429~Too Many Requests} ile birlikte
+\texttt{Retry-After} başlığı döndürülür.
+
+\paragraph{Internal JWT.}
+Gateway, gelen public JWT'yi doğruladıktan sonra kısa ömürlü (TTL~30~s)
+ve kapsamı sınırlı bir internal JWT imzalar.
+Bu token \texttt{X-Internal-Auth} başlığıyla uygulama servislerine
+iletilir; servisler yalnızca bu token'ı doğrular ve \texttt{X-User-Id},
+\texttt{X-Platform-Role} değerlerine güvenir.
+Bu mekanizma, bir servisin ele geçirilmesi durumunda yatay hareketin
+önüne geçer.
+
+\paragraph{TLS ve Güvenlik Başlıkları.}
+Dış bağlantılar TLS~1.2 ve TLS~1.3 ile korunur.
+Let's Encrypt sertifikaları 12 saatte bir otomatik olarak yenilenir.
+HSTS (\texttt{max-age=31536000}), \texttt{X-Frame-Options: SAMEORIGIN},
+\texttt{X-Content-Type-Options: nosniff} ve \texttt{X-XSS-Protection}
+başlıkları tüm yanıtlara eklenir.
+\textcolor{red}{Büyük ElectionGuard manifest ve kanıt JSON'larını karşılayabilmek için
+\texttt{proxy\_buffer\_size}~128k, \texttt{proxy\_buffers}~4~×~256k ve
+\texttt{proxy\_read\_timeout}~120s olarak yapılandırılmıştır.}
+(\textcolor{green}{Mevcut \texttt{nginx.conf} dosyasında bu üç tampon (\textit{buffer}) ayarı tanımlı değildir; yalnızca büyük ElectionGuard manifest ve kanıt JSON'larını karşılayabilmek için \texttt{client\_max\_body\_size}~10M değeri ayarlanmıştır. \texttt{proxy\_buffer\_size}, \texttt{proxy\_buffers} ve \texttt{proxy\_read\_timeout} parametreleri OpenResty/Nginx varsayılan değerlerinde bırakılmıştır.})
+
+\subsection{Inter-Service Communication and Asynchronous Audit}
+\label{subsec:interservice}
+
+Servisler arası iletişim, senkron ve asenkron kanalların bilinçli
+kombinasyonuna dayanmaktadır.
+
+\paragraph{Senkron İletişim.}
+Şifreli oy doğrulama için \texttt{election-service}'ten
+\texttt{crypto-engine}'e yapılan gRPC çağrısında 30~saniyelik zaman aşımı
+uygulanır; sayım (tally) işlemi için bu süre 120~saniyeye çıkar.
+İkili (binary) Protobuf serileştirme ve HTTP/2 çoklama (multiplexing),
+büyük ElectionGuard manifestlerinin düşük gecikmeyle iletilmesini sağlar.
+Tablo~\ref{tab:communication} tüm senkron iletişim kanallarını özetlemektedir.
+
+\begin{table}[ht]
+\centering
+\caption{Senkron Servisler Arası İletişim Kanalları}
+\label{tab:communication}
+\begin{tabular}{llll}
+\toprule
+\textbf{Kaynak} & \textbf{Hedef} & \textbf{Protokol} & \textbf{Not} \\
+\midrule
+Mobile       & Gateway         & HTTPS/TLS   & Public JWT \\
+Gateway      & Servisler       & HTTP/JSON   & Internal JWT (30~s TTL) \\
+election-svc & community-svc   & HTTP/JSON   & Internal JWT \\
+election-svc & user-svc        & HTTP/JSON   & Internal JWT \\
+election-svc & bulletin-board  & HTTP/JSON   & Internal JWT \\
+election-svc & crypto-engine   & gRPC/Protobuf & 30~s / 120~s timeout \\
+election-svc & crypto-kotlin   & gRPC/Protobuf & Paralel POC \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Asenkron Denetim Kuyruğu.}
+Oy gönderiminin kullanıcı deneyimini sekteye uğratmaması için denetim
+defterine yazım işlemi asenkron gerçekleştirilmektedir.
+\texttt{election-service}, oyu PostgreSQL'e kaydeder ve kullanıcıya anında
+HTTP~200 döndürür; aynı anda \texttt{notification.exchange} (Topic)
+kuyruğuna bir olay yayınlar.
+\texttt{bulletin-board-service} bu olayı kendi temposunda tüketerek
+MongoDB'deki hash zincirini günceller.
+
+RabbitMQ'da iki exchange tanımlıdır: kullanıcı e-postası için
+\texttt{email.exchange} (Direct) ve seçim bildirimleri için
+\texttt{notification.exchange} (Topic).
+Her exchange'e karşılık gelen Dead Letter Queue (DLQ) mevcuttur; bu yapı,
+geçici servis hatalarında mesaj kaybını önler.
+Şekil~\ref{fig:rabbitmq} asenkron olay akışını göstermektedir.
+
+% ---------------------------------------------------------------
+% Şekil 5: RabbitMQ asenkron mesaj akışı
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §6.2
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/rabbitmq_flow.pdf
+  \fbox{\rule{0pt}{4.5cm}\rule{0.85\linewidth}{0pt}}
+  \caption{RabbitMQ üzerinden asenkron olay akışı. Direct ve Topic
+           exchange yapıları, üreticiler, tüketiciler ve DLQ'lar
+           gösterilmektedir.}
+  \label{fig:rabbitmq}
+\end{figure}
+
+\subsection{Data Persistence}
+\label{subsec:persistence}
+
+Veri kalıcılığı katmanı, mikroservis sınırlarını veri seviyesinde de
+koruyacak biçimde tasarlanmıştır.
+
+\paragraph{PostgreSQL 15 — Dört İzole Veritabanı.}
+Her servis yalnızca kendi veritabanına erişir:
+\texttt{userdb} (kimlik doğrulama ve denetim),
+\texttt{communitydb} (topluluk ve üyelik),
+\texttt{electiondb} (seçim, oy, guardian, sonuç) ve
+\textcolor{red}{\texttt{bulletindb} (bülten panosu alternatif PostgreSQL arka ucu).}
+(\textcolor{green}{Bülten panosu kayıtları kalıcı olarak MongoDB üzerinde tutulmaktadır; \texttt{bulletin-board-service} \texttt{@Document}, \texttt{MongoRepository} ve \texttt{MongoTemplate} ile uygulanmıştır. PostgreSQL üzerindeki \texttt{bulletindb} şeması, projenin erken aşamasından kalan ve üretimde kullanılmayan rezerve bir şemadır.})
+Bu yalıtım, bir servis güvenliği ihlali durumunda diğer servislerin
+veri alanlarının korunmasını garantiler.
+\texttt{electiondb}, V1'den V11'e kadar 11 Flyway migrasyonu içerir.
+En kritik değişiklik, E2E-V uyumluluğunu sağlamak amacıyla V11 ile
+uygulanan \texttt{votes.candidate\_id} sütununun kaldırılması ve
+\texttt{vote\_nullifiers} tablosunun eklenmesidir.
+
+\paragraph{MongoDB — Bülten Panosu Defteri.}
+Bülten panosu kayıtları, \texttt{\_id}, \texttt{electionId},
+\texttt{recordType}, \texttt{ballotHash}, \texttt{previousHash},
+\texttt{recordHash} ve \texttt{payload} alanlarını içeren belge
+yapısında saklanır.
+\texttt{recordHash} değeri Denklem~(\ref{eq:hashchain})'deki formülle
+hesaplanır.
+
+\paragraph{Redis 7 ve Backend'in Gizlilik Garantisi.}
+Redis, token önbelleği ve hız sınırı sayaçları için kullanılmaktadır.
+Tablo~\ref{tab:data_privacy}, sistemin hangi verileri sakladığını ve
+hangilerini asla kayıt altına almadığını özetlemektedir.
+
+\begin{table}[ht]
+\centering
+\caption{Backend'in Sakladığı ve Saklamadığı Veriler}
+\label{tab:data_privacy}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Veri} & \textbf{Saklanır mı?} & \textbf{Notlar} \\
+\midrule
+Düz metin oy tercihi  & \textbf{Hayır} & Mobilden çıkmaz \\
+\texttt{encryptedBallot}   & Evet  & E2E-V denetim izi \\
+\texttt{zkpProof}, \texttt{ballotHash}, \texttt{trackingCode} & Evet & Doğrulama, bütünlük, makbuz \\
+Guardian private key  & \textbf{Hayır} & Yalnızca SecureStore'da \\
+\texttt{decryptionShare}   & Evet  & Tek başına deşifre edemez; $Q$ adet gerekir \\
+\texttt{tallyProof}, \texttt{tallyResults} & Evet & ElectionGuard sayım kanıtı \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Infrastructure and Observability}
+\label{subsec:infra}
+
+\textcolor{red}{Üretim ortamında 16 Docker container tek bir köprü ağı
+(\texttt{172.19.0.0/16}) üzerinde çalışmaktadır.
+Bellek bütçesi yaklaşık 2.5~GB olarak planlanmış ve 4~GB RAM'e sahip
+bir sunucuya sığdırılmıştır: Gateway 256~MB, user-service 512~MB,
+election-service ve community-service 384~MB, bulletin-board 256~MB
+ve crypto-engine 512~MB.}
+(\textcolor{green}{Üretim ortamında 16 Docker container tek bir köprü ağı (\texttt{cepsandik-network}, üretim Compose dosyasında \texttt{app-net}) üzerinde çalışmaktadır. CIDR adresi (\texttt{172.19.0.0/16}) Compose dosyalarında elle tanımlanmamış olup Docker varsayılan değerine bırakılmıştır. Üretim için \texttt{docker-compose.prod.yaml} dosyasında atanan bellek üst sınırları şu şekildedir: Gateway 256~MB, user-service 450~MB, community-service ve election-service 400~MB, bulletin-board 300~MB, notification-service 400~MB ve crypto-engine 512~MB. Uygulama servislerinin toplam bütçesi yaklaşık 2.7~GB, altyapı container'ları (PostgreSQL 256~MB, Redis 128~MB, RabbitMQ 256~MB, backup 128~MB) dahil edildiğinde yaklaşık 3.5~GB'a ulaşmakta ve 4~GB RAM'e sahip bir sunucuya sığdırılmaktadır.})
+
+Şekil~\ref{fig:infra_topology} container topolojisini ve bağımlılıklarını
+göstermektedir.
+
+% ---------------------------------------------------------------
+% Şekil 6: Docker container topolojisi
+% Mermaid kaynağı: JISA_System_Architecture_Reference.md §9.1
+% ---------------------------------------------------------------
+\begin{figure}[ht]
+  \centering
+  % Görseli buraya ekleyin: figures/infra_topology.pdf
+  \fbox{\rule{0pt}{6cm}\rule{0.9\linewidth}{0pt}}
+  \caption{Üretim Docker container topolojisi. Kenar, uygulama, kriptografi,
+           veri ve gözlemlenebilirlik katmanları ile aralarındaki
+           bağımlılıklar gösterilmektedir.}
+  \label{fig:infra_topology}
+\end{figure}
+
+PostgreSQL için cron tabanlı yedekleme servisi günlük \texttt{pg\_dump
+| gzip} alır ve 7 gün saklar.
+Servis sağlığı, Prometheus tarafından her 30 saniyede bir
+\texttt{/actuator/prometheus} uç noktasından çekilen Micrometer metrikleriyle
+izlenir.
+Loki + Promtail tüm container günlüklerini Docker soketinden toplar;
+her satır \texttt{timestamp}, \texttt{level}, \texttt{service},
+\texttt{correlation\_id} ve \texttt{user\_id} alanlarını içeren JSON
+yapısındadır.
+Bu sayede tek bir oy verme işleminin tüm servislerdeki izi, yalnızca
+\texttt{X-Correlation-ID} değeriyle Grafana üzerinden sorgulanabilmektedir.
+%%============================================================
+%%  KAYNAKLAR
+%%============================================================
+\bibliographystyle{elsarticle-num}
+\bibliography{cas-refs}
+
+\end{document}

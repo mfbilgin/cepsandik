@@ -69,7 +69,9 @@ public class CryptoEngineClient {
             String electionId,
             int numberOfGuardians,
             int quorum,
-            List<ContestInfo> contests) {
+            List<ContestInfo> contests,
+            String startDate,
+            String endDate) {
 
         log.info("SetupElection gRPC çağrısı: election={}, N={}, Q={}",
                 electionId, numberOfGuardians, quorum);
@@ -80,6 +82,8 @@ public class CryptoEngineClient {
                     .setNumberOfGuardians(numberOfGuardians)
                     .setQuorum(quorum)
                     .addAllContests(contests)
+                    .setStartDate(startDate != null ? startDate : "")
+                    .setEndDate(endDate != null ? endDate : "")
                     .build();
 
             SetupElectionResponse response = blockingStub
@@ -98,49 +102,44 @@ public class CryptoEngineClient {
         }
     }
 
-    // ==================== Encrypt Ballot ====================
+    // ==================== Validate Ballot (E2E-V) ====================
 
     /**
-     * Tek bir oyu şifreler.
-     * Context ve manifest PostgreSQL'den çekilip gönderilir (stateless).
+     * Mobile'da client-side ElGamal ile şifrelenmiş ballot'u doğrular.
+     * Server hiçbir aşamada plaintext oyu görmez.
      */
-    public EncryptBallotResponse encryptBallot(
+    public ValidateBallotResponse validateBallot(
             String electionId,
             String electionGuardContext,
             String electionManifest,
-            byte[] rsaEncryptedPayload,
             String ballotId,
-            String ballotStyleId) {
+            String ciphertextBallot,
+            String zkpProof,
+            String trackingCode,
+            String ballotHash) {
 
-        log.info("EncryptBallot gRPC çağrısı: election={}, ballot={}",
-                electionId, ballotId);
+        log.info("ValidateBallot gRPC çağrısı: election={}, ballot={}", electionId, ballotId);
 
         try {
-            EncryptBallotRequest.Builder requestBuilder = EncryptBallotRequest.newBuilder()
+            ValidateBallotRequest request = ValidateBallotRequest.newBuilder()
                     .setElectionId(electionId)
                     .setElectionGuardContext(electionGuardContext)
                     .setElectionManifest(electionManifest)
                     .setBallotId(ballotId)
-                    .setBallotStyleId(ballotStyleId != null ? ballotStyleId : "ballot-style-1");
+                    .setCiphertextBallot(ciphertextBallot)
+                    .setZkpProof(zkpProof != null ? zkpProof : "")
+                    .setTrackingCode(trackingCode != null ? trackingCode : "")
+                    .setBallotHash(ballotHash != null ? ballotHash : "")
+                    .build();
 
-            if (rsaEncryptedPayload != null) {
-                requestBuilder.setRsaEncryptedPayload(
-                        com.google.protobuf.ByteString.copyFrom(rsaEncryptedPayload));
-            }
-
-            EncryptBallotResponse response = blockingStub
+            return blockingStub
                     .withDeadlineAfter(30, TimeUnit.SECONDS)
-                    .encryptBallot(requestBuilder.build());
-
-            log.info("EncryptBallot başarılı: ballot={}, tracking_code={}",
-                    ballotId, response.getTrackingCode().substring(0, Math.min(16, response.getTrackingCode().length())));
-
-            return response;
+                    .validateBallot(request);
 
         } catch (StatusRuntimeException e) {
-            log.error("EncryptBallot gRPC hatası: status={}, desc={}",
+            log.error("ValidateBallot gRPC hatası: status={}, desc={}",
                     e.getStatus().getCode(), e.getStatus().getDescription());
-            throw new RuntimeException("Crypto-Engine EncryptBallot hatası: " + e.getMessage(), e);
+            throw new RuntimeException("Crypto-Engine ValidateBallot hatası: " + e.getMessage(), e);
         }
     }
 
@@ -186,25 +185,69 @@ public class CryptoEngineClient {
         }
     }
 
-    // ==================== Get Public Key ====================
-
     /**
-     * Crypto-Engine'in RSA public key'ini döner.
+     * Bireysel kamu anahtarlarını birleştirip ortak anahtar ve context üretir.
      */
-    public String getPublicKey() {
-        log.info("GetPublicKey gRPC çağrısı");
+    public CreateJointKeyResponse createJointKey(
+            String electionId,
+            int numberOfGuardians,
+            int quorum,
+            List<GuardianPublicKey> publicKeys,
+            List<ContestInfo> contests,
+            String startDate,
+            String endDate) {
+
+        log.info("CreateJointKey gRPC çağrısı: election={}, guardians={}", electionId, publicKeys.size());
 
         try {
-            GetPublicKeyResponse response = blockingStub
-                    .withDeadlineAfter(10, TimeUnit.SECONDS)
-                    .getPublicKey(GetPublicKeyRequest.newBuilder().build());
+            CreateJointKeyRequest request = CreateJointKeyRequest.newBuilder()
+                    .setElectionId(electionId)
+                    .setNumberOfGuardians(numberOfGuardians)
+                    .setQuorum(quorum)
+                    .addAllPublicKeys(publicKeys)
+                    .addAllContests(contests)
+                    .setStartDate(startDate != null ? startDate : "")
+                    .setEndDate(endDate != null ? endDate : "")
+                    .build();
 
-            return response.getRsaPublicKeyPem();
+            return blockingStub
+                    .withDeadlineAfter(60, TimeUnit.SECONDS)
+                    .createJointKey(request);
 
         } catch (StatusRuntimeException e) {
-            log.error("GetPublicKey gRPC hatası: status={}, desc={}",
-                    e.getStatus().getCode(), e.getStatus().getDescription());
-            throw new RuntimeException("Crypto-Engine GetPublicKey hatası: " + e.getMessage(), e);
+            log.error("CreateJointKey gRPC hatası: {}", e.getMessage());
+            throw new RuntimeException("Joint key üretilemedi: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Dağıtık deşifre paylarını toplayıp sonucu açıklar.
+     */
+    public TallyElectionResponse decryptWithShares(
+            String electionId,
+            String context,
+            String manifest,
+            List<String> ballots,
+            List<DecryptionShare> shares) {
+
+        log.info("DecryptWithShares gRPC çağrısı: election={}, shares={}", electionId, shares.size());
+
+        try {
+            DecryptWithSharesRequest request = DecryptWithSharesRequest.newBuilder()
+                    .setElectionId(electionId)
+                    .setElectionGuardContext(context)
+                    .setElectionManifest(manifest)
+                    .addAllCiphertextBallots(ballots)
+                    .addAllShares(shares)
+                    .build();
+
+            return blockingStub
+                    .withDeadlineAfter(120, TimeUnit.SECONDS)
+                    .decryptWithShares(request);
+
+        } catch (StatusRuntimeException e) {
+            log.error("DecryptWithShares gRPC hatası: {}", e.getMessage());
+            throw new RuntimeException("Deşifre işlemi başarısız: " + e.getMessage(), e);
         }
     }
 }

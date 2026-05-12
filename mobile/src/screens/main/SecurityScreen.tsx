@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { api } from '../../services/api';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import * as SecureStore from 'expo-secure-store';
 import { useI18n } from '../../i18n/LanguageContext';
 
@@ -132,11 +132,11 @@ export const SecurityScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-[#f6f7f8]`}
+            style={tw`flex-1 bg-background`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-            <View style={tw`bg-white border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
+            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
@@ -144,7 +144,7 @@ export const SecurityScreen = () => {
             </View>
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6 ${isKeyboardVisible ? 'pb-100' : ''}`} keyboardShouldPersistTaps="handled">
-                <View style={tw`flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100`}>
+                <View style={tw`flex-col gap-5 bg-surface p-6 rounded-2xl shadow-sm border border-slate-100`}>
                     <Text style={tw`text-lg font-bold text-slate-900 mb-1`}>{t('security.changePassword')}</Text>
 
                     <View style={tw`flex-col gap-2`}>
@@ -209,7 +209,7 @@ export const SecurityScreen = () => {
                     </View>
 
                     <TouchableOpacity
-                        style={tw`mt-4 w-full bg-[#1162d4] flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isLoading ? 'opacity-50' : ''}`}
+                        style={tw`mt-4 w-full bg-primary flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isLoading ? 'opacity-50' : ''}`}
                         onPress={handleChangePassword}
                         disabled={isLoading}
                     >
@@ -219,10 +219,10 @@ export const SecurityScreen = () => {
                 </View>
 
                 {/* 2FA Block */}
-                <View style={tw`flex-col gap-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-2`}>
+                <View style={tw`flex-col gap-2 bg-surface p-6 rounded-2xl shadow-sm border border-slate-100 mt-2`}>
                     <View style={tw`flex-row items-center justify-between`}>
                         <View style={tw`flex-row items-center gap-2`}>
-                            <Ionicons name="shield-checkmark" size={24} color={is2FAEnabled ? "#10b981" : "#1162d4"} />
+                            <Ionicons name="shield-checkmark" size={24} color={is2FAEnabled ? "#10b981" : "#41431B"} />
                             <Text style={tw`text-lg font-bold text-slate-900`}>{t('security.2faTitle')}</Text>
                         </View>
                         {is2FAEnabled && (

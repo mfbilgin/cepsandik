@@ -23,6 +23,7 @@ import java.util.List;
 public class InternalCommunityController {
 
     private final CommunityMemberRepository memberRepository;
+    private final com.cepsandik.communityservice.repository.CommunityRepository communityRepository;
 
     /**
      * Topluluk üyelerinin userId listesini döndürür.
@@ -37,5 +38,12 @@ public class InternalCommunityController {
                 .toList();
 
         return ResponseEntity.ok(userIds);
+    }
+
+    @GetMapping("/{communityId}/name")
+    public ResponseEntity<String> getName(@PathVariable Long communityId) {
+        return communityRepository.findByIdAndIsDeletedFalse(communityId)
+                .map(c -> ResponseEntity.ok(c.getName()))
+                .orElse(ResponseEntity.notFound().build());
     }
 }

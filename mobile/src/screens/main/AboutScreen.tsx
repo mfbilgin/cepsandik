@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const AboutScreen = () => {
@@ -10,8 +10,8 @@ export const AboutScreen = () => {
     const { t } = useI18n();
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8]`}>
-            <View style={tw`bg-white border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
+        <View style={tw`flex-1 bg-background`}>
+            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
@@ -20,14 +20,14 @@ export const AboutScreen = () => {
 
             <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6`}>
                 <View style={tw`items-center justify-center py-6`}>
-                    <View style={tw`w-24 h-24 bg-[#1162d4] rounded-3xl items-center justify-center shadow-lg mb-4`}>
+                    <View style={tw`w-24 h-24 bg-primary rounded-3xl items-center justify-center shadow-lg mb-4`}>
                         <Ionicons name="cube-outline" size={48} color="white" />
                     </View>
                     <Text style={tw`text-2xl font-bold text-slate-900 mb-1`}>CepSandık</Text>
                     <Text style={tw`text-base text-slate-500`}>{t('about.version')}</Text>
                 </View>
 
-                <View style={tw`bg-white rounded-2xl shadow-sm border border-slate-100 p-6`}>
+                <View style={tw`bg-surface rounded-2xl shadow-sm border border-slate-100 p-6`}>
                     <Text style={tw`text-sm text-slate-600 leading-relaxed mb-4`}>
                         {t('about.description1')}
                     </Text>

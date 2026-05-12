@@ -4,12 +4,12 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "votes", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_vote_token", columnNames = {"vote_token"}),
-    @UniqueConstraint(name = "uk_vote_election_token", columnNames = {"election_id", "vote_token"})
+    @UniqueConstraint(name = "uk_vote_election_ballot", columnNames = {"election_id", "ballot_id"}),
+    @UniqueConstraint(name = "uk_vote_election_tracking", columnNames = {"election_id", "tracking_code"})
 })
 @Getter
 @Setter
@@ -26,27 +26,27 @@ public class Vote {
     @JoinColumn(name = "election_id", nullable = false)
     private Election election;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "candidate_id", nullable = false)
-    private Candidate candidate;
+    /** Anonymous ElectionGuard ballot id. It must not encode user or option data. */
+    @Column(name = "ballot_id", nullable = false, length = 128)
+    private String ballotId;
 
-    /** Oy kullanmak için kullanılan tek kullanımlık token */
-    @Column(name = "vote_token", nullable = false, length = 36)
-    private String voteToken;
-
-    /** Şifreli oy verisi (ElectionGuard CiphertextBallot JSON) */
-    @Column(name = "encrypted_ballot", columnDefinition = "TEXT")
+    /** ElectionGuard CiphertextBallot JSON. */
+    @Column(name = "encrypted_ballot", nullable = false, columnDefinition = "TEXT")
     private String encryptedBallot;
 
-    /** ElectionGuard tracking code (doğrulama kodu) */
-    @Column(name = "tracking_code", length = 128)
+    /** ElectionGuard tracking code exposed to the voter for recorded-as-cast checks. */
+    @Column(name = "tracking_code", nullable = false, length = 128)
     private String trackingCode;
 
-    /** Zero Knowledge Proof (JSON) */
-    @Column(name = "zkp_proof", columnDefinition = "TEXT")
+    /** Ballot encryption proof metadata / verifier payload. */
+    @Column(name = "zkp_proof", nullable = false, columnDefinition = "TEXT")
     private String zkpProof;
 
+    /** SHA-256 hash of encryptedBallot, used by the bulletin board hash chain. */
+    @Column(name = "ballot_hash", nullable = false, length = 64)
+    private String ballotHash;
+
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "cast_at", nullable = false, updatable = false)
+    private Instant castAt;
 }

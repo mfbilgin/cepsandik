@@ -1,7 +1,6 @@
 package com.cepsandik.electionservice.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,12 +10,24 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CastVoteRequest {
 
-    @NotBlank(message = "Oy token'ı zorunludur")
-    private String voteToken;
+    @NotBlank(message = "Ballot ID zorunludur")
+    private String ballotId;
 
-    @NotNull(message = "Aday ID zorunludur")
-    private Long candidateId;
+    @NotBlank(message = "Anonim oy kullanma belgesi zorunludur")
+    private String credential;
 
-    /** RSA ile şifrelenmiş oy verisi (Crypto-Engine entegrasyonu) */
-    private byte[] rsaEncryptedPayload;
+    @NotBlank(message = "Oy kullanma belgesi imzasi zorunludur")
+    private String credentialSignature;
+
+    @NotBlank(message = "Nullifier hash zorunludur")
+    private String nullifierHash;
+
+    @NotBlank(message = "Sifreli oy zorunludur")
+    private String encryptedBallot;
+
+    @NotBlank(message = "ZKP kaniti zorunludur")
+    private String zkpProof;
+
+    @NotBlank(message = "Tracking code zorunludur")
+    private String trackingCode;
 }

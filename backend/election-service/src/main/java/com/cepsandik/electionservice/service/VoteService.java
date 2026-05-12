@@ -1,12 +1,12 @@
 package com.cepsandik.electionservice.service;
 
+import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.dto.request.CastVoteRequest;
 import com.cepsandik.electionservice.dto.response.*;
 import com.cepsandik.electionservice.entity.*;
 import com.cepsandik.electionservice.exception.ApiException;
-import com.cepsandik.electionservice.grpc.EncryptBallotResponse;
 import com.cepsandik.electionservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,9 +14,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -31,60 +32,43 @@ public class VoteService {
     private final AccessCodeRepository accessCodeRepository;
     private final VoteTokenRepository voteTokenRepository;
     private final VoteRepository voteRepository;
+    private final VoteNullifierRepository voteNullifierRepository;
+    private final BulletinBoardClient bulletinBoardClient;
     private final CryptoEngineClient cryptoEngineClient;
     private final UtcClock utcClock;
 
-    // ==================== Erişim Kodu Doğrulama ====================
-
-    /**
-     * Erişim kodunu doğrular ve seçim bilgilerini döndürür.
-     * Kod geçerliyse kullanım sayısını artırır.
-     */
     @Transactional
     public AccessVerificationResponse verifyAccessCode(Long electionId, String code) {
         Election election = findElectionOrThrow(electionId);
-
-        // Seçim aktif mi kontrol et
         if (!election.isActive()) {
-            throw ApiException.badRequest("Bu seçim şu an aktif değil");
+            throw ApiException.badRequest("Bu secim su an aktif degil");
         }
 
-        // Erişim kodunu bul ve doğrula
         AccessCode accessCode = accessCodeRepository.findByCode(code.toUpperCase())
-                .orElseThrow(() -> ApiException.notFound("Geçersiz erişim kodu"));
-
-        // Kodun bu seçime ait olup olmadığını kontrol et
+                .orElseThrow(() -> ApiException.notFound("Gecersiz erisim kodu"));
         if (!accessCode.getElection().getId().equals(electionId)) {
-            throw ApiException.badRequest("Bu erişim kodu bu seçime ait değil");
+            throw ApiException.badRequest("Bu erisim kodu bu secime ait degil");
         }
 
-        // Kodun geçerliliğini kontrol et
-        var now = utcClock.instant();
+        Instant now = utcClock.instant();
         if (!accessCode.isValid(now)) {
-            if (!accessCode.getIsActive()) {
-                throw ApiException.badRequest("Bu erişim kodu deaktif edilmiş");
-            }
-            if (accessCode.getExpiresAt() != null && accessCode.getExpiresAt().isBefore(now)) {
-                throw ApiException.badRequest("Bu erişim kodunun süresi dolmuş");
-            }
-            if (accessCode.getMaxUses() != null && accessCode.getCurrentUses() >= accessCode.getMaxUses()) {
-                throw ApiException.badRequest("Bu erişim kodu maksimum kullanım sayısına ulaşmış");
-            }
+            throw ApiException.badRequest("Bu erisim kodu aktif degil, suresi dolmus veya kullanim limiti dolmus");
         }
 
-        // Kullanım sayısını artır
         accessCode.incrementUsage();
         accessCodeRepository.save(accessCode);
 
-        // Adayları getir
-        List<Candidate> candidates = candidateRepository.findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(electionId);
-        List<CandidateResponse> candidateResponses = candidates.stream()
+        List<CandidateResponse> candidates = candidateRepository
+                .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(electionId)
+                .stream()
                 .map(c -> CandidateResponse.builder()
                         .id(c.getId())
                         .name(c.getName())
                         .description(c.getDescription())
                         .imageUrl(c.getImageUrl())
                         .displayOrder(c.getDisplayOrder())
+                        .candidateType(c.getCandidateType())
+                        .memberUserId(c.getMemberUserId())
                         .createdAt(c.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
@@ -98,28 +82,24 @@ public class VoteService {
                 .maxSelections(election.getMaxSelections())
                 .startTime(election.getStartTime())
                 .endTime(election.getEndTime())
-                .candidateCount(candidateResponses.size())
-                .candidates(candidateResponses)
-                .anonymousVoting(election.getAnonymousVoting())
+                .candidateCount(candidates.size())
+                .candidates(candidates)
                 .build();
     }
 
-    // ==================== Vote Token Yönetimi ====================
-
     /**
-     * Kullanıcı için tek kullanımlık vote token üretir.
-     * Her kullanıcı bir seçimde sadece 1 token alabilir.
+     * Compatibility endpoint for the current mobile flow.
+     * The returned value is an eligibility credential, not a vote token, and is
+     * never stored on the cast ballot. Future work should replace this with
+     * proper blind-signature issuance.
      */
     @Transactional
     public VoteTokenResponse generateVoteToken(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
-        // Seçim aktif mi kontrol et
         if (!election.isActive()) {
-            throw ApiException.badRequest("Bu seçim şu an aktif değil, oy token'ı alınamaz");
+            throw ApiException.badRequest("Bu secim su an aktif degil, oy kullanma belgesi alinamaz");
         }
 
-        // Kullanıcı zaten token almış mı kontrol et
         var existingToken = voteTokenRepository.findByElectionIdAndUserId(electionId, userId);
         if (existingToken.isPresent()) {
             VoteToken token = existingToken.get();
@@ -133,285 +113,194 @@ public class VoteService {
                     .build();
         }
 
-        // Yeni token üret
-        VoteToken voteToken = VoteToken.builder()
+        VoteToken credential = VoteToken.builder()
                 .election(election)
                 .userId(userId)
                 .token(UUID.randomUUID().toString())
                 .build();
-
-        voteToken = voteTokenRepository.save(voteToken);
-
-        log.info("Vote token üretildi - Election: {}, User: {}", electionId, userId);
+        credential = voteTokenRepository.save(credential);
 
         return VoteTokenResponse.builder()
-                .token(voteToken.getToken())
+                .token(credential.getToken())
                 .electionId(election.getId())
                 .electionTitle(election.getTitle())
                 .isUsed(false)
-                .createdAt(voteToken.getCreatedAt())
+                .createdAt(credential.getCreatedAt())
                 .build();
     }
 
-    // ==================== Oy Verme ====================
-
-    /**
-     * Oy kullanır. İdempotent: aynı token ile tekrar oy atılırsa mevcut oy döndürülür.
-     */
     @Transactional
     public VoteResponse castVote(Long electionId, CastVoteRequest request) {
         Election election = findElectionOrThrow(electionId);
-
-        // Seçim aktif mi kontrol et
         if (!election.isActive()) {
-            throw ApiException.badRequest("Bu seçim şu an aktif değil, oy kullanılamaz");
+            throw ApiException.badRequest("Bu secim su an aktif degil, oy kullanilamaz");
+        }
+        if (election.getElectionGuardContext() == null || election.getElectionGuardContext().isBlank()) {
+            throw ApiException.badRequest("Bu secimde ElectionGuard context hazir degil");
         }
 
-        // Vote token'ı doğrula
-        VoteToken voteToken = voteTokenRepository.findByToken(request.getVoteToken())
-                .orElseThrow(() -> ApiException.notFound("Geçersiz oy token'ı"));
-
-        // Token bu seçime ait mi
-        if (!voteToken.getElection().getId().equals(electionId)) {
-            throw ApiException.badRequest("Bu token bu seçime ait değil");
-        }
-
-        // İdempotency: token zaten kullanılmışsa mevcut oyu döndür
-        if (voteToken.getIsUsed()) {
-            Vote existingVote = voteRepository.findByVoteToken(request.getVoteToken())
+        var existingNullifier = voteNullifierRepository
+                .findByElectionIdAndNullifierHash(electionId, request.getNullifierHash());
+        if (existingNullifier.isPresent()) {
+            Vote existingVote = voteRepository
+                    .findByElectionIdAndBallotId(electionId, existingNullifier.get().getBallotId())
                     .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-                            "Token kullanılmış ama oy bulunamadı"));
-
-            log.info("İdempotent oy isteği - Election: {}, Token: {}", electionId, request.getVoteToken());
-
+                            "Nullifier kaydi var ama anonim oy bulunamadi"));
             return VoteResponse.builder()
                     .electionId(election.getId())
                     .electionTitle(election.getTitle())
-                    .candidateId(existingVote.getCandidate().getId())
-                    .candidateName(existingVote.getCandidate().getName())
                     .alreadyVoted(true)
-                    .votedAt(voteRecordedAt(existingVote.getCreatedAt()))
+                    .votedAt(existingVote.getCastAt())
                     .trackingCode(existingVote.getTrackingCode())
                     .build();
         }
 
-        // Adayın geçerli olup olmadığını kontrol et
-        Candidate candidate = candidateRepository.findById(request.getCandidateId())
-                .orElseThrow(() -> ApiException.notFound("Aday bulunamadı"));
+        VoteToken credential = validateAnonymousCredential(electionId, request);
 
-        if (!candidate.getElection().getId().equals(electionId)) {
-            throw ApiException.badRequest("Bu aday bu seçime ait değil");
+        if (voteRepository.existsByElectionIdAndBallotId(electionId, request.getBallotId())) {
+            throw ApiException.conflict("Bu ballot daha once kaydedilmis");
         }
 
-        if (candidate.getIsDeleted()) {
-            throw ApiException.badRequest("Bu aday silinmiş");
+        String ballotHash = sha256Hex(request.getEncryptedBallot());
+        var validation = cryptoEngineClient.validateBallot(
+                String.valueOf(electionId),
+                election.getElectionGuardContext(),
+                election.getElectionManifest(),
+                request.getBallotId(),
+                request.getEncryptedBallot(),
+                request.getZkpProof(),
+                request.getTrackingCode(),
+                ballotHash
+        );
+        if (!validation.getValid()) {
+            throw ApiException.badRequest("ElectionGuard ballot dogrulamasi basarisiz: " + validation.getError());
         }
+        String trackingCode = validation.getTrackingCode().isBlank()
+                ? request.getTrackingCode()
+                : validation.getTrackingCode();
+        if (trackingCode == null || trackingCode.isBlank()) {
+            throw ApiException.badRequest("Tracking code zorunludur");
+        }
+        ballotHash = validation.getBallotHash().isBlank() ? ballotHash : validation.getBallotHash();
 
-        // Oyu kaydet
         Vote vote = Vote.builder()
                 .election(election)
-                .candidate(candidate)
-                .voteToken(request.getVoteToken())
+                .ballotId(request.getBallotId())
+                .encryptedBallot(request.getEncryptedBallot())
+                .trackingCode(trackingCode)
+                .zkpProof(request.getZkpProof())
+                .ballotHash(ballotHash)
                 .build();
-
-        // === Crypto-Engine: ElGamal şifreleme ===
-        if (election.getElectionGuardContext() != null && request.getRsaEncryptedPayload() != null) {
-            try {
-                EncryptBallotResponse cryptoResponse = cryptoEngineClient.encryptBallot(
-                        String.valueOf(electionId),
-                        election.getElectionGuardContext(),
-                        election.getElectionManifest(),
-                        request.getRsaEncryptedPayload(),
-                        request.getVoteToken(),
-                        "ballot-style-1"
-                );
-
-                vote.setEncryptedBallot(cryptoResponse.getCiphertextBallot());
-                vote.setTrackingCode(cryptoResponse.getTrackingCode());
-                vote.setZkpProof(cryptoResponse.getZkpProof());
-
-                log.info("Oy kriptografik olarak şifrelendi: election={}, tracking_code={}",
-                        electionId, cryptoResponse.getTrackingCode().substring(0, Math.min(16, cryptoResponse.getTrackingCode().length())));
-
-            } catch (Exception e) {
-                log.error("Crypto-Engine EncryptBallot hatası: election={}, ballot={}",
-                        electionId, request.getVoteToken(), e);
-                // Kriptografik şifreleme başarısız olursa oyu yine kaydet
-                // ancak şifreli veri olmadan
-                log.warn("Şifreli oy kaydedilemedi, düz oy olarak devam ediliyor.");
-            }
-        }
-
         vote = voteRepository.save(vote);
 
-        // Token'ı kullanıldı olarak işaretle
-        voteToken.markAsUsed(utcClock.instant());
-        voteTokenRepository.save(voteToken);
+        voteNullifierRepository.save(VoteNullifier.builder()
+                .election(election)
+                .nullifierHash(request.getNullifierHash())
+                .ballotId(request.getBallotId())
+                .build());
+        credential.markAsUsed(utcClock.instant());
+        voteTokenRepository.save(credential);
 
-        log.info("Oy kullanıldı - Election: {}, Candidate: {}", electionId, request.getCandidateId());
+        bulletinBoardClient.appendRecord(
+                String.valueOf(electionId),
+                "BALLOT_CAST",
+                vote.getTrackingCode(),
+                vote.getBallotHash(),
+                vote.getEncryptedBallot()
+        );
+
+        log.info("Anonim E2E-V oy kaydedildi: election={}, ballot={}, hash={}",
+                electionId, request.getBallotId(), ballotHash);
 
         return VoteResponse.builder()
                 .electionId(election.getId())
                 .electionTitle(election.getTitle())
-                .candidateId(candidate.getId())
-                .candidateName(candidate.getName())
                 .alreadyVoted(false)
-                .votedAt(voteRecordedAt(vote.getCreatedAt()))
+                .votedAt(vote.getCastAt())
                 .trackingCode(vote.getTrackingCode())
                 .build();
     }
 
-    // ==================== Oy Durumu ====================
-
-    /**
-     * Kullanıcının belirli bir seçimdeki oy durumunu kontrol eder.
-     */
     @Transactional(readOnly = true)
     public VoteResponse getMyVoteStatus(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
-        var tokenOptional = voteTokenRepository.findByElectionIdAndUserId(electionId, userId);
-
-        if (tokenOptional.isEmpty()) {
-            return VoteResponse.builder()
-                    .electionId(election.getId())
-                    .electionTitle(election.getTitle())
-                    .alreadyVoted(false)
-                    .build();
-        }
-
-        VoteToken voteToken = tokenOptional.get();
-
-        if (!voteToken.getIsUsed()) {
-            return VoteResponse.builder()
-                    .electionId(election.getId())
-                    .electionTitle(election.getTitle())
-                    .alreadyVoted(false)
-                    .build();
-        }
-
-        // Anonim seçimde aday bilgisini gösterme
-        if (election.getAnonymousVoting()) {
-            var anonVote = voteRepository.findByVoteToken(voteToken.getToken());
-            return VoteResponse.builder()
-                    .electionId(election.getId())
-                    .electionTitle(election.getTitle())
-                    .alreadyVoted(true)
-                    .votedAt(voteToken.getUsedAt())
-                    .trackingCode(anonVote.map(Vote::getTrackingCode).orElse(null))
-                    .build();
-        }
-
-        // Anonim olmayan seçimde, oy detayını göster
-        var voteOptional = voteRepository.findByVoteToken(voteToken.getToken());
-        if (voteOptional.isPresent()) {
-            Vote vote = voteOptional.get();
-            return VoteResponse.builder()
-                    .electionId(election.getId())
-                    .electionTitle(election.getTitle())
-                    .candidateId(vote.getCandidate().getId())
-                    .candidateName(vote.getCandidate().getName())
-                    .alreadyVoted(true)
-                    .votedAt(voteRecordedAt(vote.getCreatedAt()))
-                    .trackingCode(vote.getTrackingCode())
-                    .build();
-        }
-
+        var credential = voteTokenRepository.findByElectionIdAndUserId(electionId, userId);
         return VoteResponse.builder()
                 .electionId(election.getId())
                 .electionTitle(election.getTitle())
-                .alreadyVoted(true)
-                .votedAt(voteToken.getUsedAt())
+                .alreadyVoted(false)
+                .votedAt(credential.map(VoteToken::getUsedAt).orElse(null))
                 .build();
     }
 
-    // ==================== Seçim İstatistikleri ====================
-
-    /**
-     * Seçim için oy istatistiklerini döndürür. Sadece CLOSED veya ARCHIVED seçimler için.
-     */
     @Transactional(readOnly = true)
     public ElectionStatsResponse getElectionStats(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
-        // Sonuçlar yayınlanmış mı veya kullanıcı seçim sahibi mi kontrol et
         boolean isOwner = election.getCreatedBy().equals(userId);
         boolean isClosed = election.isClosed() || election.getStatus().name().equals("ARCHIVED");
-
         if (!isOwner && !isClosed) {
-            throw ApiException.forbidden("Seçim sonuçları henüz yayınlanmadı");
+            throw ApiException.forbidden("Secim sonuclari henuz yayinlanmadi");
         }
-
-        long totalVotes = voteRepository.countByElectionId(electionId);
-        List<Object[]> voteCounts = voteRepository.countVotesByCandidateForElection(electionId);
-
-        List<CandidateStatsResponse> candidateStats = voteCounts.stream()
-                .map(row -> {
-                    Long candidateId = (Long) row[0];
-                    Long count = (Long) row[1];
-                    Candidate candidate = candidateRepository.findById(candidateId).orElse(null);
-                    return CandidateStatsResponse.builder()
-                            .candidateId(candidateId)
-                            .candidateName(candidate != null ? candidate.getName() : "Bilinmeyen")
-                            .voteCount(count)
-                            .percentage(totalVotes > 0 ? (double) count / totalVotes * 100 : 0)
-                            .build();
-                })
-                .collect(Collectors.toList());
 
         return ElectionStatsResponse.builder()
                 .electionId(election.getId())
                 .electionTitle(election.getTitle())
                 .status(election.getStatus())
-                .totalVotes(totalVotes)
-                .candidateStats(candidateStats)
+                .totalVotes(voteRepository.countByElectionId(electionId))
+                .candidateStats(List.of())
                 .build();
     }
 
-    // ==================== ZKP / Verifiability Kanıtları ====================
-
-    /**
-     * Kullanıcının kendi oyuna ait kriptografik (ZKP) ve ElectionGuard kanıtlarını döndürür.
-     */
     @Transactional(readOnly = true)
     public VoteProofResponse getMyVoteProof(Long electionId, String userId) {
-        findElectionOrThrow(electionId);
+        throw ApiException.badRequest("Tam E2E-V modunda kullanici kimligiyle oy kaniti getirilemez. Tracking code ile public bulletin endpoint'ini kullanin.");
+    }
 
-        // Kullanıcının tokenını kontrol et
-        VoteToken voteToken = voteTokenRepository.findByElectionIdAndUserId(electionId, userId)
-                .orElseThrow(() -> ApiException.badRequest("Bu seçimde token sahibi değilsiniz"));
-
-        if (!voteToken.getIsUsed()) {
-            throw ApiException.badRequest("Henüz oy kullanmadınız");
-        }
-
-        // Oy tablosundan ZKP'yi çek
-        Vote vote = voteRepository.findByVoteToken(voteToken.getToken())
-                .orElseThrow(() -> ApiException.notFound("Oy kaydı bulunamadı (belki de şifreli kaydedilmedi)"));
-
-        if (vote.getEncryptedBallot() == null || vote.getZkpProof() == null) {
-            throw ApiException.badRequest("Bu oya ait ElectionGuard kriptografik kanıtları mevcut değil.");
-        }
+    @Transactional(readOnly = true)
+    public VoteProofResponse getVoteProofByTrackingCode(Long electionId, String trackingCode) {
+        Vote vote = voteRepository.findByElectionIdAndTrackingCode(electionId, trackingCode)
+                .orElseThrow(() -> ApiException.notFound("Tracking code ile eslesen oy bulunamadi"));
 
         return VoteProofResponse.builder()
                 .electionId(electionId)
-                .voteToken(vote.getVoteToken())
+                .ballotId(vote.getBallotId())
                 .trackingCode(vote.getTrackingCode())
                 .encryptedBallot(vote.getEncryptedBallot())
                 .zkpProof(vote.getZkpProof())
+                .ballotHash(vote.getBallotHash())
                 .build();
     }
 
-    // ==================== Helper Methods ====================
+    private VoteToken validateAnonymousCredential(Long electionId, CastVoteRequest request) {
+        if (request.getCredential().equals(request.getNullifierHash())) {
+            throw ApiException.badRequest("Credential ve nullifier ayni olamaz");
+        }
+        if (request.getEncryptedBallot().contains("\"candidateId\"") || request.getEncryptedBallot().contains("candidate_id")) {
+            throw ApiException.badRequest("Plain candidate id iceren oy kabul edilemez");
+        }
+        VoteToken credential = voteTokenRepository.findByToken(request.getCredential())
+                .orElseThrow(() -> ApiException.forbidden("Gecersiz oy kullanma belgesi"));
+        if (!credential.getElection().getId().equals(electionId)) {
+            throw ApiException.forbidden("Oy kullanma belgesi bu secime ait degil");
+        }
+        if (credential.getIsUsed()) {
+            throw ApiException.conflict("Bu oy kullanma belgesi daha once kullanilmis");
+        }
+        return credential;
+    }
 
-    /** Oy kaydı `timestamp without time zone` olarak UTC duvar saati saklandığı varsayımıyla. */
-    private static Instant voteRecordedAt(LocalDateTime createdAt) {
-        return createdAt != null ? createdAt.atZone(ZoneOffset.UTC).toInstant() : null;
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 hesaplanamadi", e);
+        }
     }
 
     private Election findElectionOrThrow(Long id) {
         return electionRepository.findById(id)
                 .filter(e -> !e.getIsDeleted())
-                .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
+                .orElseThrow(() -> ApiException.notFound("Secim bulunamadi"));
     }
 }

@@ -1,11 +1,15 @@
 import React, { useLayoutEffect, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, RefreshControl, Image, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Keyboard } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { useUI } from '../../context/UIContext';
+import { registerForPushNotificationsAsync } from '../../utils/notificationHandler';
+import { api } from '../../services/api';
+import { Switch } from 'react-native';
 
 export const ProfileScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
@@ -14,6 +18,7 @@ export const ProfileScreen = () => {
 
     const navigation = useNavigation<any>();
     const { t, language, setLanguage } = useI18n();
+    const { showDialog } = useUI();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -40,10 +45,13 @@ export const ProfileScreen = () => {
     }, [refreshUser]);
 
     const handleLogout = () => {
-        Alert.alert(t('profile.logoutTitle'), t('profile.logoutBody'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('profile.logout'), onPress: signOut, style: 'destructive' }
-        ]);
+        showDialog({
+            title: t('profile.logoutTitle'),
+            message: t('profile.logoutBody'),
+            type: 'confirm',
+            confirmText: t('profile.logout'),
+            onConfirm: signOut
+        });
     };
 
     const handleNotImplemented = () => {
@@ -97,13 +105,50 @@ export const ProfileScreen = () => {
         }
     };
 
+    const toggleGuardianRole = async () => {
+        if (!user) return;
+        
+        const currentEligible = (user as any).isGuardianEligible;
+        
+        if (!currentEligible) {
+            // Aday olmak istiyor -> İzin al
+            const token = await registerForPushNotificationsAsync();
+            if (token) {
+                try {
+                    await api.put('/users/me/push-token', {
+                        pushToken: token,
+                        guardianEligible: true
+                    });
+                    await refreshUser();
+                    Toast.show({ type: 'success', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleSuccess') });
+                } catch (error) {
+                    Toast.show({ type: 'error', text1: t('security.loadError'), text2: t('auth.forgot.failedBody') });
+                }
+            } else {
+                Toast.show({ type: 'error', text1: t('profile.notificationPermissionRequired'), text2: t('profile.notificationSettings') });
+            }
+        } else {
+            // Adaylıktan çıkmak istiyor
+            try {
+                await api.put('/users/me/push-token', {
+                    pushToken: (user as any).pushToken,
+                    guardianEligible: false
+                });
+                await refreshUser();
+                Toast.show({ type: 'info', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleDisabled') });
+            } catch (error) {
+                Toast.show({ type: 'error', text1: t('security.loadError'), text2: t('auth.forgot.failedBody') });
+            }
+        }
+    };
+
     const is2FA = (user as any)?.isMfaEnabled || (user as any)?.mfaEnabled;
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8]`}>
+        <View style={tw`flex-1 bg-background`}>
             {/* Header */}
-            <View style={tw`items-center justify-center p-4 pt-14 pb-4 bg-white border-b border-slate-100 z-10 shadow-sm`}>
-                <Text style={tw`text-xl font-bold leading-tight tracking-tight text-center text-slate-900`}>
+            <View style={tw`items-center justify-center p-4 pt-14 pb-4 bg-surface border-b border-background z-10 shadow-sm`}>
+                <Text style={tw`text-xl font-bold leading-tight tracking-tight text-center text-primary`}>
                     {t('profile.title')}
                 </Text>
             </View>
@@ -111,12 +156,12 @@ export const ProfileScreen = () => {
             {/* Scrollable Content */}
             <ScrollView
                 style={tw`flex-1`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1162d4']} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[tw.color('primary') as string]} />}
             >
                 {/* User Profile Card */}
                 <View style={tw`p-6 flex-col items-center`}>
                     <View style={tw`relative mb-4`}>
-                        <View style={tw`w-28 h-28 rounded-full bg-[#1162d4] border-4 border-white shadow-lg items-center justify-center overflow-hidden`}>
+                        <View style={tw`w-28 h-28 rounded-full bg-primary border-4 border-white shadow-lg items-center justify-center overflow-hidden`}>
                             {user?.profileImage ? (
                                 <React.Fragment>
                                     {/* <Text style={tw`text-xs text-white`}>Resim Yüklendi</Text> */}
@@ -127,18 +172,18 @@ export const ProfileScreen = () => {
                             )}
                         </View>
                         <TouchableOpacity
-                            style={tw`absolute bottom-1 right-1 bg-[#1162d4] rounded-full p-2.5 shadow-md border-2 border-white`}
+                            style={tw`absolute bottom-0 right-0 bg-primary rounded-full p-2.5 border-2 border-white`}
                             onPress={handleImagePick}
                             activeOpacity={0.8}
                         >
                             <Ionicons name="camera" size={18} color="white" />
                         </TouchableOpacity>
                     </View>
-                    <Text style={tw`text-2xl font-bold text-slate-900 mb-1`}>{user?.firstName} {user?.lastName}</Text>
-                    <Text style={tw`text-slate-500 text-sm font-medium`}>{user?.email || t('profile.defaultEmail')}</Text>
-                    <View style={tw`mt-4 px-3.5 py-1.5 bg-green-50 items-center justify-center flex-row gap-1.5 rounded-full border border-green-200`}>
-                        <Ionicons name="shield-checkmark" size={16} color="#16a34a" />
-                        <Text style={tw`text-green-700 text-xs font-bold uppercase tracking-wide`}>{t('profile.verifiedVoter')}</Text>
+                    <Text style={tw`text-2xl font-bold text-primary mb-1`}>{user?.firstName} {user?.lastName}</Text>
+                    <Text style={tw`text-textSecondary text-sm font-medium`}>{user?.email || t('profile.defaultEmail')}</Text>
+                    <View style={tw`mt-4 px-3.5 py-1.5 bg-success/10 items-center justify-center flex-row gap-1.5 rounded-full border border-success/20`}>
+                        <Ionicons name="shield-checkmark" size={16} color={tw.color('success') as string} />
+                        <Text style={tw`text-success text-xs font-bold uppercase tracking-wide`}>{t('profile.verifiedVoter')}</Text>
                     </View>
                 </View>
 
@@ -146,68 +191,87 @@ export const ProfileScreen = () => {
                 <View style={tw`px-5 pb-8 flex-col gap-6 mt-2`}>
                     {/* Account Settings Group */}
                     <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>{t('profile.section.account')}</Text>
-                        <View style={tw`bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
+                        <Text style={tw`px-2 mb-2 text-xs font-bold text-textSecondary uppercase tracking-wider`}>{t('profile.section.account')}</Text>
+                        <View style={tw`bg-surface rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
                             {/* Edit Profile */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white border-b border-slate-100`} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.7}>
+                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.7}>
                                 <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-[#1162d4]/10 items-center justify-center`}>
-                                        <Ionicons name="person-outline" size={20} color="#1162d4" />
+                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/10 items-center justify-center`}>
+                                        <Ionicons name="person-outline" size={20} color={tw.color('primary') as string} />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.editProfile')}</Text>
+                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.editProfile')}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
 
                             {/* Security */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white border-b border-slate-100`} onPress={() => navigation.navigate('SecuritySettings')} activeOpacity={0.7}>
+                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('SecuritySettings')} activeOpacity={0.7}>
                                 <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-orange-50 items-center justify-center`}>
-                                        <Ionicons name="lock-closed-outline" size={20} color="#ea580c" />
+                                    <View style={tw`w-10 h-10 rounded-xl bg-secondary/20 items-center justify-center`}>
+                                        <Ionicons name="lock-closed-outline" size={20} color={tw.color('primary') as string} />
                                     </View>
                                     <View style={tw`flex-col`}>
-                                        <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.securityPassword')}</Text>
+                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.securityPassword')}</Text>
 
                                     </View>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
 
                             {/* Notifications */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white`} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
+                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('NotificationSettings')} activeOpacity={0.7}>
                                 <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-purple-50 items-center justify-center`}>
-                                        <Ionicons name="notifications-outline" size={20} color="#9333ea" />
+                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/20 items-center justify-center`}>
+                                        <Ionicons name="notifications-outline" size={20} color={tw.color('primary') as string} />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.notificationSettings')}</Text>
+                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.notificationSettings')}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
 
-                            <View style={tw`p-4 bg-white border-t border-slate-100`}>
+                            {/* Guardian Role Toggle */}
+                            <View style={tw`flex-row items-center justify-between p-4 bg-surface`}>
+                                <View style={tw`flex-row items-center gap-4`}>
+                                    <View style={tw`w-10 h-10 rounded-xl bg-success/10 items-center justify-center`}>
+                                        <Ionicons name="shield-outline" size={20} color={tw.color('success') as string} />
+                                    </View>
+                                    <View style={tw`flex-1 mr-4`}>
+                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.guardianRole')}</Text>
+                                        <Text style={tw`text-xs text-textSecondary`}>{t('profile.guardianRoleDesc')}</Text>
+                                    </View>
+                                </View>
+                                <Switch
+                                    value={(user as any)?.isGuardianEligible || false}
+                                    onValueChange={toggleGuardianRole}
+                                    trackColor={{ false: '#cbd5e1', true: tw.color('success') as string }}
+                                    thumbColor="white"
+                                />
+                            </View>
+
+                            <View style={tw`p-4 bg-surface border-t border-slate-100`}>
                                 <View style={tw`flex-row items-center justify-between`}>
                                     <View style={tw`flex-row items-center gap-4`}>
-                                        <View style={tw`w-10 h-10 rounded-xl bg-indigo-50 items-center justify-center`}>
-                                            <Ionicons name="language-outline" size={20} color="#4f46e5" />
+                                        <View style={tw`w-10 h-10 rounded-xl bg-secondary/20 items-center justify-center`}>
+                                            <Ionicons name="language-outline" size={20} color={tw.color('primary') as string} />
                                         </View>
-                                        <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.language')}</Text>
+                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.language')}</Text>
                                     </View>
-                                    <View style={tw`flex-row rounded-xl bg-slate-100 p-1`}>
+                                    <View style={tw`flex-row rounded-xl bg-background p-1 border border-primary/10`}>
                                         <TouchableOpacity
-                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'tr' ? 'bg-white' : '')}
+                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'tr' ? 'bg-primary' : '')}
                                             onPress={() => setLanguage('tr')}
                                             activeOpacity={0.8}
                                         >
-                                            <Text style={tw.style(`text-xs font-bold`, language === 'tr' ? 'text-slate-900' : 'text-slate-500')}>
+                                            <Text style={tw.style(`text-xs font-bold`, language === 'tr' ? 'text-surface' : 'text-textSecondary')}>
                                                 {t('profile.languageTurkish')}
                                             </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'en' ? 'bg-white' : '')}
+                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'en' ? 'bg-primary' : '')}
                                             onPress={() => setLanguage('en')}
                                             activeOpacity={0.8}
                                         >
-                                            <Text style={tw.style(`text-xs font-bold`, language === 'en' ? 'text-slate-900' : 'text-slate-500')}>
+                                            <Text style={tw.style(`text-xs font-bold`, language === 'en' ? 'text-surface' : 'text-textSecondary')}>
                                                 {t('profile.languageEnglish')}
                                             </Text>
                                         </TouchableOpacity>
@@ -219,43 +283,51 @@ export const ProfileScreen = () => {
 
                     {/* Support Group */}
                     <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider`}>{t('profile.section.support')}</Text>
-                        <View style={tw`bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
+                        <Text style={tw`px-2 mb-2 text-xs font-bold text-textSecondary uppercase tracking-wider`}>{t('profile.section.support')}</Text>
+                        <View style={tw`bg-surface rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
                             {/* About */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white border-b border-slate-100`} onPress={() => navigation.navigate('About')} activeOpacity={0.7}>
+                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('About')} activeOpacity={0.7}>
                                 <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-slate-50 items-center justify-center`}>
-                                        <Ionicons name="information-circle-outline" size={22} color="#475569" />
+                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/10 items-center justify-center`}>
+                                        <Ionicons name="information-circle-outline" size={22} color={tw.color('primary') as string} />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.about')}</Text>
+                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.about')}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
 
                             {/* Help */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-white`} onPress={() => navigation.navigate('Help')} activeOpacity={0.7}>
+                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface`} onPress={() => navigation.navigate('Help')} activeOpacity={0.7}>
                                 <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-slate-50 items-center justify-center`}>
-                                        <Ionicons name="help-buoy-outline" size={22} color="#475569" />
+                                    <View style={tw`w-10 h-10 rounded-xl bg-secondary/10 items-center justify-center`}>
+                                        <Ionicons name="help-buoy-outline" size={22} color={tw.color('primary') as string} />
                                     </View>
-                                    <Text style={tw`text-base font-semibold text-slate-900`}>{t('profile.helpCenter')}</Text>
+                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.helpCenter')}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
                             </TouchableOpacity>
                         </View>
                     </View>
-
+                    {/* Security Badge */}
+                    <View style={tw`px-5`}>
+                        <View style={tw`flex-column items-center gap-2 bg-primary/10 py-1.5 rounded-full  border border-primary/20`}>
+                            <Text style={tw`text-xs font-semibold tracking-wide uppercase text-primary`}>
+                                {t('home.securedBy')}
+                            </Text>
+                        </View>
+                    </View>
                     {/* Logout Button */}
                     <TouchableOpacity
-                        style={tw`w-full flex-row items-center justify-center gap-2 p-4 rounded-2xl bg-red-50 mt-2 shadow-sm border border-red-100`}
+                        style={tw`w-full flex-row items-center justify-center gap-2 p-4 rounded-2xl bg-danger/10 mt-2 border border-danger/20`}
                         onPress={handleLogout}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="log-out-outline" size={24} color="#dc2626" />
-                        <Text style={tw`text-red-600 font-bold text-base`}>{t('profile.logout')}</Text>
+                        <Ionicons name="log-out-outline" size={24} color={tw.color('danger') as string} />
+                        <Text style={tw`text-danger font-bold text-base`}>{t('profile.logout')}</Text>
                     </TouchableOpacity>
 
-                    <Text style={tw`text-center text-xs text-slate-400 mt-2 font-medium`}>{t('profile.version')}</Text>
+
+                    <Text style={tw`text-center text-xs text-textSecondary mt-2 font-medium`}>{t('profile.version')}</Text>
                 </View>
             </ScrollView>
         </View>

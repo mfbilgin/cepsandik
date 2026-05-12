@@ -14,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByVerificationToken(String token);
 
+    java.util.List<User> findByIdIn(java.util.List<UUID> ids);
+
     @Query(value = "SELECT * FROM users WHERE email = :email", nativeQuery = true)
     Optional<User> findAnyByEmail(String email);
 
@@ -28,4 +30,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     long countByDeletedAtIsNotNull();
 
     long countByCreatedAtAfter(LocalDateTime dateTime);
+
+    @Query(value = "SELECT * FROM users WHERE is_guardian_eligible = true AND is_active = true ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    java.util.List<User> findRandomEligibleGuardians(int limit);
 }

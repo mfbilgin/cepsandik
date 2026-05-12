@@ -15,7 +15,10 @@ import { TwoFactorAuthenticatorSetupScreen } from '../screens/main/TwoFactorAuth
 import { TwoFactorVerificationScreen } from '../screens/main/TwoFactorVerificationScreen';
 import { CommunityDetailScreen } from '../screens/main/CommunityDetailScreen';
 import { CommunityManagementScreen } from '../screens/main/CommunityManagementScreen';
+import { CommunityMembersScreen } from '../screens/main/CommunityMembersScreen';
 import { CreateElectionScreen } from '../screens/main/CreateElectionScreen';
+import { VoteVerificationScreen } from '../screens/main/VoteVerificationScreen';
+import { ElectionResultsScreen } from '../screens/main/ElectionResultsScreen';
 import { RecoveryCodesScreen } from '../screens/main/RecoveryCodesScreen';
 import { useI18n } from '../i18n/LanguageContext';
 
@@ -39,6 +42,11 @@ export const MainStack = () => {
             <Stack.Screen
                 name="CommunityManagement"
                 component={CommunityManagementScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="CommunityMembers"
+                component={CommunityMembersScreen}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -72,7 +80,7 @@ export const MainStack = () => {
                 options={{ headerShown: false }}
             />
             <Stack.Screen
-                name="Notifications"
+                name="NotificationSettings"
                 component={NotificationsScreen}
                 options={{ headerShown: false }}
             />
@@ -109,6 +117,16 @@ export const MainStack = () => {
             <Stack.Screen
                 name="RecoveryCodes"
                 component={RecoveryCodesScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="VoteVerification"
+                component={VoteVerificationScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="ElectionResults"
+                component={ElectionResultsScreen}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>

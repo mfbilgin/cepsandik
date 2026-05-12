@@ -1,7 +1,10 @@
 package com.cepsandik.electionservice.service;
 
 import com.cepsandik.electionservice.client.CryptoEngineClient;
+import com.cepsandik.electionservice.client.CommunityServiceClient;
+import com.cepsandik.electionservice.client.UserServiceClient;
 import com.cepsandik.electionservice.config.AccessCodeConfig;
+import org.slf4j.MDC;
 import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.dto.request.CreateAccessCodeRequest;
 import com.cepsandik.electionservice.dto.request.CreateCandidateRequest;
@@ -11,10 +14,15 @@ import com.cepsandik.electionservice.dto.response.*;
 import com.cepsandik.electionservice.entity.AccessCode;
 import com.cepsandik.electionservice.entity.Candidate;
 import com.cepsandik.electionservice.entity.Election;
+import com.cepsandik.electionservice.entity.ElectionGuardian;
 import com.cepsandik.electionservice.entity.Vote;
 import com.cepsandik.electionservice.enums.ElectionStatus;
 import com.cepsandik.electionservice.exception.ApiException;
 import com.cepsandik.electionservice.grpc.*;
+import com.cepsandik.electionservice.dto.GuardianAssignmentEvent;
+import com.cepsandik.electionservice.config.NotificationRabbitConfig;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.cepsandik.electionservice.repository.ElectionGuardianRepository;
 import com.cepsandik.electionservice.mapper.AccessCodeMapper;
 import com.cepsandik.electionservice.mapper.ElectionMapper;
 import com.cepsandik.electionservice.repository.AccessCodeRepository;
@@ -33,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,34 +52,51 @@ public class ElectionService {
     private final CandidateRepository candidateRepository;
     private final AccessCodeRepository accessCodeRepository;
     private final VoteRepository voteRepository;
+    private final ElectionGuardianRepository guardianRepository;
     private final ElectionMapper electionMapper;
     private final AccessCodeMapper accessCodeMapper;
     private final AccessCodeConfig accessCodeConfig;
     private final CryptoEngineClient cryptoEngineClient;
+    private final CommunityServiceClient communityServiceClient;
+    private final UserServiceClient userServiceClient;
+    private final RabbitTemplate rabbitTemplate;
     private final UtcClock utcClock;
 
-    @Value("${app.guardian.count:3}")
+    @Value("${app.guardian.count:5}")
     private int guardianCount;
 
-    @Value("${app.guardian.quorum:2}")
+    @Value("${app.guardian.quorum:3}")
     private int guardianQuorum;
+
+    /**
+     * Dev/test bayrağı: Eğer aktif gönüllü emanetçi bulunamazsa publish hata
+     * fırlatmasın, distributed ceremony'yi atlasın. SCHEDULED→ACTIVE geçişinde
+     * ElectionLifecycleService.setupElectionGuard() (auto SetupElection RPC) yine
+     * sahte guardian'ları + joint key'i üretir. Production'da false olmalı.
+     */
+    @Value("${app.guardian.dev-bypass:false}")
+    private boolean guardianDevBypass;
 
     // ==================== ELECTION CRUD ====================
 
     @Transactional
     public ElectionResponse createElection(CreateElectionRequest request, String userId) {
-        // Bitiş zamanı başlangıçtan sonra olmalı
-        if (request.getEndTime().isBefore(request.getStartTime())) {
-            throw ApiException.badRequest("Bitiş zamanı başlangıç zamanından sonra olmalıdır");
-        }
+        Election election = Election.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .communityId(request.getCommunityId())
+                .createdBy(userId)
+                .type(request.getType())
+                .participantType(request.getParticipantType())
+                .maxSelections(request.getMaxSelections())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .resultsPublic(request.getResultsPublic() != null ? request.getResultsPublic() : true)
+                .build();
 
-        Election election = electionMapper.toEntity(request, userId);
         Election saved = electionRepository.save(election);
-
-        log.info("Seçim oluşturuldu: id={}, title={}, createdBy={}",
-                saved.getId(), saved.getTitle(), userId);
-
-        return electionMapper.toResponse(saved);
+        log.info("Seçim oluşturuldu: id={}, title={}", saved.getId(), saved.getTitle());
+        return electionMapper.toDetailedResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -82,58 +108,28 @@ public class ElectionService {
     @Transactional(readOnly = true)
     public PageResponse<ElectionResponse> getElectionsByCommunity(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedActive(communityId,
-                utcClock.instant(), pageable);
-
+        Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedFalse(communityId, pageable);
         return buildPageResponse(electionPage);
     }
 
     @Transactional
     public ElectionResponse updateElection(Long id, UpdateElectionRequest request, String userId) {
         Election election = findElectionOrThrow(id);
-
-        // Yetki kontrolü
         checkOwnership(election, userId);
 
-        // Sadece DRAFT durumunda güncellenebilir
         if (!election.isEditable()) {
-            throw ApiException.badRequest("Sadece taslak durumundaki seçimler düzenlenebilir");
+            throw ApiException.badRequest("Sadece taslak seçimler güncellenebilir");
         }
 
-        // Güncelleme
-        if (request.getTitle() != null) {
-            election.setTitle(request.getTitle());
-        }
-        if (request.getDescription() != null) {
-            election.setDescription(request.getDescription());
-        }
-        if (request.getType() != null) {
-            election.setType(request.getType());
-        }
-        if (request.getMaxSelections() != null) {
-            election.setMaxSelections(request.getMaxSelections());
-        }
-        if (request.getStartTime() != null) {
-            election.setStartTime(request.getStartTime());
-        }
-        if (request.getEndTime() != null) {
-            election.setEndTime(request.getEndTime());
-        }
-        if (request.getResultsPublic() != null) {
-            election.setResultsPublic(request.getResultsPublic());
-        }
-        if (request.getAnonymousVoting() != null) {
-            election.setAnonymousVoting(request.getAnonymousVoting());
-        }
-
-        // Tarih kontrolü
-        if (election.getEndTime().isBefore(election.getStartTime())) {
-            throw ApiException.badRequest("Bitiş zamanı başlangıç zamanından sonra olmalıdır");
-        }
+        if (request.getTitle() != null) election.setTitle(request.getTitle());
+        if (request.getDescription() != null) election.setDescription(request.getDescription());
+        if (request.getStartTime() != null) election.setStartTime(request.getStartTime());
+        if (request.getEndTime() != null) election.setEndTime(request.getEndTime());
+        if (request.getResultsPublic() != null) election.setResultsPublic(request.getResultsPublic());
+        if (request.getMaxSelections() != null) election.setMaxSelections(request.getMaxSelections());
 
         Election saved = electionRepository.save(election);
         log.info("Seçim güncellendi: id={}", id);
-
         return electionMapper.toDetailedResponse(saved);
     }
 
@@ -142,15 +138,13 @@ public class ElectionService {
         Election election = findElectionOrThrow(id);
         checkOwnership(election, userId);
 
-        // Aktif seçim silinemez
-        if (election.isActive()) {
-            throw ApiException.badRequest("Aktif seçimler silinemez");
+        if (!election.isEditable()) {
+            throw ApiException.badRequest("Sadece taslak seçimler silinebilir");
         }
 
         election.setIsDeleted(true);
         electionRepository.save(election);
-
-        log.info("Seçim silindi: id={}", id);
+        log.info("Seçim silindi (soft delete): id={}", id);
     }
 
     // ==================== STATUS MANAGEMENT ====================
@@ -170,12 +164,87 @@ public class ElectionService {
             throw ApiException.badRequest("Seçim yayınlamak için en az 2 aday gereklidir");
         }
 
+        // === Dağıtık Emanetçi Seçimi ===
+        selectGuardians(election);
+
         election.setStatus(ElectionStatus.SCHEDULED);
+        election.setMinGuardiansThreshold(guardianQuorum);
         Election saved = electionRepository.save(election);
 
-        log.info("Seçim yayınlandı: id={}, status=SCHEDULED", id);
+        log.info("Seçim yayınlandı: id={}, status=SCHEDULED, guardians_selected={}", id, guardianCount);
 
         return electionMapper.toDetailedResponse(saved);
+    }
+
+    /**
+     * Seçim için rastgele emanetçileri seçer ve davet eder.
+     */
+    private void selectGuardians(Election election) {
+        List<String> eligibleUserIds;
+
+        if (election.getCommunityId() != null) {
+            // 1. Topluluk seçimi: Topluluk üyelerini al
+            List<String> memberIds = communityServiceClient.getMemberUserIds(election.getCommunityId());
+            
+            // 2. Uygun olanları filtrele (Opt-in yapmış ve aktif olanlar)
+            eligibleUserIds = userServiceClient.filterEligibleGuardians(memberIds);
+        } else {
+            // Bağımsız seçim: Tüm sistemden rastgele uygun kişileri al
+            eligibleUserIds = userServiceClient.getRandomEligibleGuardians(guardianCount);
+        }
+
+        if (eligibleUserIds.size() < guardianQuorum) {
+            if (guardianDevBypass) {
+                log.warn("[DEV-BYPASS] Yeterli gönüllü emanetçi yok ({}/{}), distributed ceremony atlandı; " +
+                        "scheduler ACTIVE'e çekerken auto-ceremony (SetupElection RPC) tetiklenecek.",
+                        eligibleUserIds.size(), guardianQuorum);
+                return;
+            }
+            throw ApiException.badRequest("Seçim başlatmak için yeterli (en az " + guardianQuorum +
+                    ") gönüllü emanetçi bulunamadı. Mevcut uygun üye: " + eligibleUserIds.size());
+        }
+
+        // Maksimum gardiyan sayısı kadar karıştır ve seç
+        java.util.Collections.shuffle(eligibleUserIds);
+        List<String> selectedIds = eligibleUserIds.stream()
+                .limit(guardianCount)
+                .toList();
+
+        // ElectionGuardian kayıtlarını oluştur
+        for (String gUserId : selectedIds) {
+            ElectionGuardian guardian = ElectionGuardian.builder()
+                    .election(election)
+                    .userId(java.util.UUID.fromString(gUserId))
+                    .status(ElectionGuardian.GuardianStatus.PENDING)
+                    .build();
+            guardianRepository.save(guardian);
+        }
+        
+        log.info("Seçim {} için {} adet emanetçi seçildi.", election.getId(), selectedIds.size());
+
+        // === Bildirim Event'i Gönder ===
+        try {
+            String communityName = election.getCommunityId() != null 
+                    ? communityServiceClient.getCommunityName(election.getCommunityId()) 
+                    : "Bağımsız Seçim";
+
+            GuardianAssignmentEvent event = GuardianAssignmentEvent.builder()
+                    .electionId(election.getId())
+                    .electionTitle(election.getTitle())
+                    .communityName(communityName)
+                    .selectedGuardianIds(selectedIds.stream().map(java.util.UUID::fromString).toList())
+                    .category("GUARDIAN_DUTY")
+                    .build();
+
+            rabbitTemplate.convertAndSend(
+                    NotificationRabbitConfig.NOTIFICATION_EXCHANGE,
+                    NotificationRabbitConfig.ELECTION_NOTIFICATION_ROUTING_KEY + ".guardian",
+                    event
+            );
+            log.info("Sandık görevlisi atama bildirimi kuyruğa gönderildi. ElectionId={}", election.getId());
+        } catch (Exception e) {
+            log.error("Bildirim gönderimi sırasında hata: ", e);
+        }
     }
 
     @Transactional
@@ -187,62 +256,13 @@ public class ElectionService {
             throw ApiException.badRequest("Sadece planlanmış seçimler başlatılabilir");
         }
 
-        // === Crypto-Engine: ElectionGuard Key Ceremony ===
-        try {
-            List<Candidate> candidates = candidateRepository
-                    .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(id);
-
-            // Contest bilgisini hazırla (tek contest = bu seçim)
-            ContestInfo contestInfo = ContestInfo.newBuilder()
-                    .setContestId("contest_" + id)
-                    .addAllSelectionIds(
-                            candidates.stream()
-                                    .map(c -> "candidate_" + c.getId())
-                                    .toList()
-                    )
-                    .setNumberElected(election.getMaxSelections() != null ? election.getMaxSelections() : 1)
-                    .setName(election.getTitle())
-                    .build();
-
-            SetupElectionResponse cryptoResponse = cryptoEngineClient.setupElection(
-                    String.valueOf(id),
-                    guardianCount,
-                    guardianQuorum,
-                    List.of(contestInfo)
-            );
-
-            // Context, manifest ve guardian record'ları PostgreSQL'e kaydet
-            election.setElectionGuardContext(cryptoResponse.getElectionGuardContext());
-            election.setElectionManifest(cryptoResponse.getElectionManifest());
-            election.setElectionPublicKey(cryptoResponse.getJointPublicKey());
-
-            // Guardian record'ları JSON array olarak sakla
-            StringBuilder guardianJson = new StringBuilder("[");
-            for (int i = 0; i < cryptoResponse.getGuardianRecordsCount(); i++) {
-                GuardianRecord gr = cryptoResponse.getGuardianRecords(i);
-                if (i > 0) guardianJson.append(",");
-                guardianJson.append("{\"guardian_id\":\"").append(gr.getGuardianId())
-                        .append("\",\"serialized_guardian\":")
-                        .append(gr.getSerializedGuardian())
-                        .append("}");
-            }
-            guardianJson.append("]");
-            election.setGuardianRecords(guardianJson.toString());
-
-            log.info("ElectionGuard key ceremony tamamlandı: electionId={}", id);
-
-        } catch (Exception e) {
-            log.error("Crypto-Engine SetupElection hatası: electionId={}", id, e);
-            throw ApiException.badRequest("Kriptografik altyapı kurulamadı: " + e.getMessage());
+        // Dağıtık yapıda seçim, tüm emanetçiler anahtarını yüklediğinde OTOMATİK başlar (ACTIVE olur).
+        // Bu metod sadece manuel zorlama için (isteğe bağlı) veya statü kontrolü için kalabilir.
+        if (!election.getStatus().equals(ElectionStatus.ACTIVE)) {
+            throw ApiException.badRequest("Seçimin başlaması için tüm emanetçilerin anahtarlarını yüklemesi bekleniyor");
         }
 
-        election.setStatus(ElectionStatus.ACTIVE);
-        election.setStartTime(utcClock.instant());
-        Election saved = electionRepository.save(election);
-
-        log.info("Seçim başlatıldı: id={}, status=ACTIVE", id);
-
-        return electionMapper.toDetailedResponse(saved);
+        return electionMapper.toDetailedResponse(election);
     }
 
     @Transactional
@@ -254,50 +274,12 @@ public class ElectionService {
             throw ApiException.badRequest("Sadece aktif seçimler sonlandırılabilir");
         }
 
-        // === Crypto-Engine: Threshold Decryption (Tally) ===
-        try {
-            if (election.getElectionGuardContext() != null) {
-                // Tüm şifreli oyları topla
-                List<Vote> votes = voteRepository.findByElectionId(id);
-                List<String> ciphertextBallots = votes.stream()
-                        .filter(v -> v.getEncryptedBallot() != null)
-                        .map(Vote::getEncryptedBallot)
-                        .toList();
-
-                if (!ciphertextBallots.isEmpty()) {
-                    // Guardian record'ları parse et
-                    List<GuardianRecord> guardianRecordsList = parseGuardianRecords(
-                            election.getGuardianRecords()
-                    );
-
-                    TallyElectionResponse tallyResponse = cryptoEngineClient.tallyElection(
-                            String.valueOf(id),
-                            election.getElectionGuardContext(),
-                            election.getElectionManifest(),
-                            ciphertextBallots,
-                            guardianRecordsList,
-                            guardianQuorum
-                    );
-
-                    election.setTallyProof(tallyResponse.getTallyProof());
-
-                    log.info("Tally çözümlemesi tamamlandı: electionId={}, contest_count={}",
-                            id, tallyResponse.getResultsCount());
-                } else {
-                    log.info("Seçim sonlandırıldı (şifreli oy yok): id={}", id);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Crypto-Engine TallyElection hatası: electionId={}", id, e);
-            // Tally hatası seçimi sonlandırmayı engellemez
-            log.warn("Tally hatası nedeniyle sonuçlar kriptografik çözümlemesiz kaydedilecek.");
-        }
-
+        // Seçimi kapat
         election.setStatus(ElectionStatus.CLOSED);
         election.setEndTime(utcClock.instant());
         Election saved = electionRepository.save(election);
 
-        log.info("Seçim sonlandırıldı: id={}, status=CLOSED", id);
+        log.info("Seçim sonlandırıldı: id={}, status=CLOSED. Artık emanetçi deşifre payları bekleniyor.", id);
 
         return electionMapper.toDetailedResponse(saved);
     }
@@ -522,7 +504,6 @@ public class ElectionService {
                 .participantType(election.getParticipantType())
                 .startTime(election.getStartTime())
                 .endTime(election.getEndTime())
-                .anonymousVoting(election.getAnonymousVoting())
                 .resultsPublic(election.getResultsPublic())
                 .candidateCount((int) candidateCount)
                 .accessCodeCount((int) accessCodeCount)
@@ -532,11 +513,44 @@ public class ElectionService {
                 .build();
     }
 
+    // ==================== ENCRYPTION PARAMS (E2E-V) ====================
+
+    @Transactional(readOnly = true)
+    public EncryptionParamsResponse getEncryptionParams(Long id) {
+        Election election = findElectionOrThrow(id);
+
+        if (election.getElectionPublicKey() == null
+                || election.getElectionGuardContext() == null
+                || election.getElectionManifest() == null) {
+            throw ApiException.badRequest(
+                    "Seçim henüz şifreleme parametrelerine hazır değil — guardian key ceremony tamamlanmamış"
+            );
+        }
+
+        return EncryptionParamsResponse.builder()
+                .electionId(election.getId())
+                .specVersion("v2.0")  // Faz 2: KMP 2.0 spec; mobile native modülü bu sürümü bekliyor
+                .electionGuardContext(election.getElectionGuardContext())
+                .electionManifest(election.getElectionManifest())
+                .jointPublicKey(election.getElectionPublicKey())
+                .build();
+    }
+
     // ==================== PROOFS ====================
 
     @Transactional(readOnly = true)
     public ElectionProofResponse getElectionProofs(Long id) {
         Election election = findElectionOrThrow(id);
+
+        List<ElectionProofResponse.BallotProofResponse> ballots = voteRepository.findByElectionId(id).stream()
+                .map(v -> ElectionProofResponse.BallotProofResponse.builder()
+                        .ballotId(v.getBallotId())
+                        .trackingCode(v.getTrackingCode())
+                        .encryptedBallot(v.getEncryptedBallot())
+                        .zkpProof(v.getZkpProof())
+                        .ballotHash(v.getBallotHash())
+                        .build())
+                .collect(Collectors.toList());
 
         return ElectionProofResponse.builder()
                 .electionId(election.getId())
@@ -544,6 +558,7 @@ public class ElectionService {
                 .electionManifest(election.getElectionManifest())
                 .guardianRecords(election.getGuardianRecords())
                 .tallyProof(election.getTallyProof())
+                .ballots(ballots)
                 .build();
     }
 

@@ -17,6 +17,18 @@ public class MemberController {
 
     private final MemberService memberService;
 
+    @PostMapping("/join")
+    public ResponseEntity<ApiResponse<MemberResponse>> joinCommunity(
+            @PathVariable Long communityId,
+            @RequestHeader("X-User-Id") String userId) {
+
+        MemberResponse response = memberService.joinCommunity(communityId, userId);
+        String message = response.getStatus().equals("PENDING") 
+            ? "Katılım isteği gönderildi" 
+            : "Topluluğa başarıyla katıldınız";
+        return ResponseEntity.status(201).body(ApiResponse.success(message, response));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<MemberResponse>>> getMembers(
             @PathVariable Long communityId,

@@ -120,7 +120,36 @@ public class UserController {
         String email = user.getEmail();
 
         UserResponse res = userService.deleteProfileImage(email);
-
         return ResponseEntity.ok(ApiResponse.ok("Profil resmi silindi", res));
+    }
+
+    // ========== Notifications & Guardian ==========
+
+    @Operation(summary = "Kullanıcının push token bilgisini ve sandık görevlisi adaylık durumunu günceller")
+    @PutMapping("/me/push-token")
+    public ResponseEntity<ApiResponse<Void>> updatePushToken(
+            Authentication authentication,
+            @Valid @RequestBody com.cepsandik.userservice.dtos.requests.UpdatePushTokenRequest req) {
+        User user = (User) authentication.getPrincipal();
+        userService.updatePushToken(user.getEmail(), req);
+        return ResponseEntity.ok(ApiResponse.ok("Bildirim ayarları güncellendi"));
+    }
+
+    @Operation(summary = "Kullanıcının tüm bildirim tercihlerini getirir")
+    @GetMapping("/me/notification-preferences")
+    public ResponseEntity<ApiResponse<java.util.List<?>>> getNotificationPreferences(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok("Bildirim tercihleri getirildi", 
+                userService.getNotificationPreferences(user.getEmail())));
+    }
+
+    @Operation(summary = "Belirli bir bildirim tercihini günceller")
+    @PutMapping("/me/notification-preferences")
+    public ResponseEntity<ApiResponse<Void>> updateNotificationPreferences(
+            Authentication authentication,
+            @Valid @RequestBody com.cepsandik.userservice.dtos.requests.UpdateNotificationPreferenceRequest req) {
+        User user = (User) authentication.getPrincipal();
+        userService.updateNotificationPreference(user.getEmail(), req);
+        return ResponseEntity.ok(ApiResponse.ok("Bildirim tercihi güncellendi"));
     }
 }

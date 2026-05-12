@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n/LanguageContext';
+import { useUI } from '../../context/UIContext';
 
 export const ElectionDetailScreen = () => {
     const route = useRoute<any>();
@@ -28,6 +29,7 @@ export const ElectionDetailScreen = () => {
     const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
     const [isUpdating, setIsUpdating] = useState(false);
     const { t, language } = useI18n();
+    const { showDialog } = useUI();
 
     const formatDate = (date: Date) => date.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
     const formatTime = (date: Date) => date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -46,8 +48,12 @@ export const ElectionDetailScreen = () => {
             setElection(res.data?.data || null);
         } catch (e) {
             console.error(e);
-            Alert.alert(t('auth.twoFactor.errorTitle'), t('electionDetail.fetchError'));
-            navigation.goBack();
+            showDialog({
+                title: t('auth.twoFactor.errorTitle'),
+                message: t('electionDetail.fetchError'),
+                type: 'error',
+                onConfirm: () => navigation.goBack()
+            });
         } finally {
             setIsLoading(false);
         }
@@ -56,14 +62,22 @@ export const ElectionDetailScreen = () => {
     const handleProceed = async () => {
         if (election.accessibility === 'PRIVATE') {
             if (!accessCode) {
-                Alert.alert(t('auth.login.missingTitle'), t('electionDetail.privateCodeRequired'));
+                showDialog({
+                    title: t('auth.login.missingTitle'),
+                    message: t('electionDetail.privateCodeRequired'),
+                    type: 'warning'
+                });
                 return;
             }
             setIsVerifying(true);
             try {
                 await api.post(`/elections/${electionId}/verify-access`, { code: accessCode });
             } catch (e) {
-                Alert.alert(t('auth.twoFactor.errorTitle'), t('electionDetail.invalidCode'));
+                showDialog({
+                    title: t('auth.twoFactor.errorTitle'),
+                    message: t('electionDetail.invalidCode'),
+                    type: 'error'
+                });
                 setIsVerifying(false);
                 return;
             }
@@ -76,10 +90,18 @@ export const ElectionDetailScreen = () => {
         setIsPublishing(true);
         try {
             await api.post(`/elections/${electionId}/publish`);
-            Alert.alert(t('security.successTitle'), t('electionDetail.published'));
+            showDialog({
+                title: t('security.successTitle'),
+                message: t('electionDetail.published'),
+                type: 'success'
+            });
             fetchDetail(); // Yeniden yükle ki status SCHEDULED olsun
         } catch (e: any) {
-            Alert.alert(t('auth.twoFactor.errorTitle'), e.response?.data?.message || t('electionDetail.publishFail'));
+            showDialog({
+                title: t('auth.twoFactor.errorTitle'),
+                message: e.response?.data?.message || t('electionDetail.publishFail'),
+                type: 'error'
+            });
         } finally {
             setIsPublishing(false);
         }
@@ -87,7 +109,11 @@ export const ElectionDetailScreen = () => {
 
     const handleUpdateDates = async () => {
         if (editEndTime <= editStartTime) {
-            Alert.alert(t('auth.twoFactor.errorTitle'), t('electionDetail.invalidDateRange'));
+            showDialog({
+                title: t('auth.twoFactor.errorTitle'),
+                message: t('electionDetail.invalidDateRange'),
+                type: 'warning'
+            });
             return;
         }
         setIsUpdating(true);
@@ -96,11 +122,19 @@ export const ElectionDetailScreen = () => {
                 startTime: editStartTime.toISOString(),
                 endTime: editEndTime.toISOString(),
             });
-            Alert.alert(t('security.successTitle'), t('electionDetail.updateDatesSuccess'));
+            showDialog({
+                title: t('security.successTitle'),
+                message: t('electionDetail.updateDatesSuccess'),
+                type: 'success'
+            });
             setIsEditModalVisible(false);
             fetchDetail();
         } catch (e: any) {
-            Alert.alert(t('auth.twoFactor.errorTitle'), e.response?.data?.message || t('electionDetail.updateDatesFail'));
+            showDialog({
+                title: t('auth.twoFactor.errorTitle'),
+                message: e.response?.data?.message || t('electionDetail.updateDatesFail'),
+                type: 'error'
+            });
         } finally {
             setIsUpdating(false);
         }
@@ -114,16 +148,16 @@ export const ElectionDetailScreen = () => {
 
     if (isLoading || !election) {
         return (
-            <View style={tw`flex-1 items-center justify-center bg-[#f6f7f8]`}>
-                <ActivityIndicator size="large" color="#1162d4" />
+            <View style={tw`flex-1 items-center justify-center bg-background`}>
+                <ActivityIndicator size="large" color={tw.color('primary')} />
             </View>
         );
     }
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8]  max-w-md mx-auto w-full`}>
+        <View style={tw`flex-1 bg-background  max-w-md mx-auto w-full`}>
             {/* Top App Bar */}
-            <View style={tw`flex-row items-center bg-white p-4 shadow-sm z-10 pt-10`}>
+            <View style={tw`flex-row items-center bg-surface p-4 shadow-sm z-10 pt-10`}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center rounded-full`}>
                     <Ionicons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
@@ -138,19 +172,15 @@ export const ElectionDetailScreen = () => {
             {/* Scrollable Content */}
             <ScrollView contentContainerStyle={tw`pb-24`}>
                 {/* Header Card & Status */}
-                <View style={tw`bg-white pb-6 px-4 pt-2 mb-2`}>
+                <View style={tw`bg-surface pb-6 px-4 pt-2 mb-2`}>
                     <View style={tw`flex-col items-center gap-4`}>
-                        <View style={tw`w-24 h-24 items-center justify-center rounded-full bg-[#1162d4]/10`}>
-                            <Ionicons name="checkbox-outline" size={48} color="#1162d4" />
+                        <View style={tw`w-24 h-24 items-center justify-center rounded-full bg-primary/10`}>
+                            <Ionicons name="checkbox-outline" size={48} color={tw.color('primary')} />
                         </View>
                         <View style={tw`items-center gap-1`}>
                             <Text style={tw`text-2xl font-bold text-slate-900 text-center leading-tight`}>
                                 {election.title}
                             </Text>
-                            <View style={tw`flex-row items-center justify-center gap-2 mt-2`}>
-                                <Ionicons name="shield-checkmark" size={16} color="#64748b" />
-                                <Text style={tw`text-sm font-medium text-slate-500`}>{t('electionDetail.badgeText')}</Text>
-                            </View>
                         </View>
                         <View style={tw`flex-row items-center gap-2 rounded-full px-4 py-1.5 border ${election.status === 'ACTIVE' ? 'bg-green-100 border-green-200' : 'bg-slate-100 border-slate-200'}`}>
                             <Ionicons name={election.status === 'ACTIVE' ? "checkmark-circle" : "time"} size={16} color={election.status === 'ACTIVE' ? "#15803d" : "#475569"} />
@@ -162,37 +192,37 @@ export const ElectionDetailScreen = () => {
                 </View>
 
                 {/* Timeline Section */}
-                <View style={tw`mx-4 my-4 rounded-xl bg-white p-4 shadow-sm border border-slate-100`}>
+                <View style={tw`mx-4 my-4 rounded-xl bg-surface p-4 shadow-sm border border-slate-100`}>
                     <View style={tw`flex-row items-center justify-between mb-4`}>
                         <View style={tw`flex-row items-center gap-2`}>
-                            <Ionicons name="calendar-outline" size={20} color="#1162d4" />
+                            <Ionicons name="calendar-outline" size={20} color={tw.color('primary')} />
                             <Text style={tw`text-base font-bold text-slate-900`}>{t('electionDetail.timeline')}</Text>
                         </View>
                         {election.status === 'DRAFT' && String(election.createdBy) === String(user?.id) && (
-                            <TouchableOpacity onPress={openEditModal} style={tw`flex-row items-center gap-1 bg-[#1162d4]/10 px-3 py-1.5 rounded-full`}>
-                                <Ionicons name="pencil" size={14} color="#1162d4" />
-                                <Text style={tw`text-xs font-bold text-[#1162d4]`}>{t('electionDetail.edit')}</Text>
+                            <TouchableOpacity onPress={openEditModal} style={tw`flex-row items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-full`}>
+                                <Ionicons name="pencil" size={14} color={tw.color('primary')} />
+                                <Text style={tw`text-xs font-bold text-primary`}>{t('electionDetail.edit')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>
                     <View style={tw`flex-row justify-between pr-4`}>
-                        <View style={tw`flex-col gap-1 border-l-4 border-[#1162d4] pl-3`}>
+                        <View style={tw`flex-col gap-1 border-l-4 border-primary pl-3`}>
                             <Text style={tw`text-xs font-semibold text-slate-500 uppercase`}>{t('electionDetail.startDate')}</Text>
                             <Text style={tw`text-sm font-medium text-slate-900`}>{new Date(election.startTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR')}</Text>
-                            <Text style={tw`text-sm text-slate-500`}>{new Date(election.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                            <Text style={tw`text-sm text-slate-500`}>{new Date(election.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</Text>
                         </View>
                         <View style={tw`flex-col gap-1 border-l-4 border-slate-200 pl-3`}>
                             <Text style={tw`text-xs font-semibold text-slate-500 uppercase`}>{t('electionDetail.endDate')}</Text>
                             <Text style={tw`text-sm font-medium text-slate-900`}>{new Date(election.endTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR')}</Text>
-                            <Text style={tw`text-sm text-slate-500`}>{new Date(election.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                            <Text style={tw`text-sm text-slate-500`}>{new Date(election.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* Description */}
-                <View style={tw`mx-4 mb-4 rounded-xl bg-white p-5 shadow-sm border border-slate-100`}>
+                <View style={tw`mx-4 mb-4 rounded-xl bg-surface p-5 shadow-sm border border-slate-100`}>
                     <View style={tw`flex-row items-center gap-2 mb-3`}>
-                        <Ionicons name="document-text-outline" size={20} color="#1162d4" />
+                        <Ionicons name="document-text-outline" size={20} color={tw.color('primary')} />
                         <Text style={tw`text-base font-bold text-slate-900`}>{t('electionDetail.descriptionTitle')}</Text>
                     </View>
                     <Text style={tw`text-sm text-slate-600 leading-relaxed`}>
@@ -201,49 +231,62 @@ export const ElectionDetailScreen = () => {
                 </View>
 
                 {/* Rules & Compliance */}
-                <View style={tw`mx-4 mb-4 rounded-xl bg-white p-5 shadow-sm border border-slate-100`}>
+                <View style={tw`mx-4 mb-4 rounded-xl bg-surface p-5 shadow-sm border border-slate-100`}>
                     <View style={tw`flex-row items-center gap-2 mb-3`}>
-                        <Ionicons name="hammer-outline" size={20} color="#1162d4" />
+                        <Ionicons name="hammer-outline" size={20} color={tw.color('primary')} />
                         <Text style={tw`text-base font-bold text-slate-900`}>{t('electionDetail.rulesTitle')}</Text>
                     </View>
                     <View style={tw`flex-col gap-3`}>
                         <View style={tw`flex-row items-start gap-3`}>
-                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-[#1162d4]/10 items-center justify-center`}>
-                                <Ionicons name="checkmark" size={14} color="#1162d4" />
+                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-primary/10 items-center justify-center`}>
+                                <Ionicons name="checkmark" size={14} color={tw.color('primary')} />
                             </View>
                             <Text style={tw`flex-1 text-sm text-slate-600`}>{t('electionDetail.rule1')}</Text>
                         </View>
                         <View style={tw`flex-row items-start gap-3`}>
-                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-[#1162d4]/10 items-center justify-center`}>
-                                <Ionicons name="checkmark" size={14} color="#1162d4" />
+                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-primary/10 items-center justify-center`}>
+                                <Ionicons name="checkmark" size={14} color={tw.color('primary')} />
                             </View>
                             <Text style={tw`flex-1 text-sm text-slate-600`}>{t('electionDetail.rule2')}</Text>
                         </View>
                         <View style={tw`flex-row items-start gap-3`}>
-                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-[#1162d4]/10 items-center justify-center`}>
-                                <Ionicons name="checkmark" size={14} color="#1162d4" />
+                            <View style={tw`mt-0.5 w-5 h-5 rounded-full bg-primary/10 items-center justify-center`}>
+                                <Ionicons name="checkmark" size={14} color={tw.color('primary')} />
                             </View>
                             <Text style={tw`flex-1 text-sm text-slate-600`}>{t('electionDetail.rule3')}</Text>
                         </View>
                     </View>
                 </View>
 
-                {/* Security Badge */}
-                <View style={tw`mx-4 mb-6 items-center pt-2 opacity-70`}>
-                    <View style={tw`flex-row items-center gap-2`}>
-                        <Ionicons name="lock-closed" size={16} color="#1162d4" />
-                        <Text style={tw`font-bold text-sm text-[#1162d4]`}>{t('electionDetail.securedBy')}</Text>
+
+
+                {/* Quick Actions */}
+                {(election.status === 'ACTIVE' || election.status === 'CLOSED' || election.status === 'ARCHIVED') && (
+                    <View style={tw`mx-4 mb-4 flex-row gap-3`}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('VoteVerification', { electionId })}
+                            style={tw`flex-1 flex-row items-center justify-center gap-2 bg-surface border border-slate-200 rounded-xl py-3.5 shadow-sm`}
+                        >
+                            <Ionicons name="shield-checkmark-outline" size={18} color={tw.color('primary')} />
+                            <Text style={tw`text-sm font-bold text-primary`}>{t('electionDetail.verifyVote')}</Text>
+                        </TouchableOpacity>
+                        {(election.status === 'CLOSED' || election.status === 'ARCHIVED') && (
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('ElectionResults', { electionId })}
+                                style={tw`flex-1 flex-row items-center justify-center gap-2 bg-surface border border-slate-200 rounded-xl py-3.5 shadow-sm`}
+                            >
+                                <Ionicons name="bar-chart-outline" size={18} color={tw.color('primary')} />
+                                <Text style={tw`text-sm font-bold text-primary`}>{t('electionDetail.viewResults')}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
-                    <Text style={tw`text-xs text-center text-slate-500 max-w-[250px] mt-2`}>
-                        {t('electionDetail.securedDesc')}
-                    </Text>
-                </View>
+                )}
 
                 {election.accessibility === 'PRIVATE' && (
                     <View style={tw`mx-4 mb-4 bg-orange-50 p-4 rounded-xl border border-orange-200`}>
                         <Text style={tw`font-bold text-orange-700 mb-2`}>{t('electionDetail.privateAccessTitle')}</Text>
                         <TextInput
-                            style={tw`bg-white border border-orange-300 rounded-lg p-3 text-center text-lg tracking-[8px] font-bold text-slate-800`}
+                            style={tw`bg-surface border border-orange-300 rounded-lg p-3 text-center text-lg tracking-[8px] font-bold text-slate-800`}
                             placeholder={t('electionDetail.privateAccessPlaceholder')}
                             value={accessCode}
                             onChangeText={setAccessCode}
@@ -252,13 +295,25 @@ export const ElectionDetailScreen = () => {
                         />
                     </View>
                 )}
+
+
+                {/* Security Badge */}
+                <View style={tw`mx-4 mb-6 items-center pt-2 opacity-70`}>
+                    <View style={tw`flex-row items-center gap-2`}>
+                        <Ionicons name="lock-closed" size={16} color={tw.color('primary')} />
+                        <Text style={tw`font-bold text-sm text-primary`}>{t('electionDetail.securedBy')}</Text>
+                    </View>
+                    <Text style={tw`text-xs text-center text-slate-500 max-w-[250px] mt-2`}>
+                        {t('electionDetail.securedDesc')}
+                    </Text>
+                </View>
             </ScrollView>
 
             {/* Sticky Footer */}
-            <View style={tw`absolute bottom-0 w-full bg-white/95 p-4 border-t border-slate-200 shadow-md`}>
+            <View style={tw`absolute bottom-0 w-full bg-surface/95 p-4 border-t border-slate-200 shadow-md`}>
                 {election.status === 'DRAFT' && String(election.createdBy) === String(user?.id) ? (
                     <TouchableOpacity
-                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-[#1162d4] py-3.5 shadow-sm`}
+                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm`}
                         onPress={handlePublish}
                         disabled={isPublishing}
                     >
@@ -269,7 +324,7 @@ export const ElectionDetailScreen = () => {
                     </TouchableOpacity>
                 ) : (
                     <TouchableOpacity
-                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-[#1162d4] py-3.5 shadow-sm ${election.status !== 'ACTIVE' ? 'opacity-50' : ''}`}
+                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm ${election.status !== 'ACTIVE' ? 'opacity-50' : ''}`}
                         onPress={handleProceed}
                         disabled={election.status !== 'ACTIVE' || isVerifying}
                     >
@@ -284,7 +339,7 @@ export const ElectionDetailScreen = () => {
             {/* Edit Dates Modal */}
             <Modal visible={isEditModalVisible} transparent animationType="slide">
                 <View style={tw`flex-1 bg-black/50 justify-center px-4`}>
-                    <View style={tw`bg-white rounded-2xl p-6 shadow-xl`}>
+                    <View style={tw`bg-surface rounded-2xl p-6 shadow-xl`}>
                         <View style={tw`flex-row items-center justify-between mb-6`}>
                             <Text style={tw`text-xl font-bold text-slate-900`}>{t('electionDetail.updateDatesTitle')}</Text>
                             <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={tw`p-2 bg-slate-100 rounded-full`}>
@@ -301,14 +356,14 @@ export const ElectionDetailScreen = () => {
                                         onPress={() => { setPickerMode('date'); setShowPicker('start'); }}
                                         style={tw`flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                     >
-                                        <Ionicons name="calendar-outline" size={18} color="#1162d4" />
+                                        <Ionicons name="calendar-outline" size={18} color={tw.color('primary')} />
                                         <Text style={tw`text-slate-900 font-medium text-sm`}>{formatDate(editStartTime)}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => { setPickerMode('time'); setShowPicker('start'); }}
                                         style={tw`bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                     >
-                                        <Ionicons name="time-outline" size={18} color="#1162d4" />
+                                        <Ionicons name="time-outline" size={18} color={tw.color('primary')} />
                                         <Text style={tw`text-slate-900 font-medium text-sm`}>{formatTime(editStartTime)}</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -322,14 +377,14 @@ export const ElectionDetailScreen = () => {
                                         onPress={() => { setPickerMode('date'); setShowPicker('end'); }}
                                         style={tw`flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                     >
-                                        <Ionicons name="calendar-outline" size={18} color="#1162d4" />
+                                        <Ionicons name="calendar-outline" size={18} color={tw.color('primary')} />
                                         <Text style={tw`text-slate-900 font-medium text-sm`}>{formatDate(editEndTime)}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => { setPickerMode('time'); setShowPicker('end'); }}
                                         style={tw`bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                     >
-                                        <Ionicons name="time-outline" size={18} color="#1162d4" />
+                                        <Ionicons name="time-outline" size={18} color={tw.color('primary')} />
                                         <Text style={tw`text-slate-900 font-medium text-sm`}>{formatTime(editEndTime)}</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -337,7 +392,7 @@ export const ElectionDetailScreen = () => {
                         </View>
 
                         <TouchableOpacity
-                            style={tw`bg-[#1162d4] items-center justify-center p-4 rounded-xl flex-row gap-2`}
+                            style={tw`bg-primary items-center justify-center p-4 rounded-xl flex-row gap-2`}
                             onPress={handleUpdateDates}
                             disabled={isUpdating}
                         >
@@ -352,6 +407,7 @@ export const ElectionDetailScreen = () => {
                         value={showPicker === 'start' ? editStartTime : editEndTime}
                         mode={pickerMode}
                         display="spinner"
+                        is24Hour={true}
                         onChange={(event, date) => {
                             if (Platform.OS === 'android') setShowPicker(null);
                             if (date) {

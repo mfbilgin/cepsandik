@@ -4,7 +4,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const ResetPasswordScreen = () => {
@@ -89,7 +89,7 @@ export const ResetPasswordScreen = () => {
 
     return (
         <KeyboardAvoidingView
-            style={tw`flex-1 bg-white`}
+            style={tw`flex-1 bg-surface`}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <ScrollView contentContainerStyle={tw`flex-grow px-6 ${isKeyboardVisible ? 'pb-100' : 'pb-8'} pt-12`} keyboardShouldPersistTaps="handled">
@@ -106,8 +106,8 @@ export const ResetPasswordScreen = () => {
                 {!isSuccess ? (
                     <View style={tw`flex-1 flex-col`}>
                         <View style={tw`flex-col items-center text-center mt-4`}>
-                            <View style={tw`bg-[#1162d4]/10 p-5 rounded-full mb-6 items-center justify-center`}>
-                                <MaterialIcons name="password" size={40} color="#1162d4" />
+                            <View style={tw`bg-primary/10 p-5 rounded-full mb-6 items-center justify-center`}>
+                                <MaterialIcons name="password" size={40} color={tw.color('primary')} />
                             </View>
                             <Text style={tw`text-3xl font-bold tracking-tight text-slate-900 mb-3`}>{t('auth.reset.title')}</Text>
                             <Text style={tw`text-slate-500 text-base text-center leading-relaxed max-w-[280px]`}>
@@ -120,7 +120,7 @@ export const ResetPasswordScreen = () => {
                                 <Text style={tw`text-sm font-semibold text-slate-700 pb-2 ml-1`}>{t('auth.reset.newPassword')}</Text>
                                 <View style={tw`relative`}>
                                     <TextInput
-                                        style={tw`w-full rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 focus:border-[#1162d4] h-14 pl-4 pr-12 text-base`}
+                                        style={tw`w-full rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 focus:border-primary h-14 pl-4 pr-12 text-base`}
                                         placeholder="••••••••"
                                         placeholderTextColor="#94a3b8"
                                         secureTextEntry={!isPasswordVisible}
@@ -157,7 +157,7 @@ export const ResetPasswordScreen = () => {
                                 <View style={tw`relative`}>
                                     <TextInput
                                         ref={confirmPasswordRef}
-                                        style={tw`w-full rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 focus:border-[#1162d4] h-14 pl-4 pr-12 text-base`}
+                                        style={tw`w-full rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-900 focus:border-primary h-14 pl-4 pr-12 text-base`}
                                         placeholder="••••••••"
                                         placeholderTextColor="#94a3b8"
                                         secureTextEntry={!isConfirmPasswordVisible}
@@ -178,7 +178,7 @@ export const ResetPasswordScreen = () => {
 
                         <View style={tw`mt-auto`}>
                             <TouchableOpacity
-                                style={tw`w-full flex-row items-center justify-center bg-[#1162d4] py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
+                                style={tw`w-full flex-row items-center justify-center bg-primary py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
                                 onPress={handleReset}
                                 disabled={isLoading}
                                 activeOpacity={0.8}

@@ -49,6 +49,13 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(name = "is_guardian_eligible", nullable = false)
+    @Builder.Default
+    private boolean isGuardianEligible = false;
+
+    @Column(name = "push_token")
+    private String pushToken;
+
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified = false;
 
@@ -69,6 +76,9 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PasswordResetToken> passwordResetTokens;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<NotificationPreference> notificationPreferences;
 
     @PrePersist
     void onCreate() {

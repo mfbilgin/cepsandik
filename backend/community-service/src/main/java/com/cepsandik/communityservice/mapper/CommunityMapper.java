@@ -17,6 +17,7 @@ public class CommunityMapper {
         community.setVisibility(request.getVisibility());
         community.setOwnerId(ownerId);
         community.setIsDeleted(false);
+        community.setCoverImageUrl(request.getCoverImageUrl());
         return community;
     }
 
@@ -32,6 +33,7 @@ public class CommunityMapper {
                 .nameChangeCount(community.getNameChangeCount())
                 .createdAt(community.getCreatedAt())
                 .updatedAt(community.getUpdatedAt())
+                .coverImageUrl(community.getCoverImageUrl())
                 .build();
     }
 

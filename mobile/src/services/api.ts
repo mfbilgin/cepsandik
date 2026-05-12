@@ -1,7 +1,20 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-export const API_URL = 'http://10.114.147.115:8088/v1';
+/**
+ * Generates a simple UUID for request tracing.
+ */
+const generateCorrelationId = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+};
+
+export const API_URL = 'http://10.0.2.2:8088/v1';
 
 export const api = axios.create({
     baseURL: API_URL,
@@ -22,8 +35,25 @@ api.interceptors.request.use(
         } catch (e) {
             console.error('SecureStore error:', e);
         }
+
+        // Distributed Tracing & Context Headers
+        config.headers['X-Correlation-ID'] = generateCorrelationId();
+        config.headers['X-App-Version'] = Constants.expoConfig?.version || '1.0.0';
+        config.headers['X-Platform'] = Platform.OS;
+
+        try {
+            let deviceId = await SecureStore.getItemAsync('device_id');
+            if (!deviceId) {
+                deviceId = generateCorrelationId();
+                await SecureStore.setItemAsync('device_id', deviceId);
+            }
+            config.headers['X-Device-ID'] = deviceId;
+        } catch (e) {
+            config.headers['X-Device-ID'] = 'unknown';
+        }
+
         const fullUrl = `${config.baseURL}${config.url}`;
-        console.log(`[API REQUEST] ${config.method?.toUpperCase()} ${fullUrl}`);
+        console.log(`[API REQUEST] [CID: ${config.headers['X-Correlation-ID']}] ${config.method?.toUpperCase()} ${fullUrl}`);
         return config;
     },
     (error) => Promise.reject(error)

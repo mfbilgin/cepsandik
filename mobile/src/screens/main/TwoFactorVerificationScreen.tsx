@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 
@@ -56,7 +56,7 @@ export const TwoFactorVerificationScreen = () => {
         const boxes = [];
         for (let i = 0; i < 6; i++) {
             boxes.push(
-                <View key={i} style={tw`w-12 h-14 bg-white border-2 rounded-xl flex items-center justify-center ${code.length === i ? 'border-[#1162d4]' : 'border-slate-200'}`}>
+                <View key={i} style={tw`w-12 h-14 bg-surface border-2 rounded-xl flex items-center justify-center ${code.length === i ? 'border-primary' : 'border-slate-200'}`}>
                     <Text style={tw`text-2xl font-bold text-slate-900`}>{code[i] || (code.length === i ? '' : '·')}</Text>
                 </View>
             );
@@ -72,10 +72,10 @@ export const TwoFactorVerificationScreen = () => {
     ];
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-[#f6f7f8]`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
+        <SafeAreaView style={[tw`flex-1 bg-background`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
             {/* Top Navigation Bar */}
-            <View style={tw`flex-row items-center justify-between px-4 py-3 bg-[#f6f7f8] border-b border-[#1162d4]/10`}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-[#1162d4]/10`}>
+            <View style={tw`flex-row items-center justify-between px-4 py-3 bg-background border-b border-primary/10`}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-primary/10`}>
                     <Ionicons name="chevron-back" size={24} color="#334155" />
                 </TouchableOpacity>
                 <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>{t('twoFactor.verify.title')}</Text>
@@ -84,8 +84,8 @@ export const TwoFactorVerificationScreen = () => {
 
             <ScrollView contentContainerStyle={tw`flex-grow flex-col items-center px-6 pt-4 pb-8 max-w-md w-full self-center`}>
                 {/* Icon/Logo Placeholder */}
-                <View style={tw`mb-6 p-4 bg-[#1162d4]/10 rounded-full`}>
-                    <MaterialIcons name="security" size={48} color="#1162d4" />
+                <View style={tw`mb-6 p-4 bg-primary/10 rounded-full`}>
+                    <MaterialIcons name="security" size={48} color={tw.color('primary')} />
                 </View>
 
                 {/* Heading & Instructions */}
@@ -104,7 +104,7 @@ export const TwoFactorVerificationScreen = () => {
                 {/* Action Buttons */}
                 <View style={tw`w-full flex-col gap-4 mt-auto mb-2`}>
                     <TouchableOpacity
-                        style={tw`w-full bg-[#1162d4] flex-row items-center justify-center py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
+                        style={tw`w-full bg-primary flex-row items-center justify-center py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
                         onPress={handleVerify}
                         disabled={isLoading}
                         activeOpacity={0.8}
@@ -113,7 +113,7 @@ export const TwoFactorVerificationScreen = () => {
                     </TouchableOpacity>
 
                     <TouchableOpacity style={tw`items-center`} onPress={() => navigation.goBack()}>
-                        <Text style={tw`text-[#1162d4] font-medium text-sm`}>{t('twoFactor.verify.cancel')}</Text>
+                        <Text style={tw`text-primary font-medium text-sm`}>{t('twoFactor.verify.cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -125,7 +125,7 @@ export const TwoFactorVerificationScreen = () => {
                         if (key.val === 'empty') return <View key={index} style={tw`w-[30%] h-12 mb-3`} />;
                         if (key.val === 'backspace') {
                             return (
-                                <TouchableOpacity key={index} onPress={() => handleKeyPress('backspace')} style={tw`w-[30%] h-12 flex items-center justify-center mb-3 rounded-lg active:bg-[#1162d4]/10`}>
+                                <TouchableOpacity key={index} onPress={() => handleKeyPress('backspace')} style={tw`w-[30%] h-12 flex items-center justify-center mb-3 rounded-lg active:bg-primary/10`}>
                                     <Ionicons name="backspace-outline" size={28} color="#475569" />
                                 </TouchableOpacity>
                             );
@@ -134,7 +134,7 @@ export const TwoFactorVerificationScreen = () => {
                             <TouchableOpacity
                                 key={index}
                                 onPress={() => handleKeyPress(key.val)}
-                                style={tw`w-[30%] h-14 flex flex-col items-center justify-center bg-white rounded-xl shadow-sm mb-3 active:bg-slate-200`}
+                                style={tw`w-[30%] h-14 flex flex-col items-center justify-center bg-surface rounded-xl shadow-sm mb-3 active:bg-slate-200`}
                             >
                                 <Text style={tw`text-2xl font-medium text-slate-900`}>{key.val}</Text>
                                 {key.letters ? (

@@ -8,12 +8,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 
 type CandidateType = 'PERSON' | 'TEXT_OPTION' | 'IMAGE_OPTION';
-type ElectionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'RANKED_CHOICE';
+type ElectionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
 
 interface Candidate {
     name: string;
@@ -83,7 +83,7 @@ export const CreateElectionScreen = () => {
     }, [candidateType]);
 
     const formatDate = (d: Date) => d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const formatTime = (d: Date) => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    const formatTime = (d: Date) => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
     const addCandidate = () => setCandidates(prev => [...prev, { name: '', description: '', imageUrl: '', candidateType, memberUserId: '' }]);
     const removeCandidate = (idx: number) => {
@@ -141,7 +141,6 @@ export const CreateElectionScreen = () => {
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),
                 resultsPublic: true,
-                anonymousVoting: true,
             });
 
             const electionId = electionRes.data?.data?.id;
@@ -172,7 +171,6 @@ export const CreateElectionScreen = () => {
     const ELECTION_TYPES = [
         { key: 'SINGLE_CHOICE', label: t('createElection.stepType.singleLabel'), icon: 'radio-button-checked', desc: t('createElection.stepType.singleDesc') },
         { key: 'MULTIPLE_CHOICE', label: t('createElection.stepType.multiLabel'), icon: 'check-box', desc: t('createElection.stepType.multiDesc') },
-        { key: 'RANKED_CHOICE', label: t('createElection.stepType.rankedLabel'), icon: 'format-list-numbered', desc: t('createElection.stepType.rankedDesc') },
     ] as const;
 
     const CANDIDATE_TYPES = [
@@ -182,9 +180,9 @@ export const CreateElectionScreen = () => {
     ] as const;
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-[#f6f7f8]`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
+        <SafeAreaView style={[tw`flex-1 bg-background`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
             {/* Header */}
-            <View style={tw`flex-row items-center px-4 py-3 bg-white border-b border-slate-200`}>
+            <View style={tw`flex-row items-center px-4 py-3 bg-surface border-b border-slate-200`}>
                 <TouchableOpacity
                     onPress={() => step === 1 ? navigation.goBack() : setStep(1)}
                     style={tw`w-10 h-10 items-center justify-center rounded-full`}
@@ -196,7 +194,7 @@ export const CreateElectionScreen = () => {
                 </Text>
                 <View style={tw`flex-row gap-1`}>
                     {[1, 2].map(s => (
-                        <View key={s} style={tw`w-2 h-2 rounded-full ${step === s ? 'bg-[#1162d4]' : 'bg-slate-200'}`} />
+                        <View key={s} style={tw`w-2 h-2 rounded-full ${step === s ? 'bg-primary' : 'bg-slate-200'}`} />
                     ))}
                 </View>
             </View>
@@ -204,7 +202,7 @@ export const CreateElectionScreen = () => {
             {step === 1 ? (
                 <ScrollView contentContainerStyle={tw`p-4 gap-4 pb-32`} showsVerticalScrollIndicator={false}>
                     {/* Basic Info Card */}
-                    <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
+                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
                         <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.basicInfo')}</Text>
 
                         <View style={tw`gap-1`}>
@@ -235,26 +233,26 @@ export const CreateElectionScreen = () => {
                     </View>
 
                     {/* Election Type Card */}
-                    <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
+                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
                         <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.typeTitle')}</Text>
                         {ELECTION_TYPES.map(t => (
                             <TouchableOpacity
                                 key={t.key}
                                 onPress={() => setElectionType(t.key)}
-                                style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${electionType === t.key ? 'border-[#1162d4] bg-[#1162d4]/5' : 'border-slate-200 bg-slate-50'}`}
+                                style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${electionType === t.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50'}`}
                             >
-                                <MaterialIcons name={t.icon as any} size={22} color={electionType === t.key ? '#1162d4' : '#94a3b8'} />
+                                <MaterialIcons name={t.icon as any} size={22} color={electionType === t.key ? '#41431B' : '#94a3b8'} />
                                 <View style={tw`flex-1`}>
-                                    <Text style={tw`font-semibold ${electionType === t.key ? 'text-[#1162d4]' : 'text-slate-700'}`}>{t.label}</Text>
+                                    <Text style={tw`font-semibold ${electionType === t.key ? 'text-primary' : 'text-slate-700'}`}>{t.label}</Text>
                                     <Text style={tw`text-xs text-slate-400`}>{t.desc}</Text>
                                 </View>
-                                {electionType === t.key && <MaterialIcons name="check-circle" size={20} color="#1162d4" />}
+                                {electionType === t.key && <MaterialIcons name="check-circle" size={20} color={tw.color('primary')} />}
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     {/* Candidate Type Card */}
-                    <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
+                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
                         <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.candidateTypeTitle')}</Text>
                         {CANDIDATE_TYPES.map(t => (
                             <TouchableOpacity
@@ -263,20 +261,20 @@ export const CreateElectionScreen = () => {
                                     setCandidateType(t.key);
                                     setCandidates(prev => prev.map(c => ({ ...c, candidateType: t.key, name: '', memberUserId: '' })));
                                 }}
-                                style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${candidateType === t.key ? 'border-[#1162d4] bg-[#1162d4]/5' : 'border-slate-200 bg-slate-50'}`}
+                                style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${candidateType === t.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50'}`}
                             >
-                                <MaterialIcons name={t.icon as any} size={22} color={candidateType === t.key ? '#1162d4' : '#94a3b8'} />
+                                <MaterialIcons name={t.icon as any} size={22} color={candidateType === t.key ? '#41431B' : '#94a3b8'} />
                                 <View style={tw`flex-1`}>
-                                    <Text style={tw`font-semibold ${candidateType === t.key ? 'text-[#1162d4]' : 'text-slate-700'}`}>{t.label}</Text>
+                                    <Text style={tw`font-semibold ${candidateType === t.key ? 'text-primary' : 'text-slate-700'}`}>{t.label}</Text>
                                     <Text style={tw`text-xs text-slate-400`}>{t.desc}</Text>
                                 </View>
-                                {candidateType === t.key && <MaterialIcons name="check-circle" size={20} color="#1162d4" />}
+                                {candidateType === t.key && <MaterialIcons name="check-circle" size={20} color={tw.color('primary')} />}
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     {/* Date/Time Card */}
-                    <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
+                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
                         <Text style={tw`text-slate-900 font-bold text-base`}>{t('createElection.timeRange')}</Text>
 
                         {/* Start Time */}
@@ -287,14 +285,14 @@ export const CreateElectionScreen = () => {
                                     onPress={() => { setStartPickerMode('date'); setShowStartPicker(true); }}
                                     style={tw`flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                 >
-                                    <MaterialIcons name="calendar-today" size={18} color="#1162d4" />
+                                    <MaterialIcons name="calendar-today" size={18} color={tw.color('primary')} />
                                     <Text style={tw`text-slate-900 font-medium text-sm`}>{formatDate(startTime)}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => { setStartPickerMode('time'); setShowStartPicker(true); }}
                                     style={tw`bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                 >
-                                    <MaterialIcons name="schedule" size={18} color="#1162d4" />
+                                    <MaterialIcons name="schedule" size={18} color={tw.color('primary')} />
                                     <Text style={tw`text-slate-900 font-medium text-sm`}>{formatTime(startTime)}</Text>
                                 </TouchableOpacity>
                             </View>
@@ -308,14 +306,14 @@ export const CreateElectionScreen = () => {
                                     onPress={() => { setEndPickerMode('date'); setShowEndPicker(true); }}
                                     style={tw`flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                 >
-                                    <MaterialIcons name="calendar-today" size={18} color="#1162d4" />
+                                    <MaterialIcons name="calendar-today" size={18} color={tw.color('primary')} />
                                     <Text style={tw`text-slate-900 font-medium text-sm`}>{formatDate(endTime)}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => { setEndPickerMode('time'); setShowEndPicker(true); }}
                                     style={tw`bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 flex-row items-center gap-2`}
                                 >
-                                    <MaterialIcons name="schedule" size={18} color="#1162d4" />
+                                    <MaterialIcons name="schedule" size={18} color={tw.color('primary')} />
                                     <Text style={tw`text-slate-900 font-medium text-sm`}>{formatTime(endTime)}</Text>
                                 </TouchableOpacity>
                             </View>
@@ -325,6 +323,7 @@ export const CreateElectionScreen = () => {
                             <DateTimePicker
                                 value={startTime}
                                 mode={startPickerMode}
+                                is24Hour={true}
                                 minimumDate={new Date()}
                                 onChange={(_, date) => { setShowStartPicker(false); if (date) setStartTime(date); }}
                             />
@@ -333,6 +332,7 @@ export const CreateElectionScreen = () => {
                             <DateTimePicker
                                 value={endTime}
                                 mode={endPickerMode}
+                                is24Hour={true}
                                 minimumDate={startTime}
                                 onChange={(_, date) => { setShowEndPicker(false); if (date) setEndTime(date); }}
                             />
@@ -341,9 +341,9 @@ export const CreateElectionScreen = () => {
                 </ScrollView>
             ) : (
                 <ScrollView contentContainerStyle={tw`p-4 gap-4 pb-32`} showsVerticalScrollIndicator={false}>
-                    <View style={tw`bg-[#1162d4]/5 border border-[#1162d4]/20 rounded-xl p-3 flex-row items-center gap-2`}>
-                        <MaterialIcons name="info" size={18} color="#1162d4" />
-                        <Text style={tw`text-[#1162d4] text-sm font-medium flex-1`}>
+                    <View style={tw`bg-primary/5 border border-primary/20 rounded-xl p-3 flex-row items-center gap-2`}>
+                        <MaterialIcons name="info" size={18} color={tw.color('primary')} />
+                        <Text style={tw`text-primary text-sm font-medium flex-1`}>
                             {candidateType === 'PERSON' ? t('createElection.candidateInfoPerson') :
                                 candidateType === 'TEXT_OPTION' ? t('createElection.candidateInfoText') :
                                     t('createElection.candidateInfoImage')}
@@ -351,7 +351,7 @@ export const CreateElectionScreen = () => {
                     </View>
 
                     {candidates.map((candidate, idx) => (
-                        <View key={idx} style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
+                        <View key={idx} style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-3`}>
                             <View style={tw`flex-row items-center justify-between`}>
                                 <Text style={tw`text-slate-900 font-bold`}>{t('createElection.candidateN', { index: idx + 1 })}</Text>
                                 <TouchableOpacity onPress={() => removeCandidate(idx)} style={tw`w-8 h-8 rounded-full bg-red-50 items-center justify-center`}>
@@ -364,7 +364,7 @@ export const CreateElectionScreen = () => {
                                     onPress={() => openMemberPicker(idx)}
                                     style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex-row items-center gap-3`}
                                 >
-                                    <MaterialIcons name="person" size={22} color="#1162d4" />
+                                    <MaterialIcons name="person" size={22} color={tw.color('primary')} />
                                     <Text style={tw`flex-1 ${candidate.name ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
                                         {candidate.name || t('createElection.selectMember')}
                                     </Text>
@@ -398,20 +398,20 @@ export const CreateElectionScreen = () => {
 
                     <TouchableOpacity
                         onPress={addCandidate}
-                        style={tw`bg-white border-2 border-dashed border-[#1162d4]/40 rounded-2xl p-4 flex-row items-center justify-center gap-2`}
+                        style={tw`bg-surface border-2 border-dashed border-primary/40 rounded-2xl p-4 flex-row items-center justify-center gap-2`}
                     >
-                        <MaterialIcons name="add" size={22} color="#1162d4" />
-                        <Text style={tw`text-[#1162d4] font-semibold`}>{t('createElection.addCandidate')}</Text>
+                        <MaterialIcons name="add" size={22} color={tw.color('primary')} />
+                        <Text style={tw`text-primary font-semibold`}>{t('createElection.addCandidate')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             )}
 
             {/* Bottom CTA */}
-            <View style={tw`absolute bottom-0 left-0 right-0 bg-white px-4 pt-3 pb-8 border-t border-slate-200`}>
+            <View style={tw`absolute bottom-0 left-0 right-0 bg-surface px-4 pt-3 pb-8 border-t border-slate-200`}>
                 <TouchableOpacity
                     onPress={step === 1 ? () => { if (validateStep1()) setStep(2); } : handleCreate}
                     disabled={isCreating}
-                    style={tw`w-full h-14 bg-[#1162d4] rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30 ${isCreating ? 'opacity-70' : ''}`}
+                    style={tw`w-full h-14 bg-primary rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30 ${isCreating ? 'opacity-70' : ''}`}
                 >
                     {isCreating ? (
                         <ActivityIndicator color="white" />
@@ -427,7 +427,7 @@ export const CreateElectionScreen = () => {
             <Modal visible={memberPickerVisible} animationType="slide" transparent onRequestClose={() => setMemberPickerVisible(false)}>
                 <View style={tw`flex-1 justify-end`}>
                     <TouchableOpacity style={tw`flex-1`} onPress={() => setMemberPickerVisible(false)} />
-                    <View style={tw`bg-white rounded-t-3xl max-h-[60%] border-t border-slate-100 shadow-2xl`}>
+                    <View style={tw`bg-surface rounded-t-3xl max-h-[60%] border-t border-slate-100 shadow-2xl`}>
                         <View style={tw`flex-row items-center px-4 py-4 border-b border-slate-100`}>
                             <Text style={tw`flex-1 text-base font-bold text-slate-900`}>{t('createElection.pickMember')}</Text>
                             <TouchableOpacity onPress={() => setMemberPickerVisible(false)}>
@@ -435,7 +435,7 @@ export const CreateElectionScreen = () => {
                             </TouchableOpacity>
                         </View>
                         {membersLoading ? (
-                            <ActivityIndicator style={tw`p-8`} color="#1162d4" />
+                            <ActivityIndicator style={tw`p-8`} color={tw.color('primary')} />
                         ) : communityMembers.length === 0 ? (
                             <Text style={tw`text-center text-slate-400 p-8`}>{t('createElection.membersLoadFail')}</Text>
                         ) : (
@@ -447,8 +447,8 @@ export const CreateElectionScreen = () => {
                                         onPress={() => selectMember(item)}
                                         style={tw`flex-row items-center gap-3 px-4 py-3 border-b border-slate-100`}
                                     >
-                                        <View style={tw`w-10 h-10 bg-[#1162d4]/10 rounded-full items-center justify-center`}>
-                                            <MaterialIcons name="person" size={22} color="#1162d4" />
+                                        <View style={tw`w-10 h-10 bg-primary/10 rounded-full items-center justify-center`}>
+                                            <MaterialIcons name="person" size={22} color={tw.color('primary')} />
                                         </View>
                                         <View>
                                             <Text style={tw`text-slate-900 font-semibold`}>{item.displayName || item.userId}</Text>

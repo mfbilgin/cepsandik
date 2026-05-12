@@ -56,4 +56,18 @@ public class CommunityServiceClient {
             return Collections.emptyList();
         }
     }
+
+    /**
+     * Topluluk ismini döndürür.
+     */
+    public String getCommunityName(Long communityId) {
+        if (communityId == null) return null;
+        try {
+            String url = communityServiceUrl + "/internal/api/v1/communities/" + communityId + "/name";
+            return restTemplate.getForObject(url, String.class);
+        } catch (RestClientException e) {
+            log.error("Community name alınamadı: communityId={}, hata={}", communityId, e.getMessage());
+            return "Topluluk #" + communityId;
+        }
+    }
 }

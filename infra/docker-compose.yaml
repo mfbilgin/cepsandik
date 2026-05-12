@@ -115,7 +115,7 @@ services:
       - APP_FRONTEND_URL=${FRONTEND_URL}
 
       # Actuator
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
       - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=never
       - MANAGEMENT_INFO_ENV_ENABLED=true
 
@@ -171,9 +171,10 @@ services:
 
       # Application Configuration
       - APP_INVITATION_LINK_BASE=${INVITATION_LINK_BASE}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
 
       # Actuator
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
       - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
 
       # Logging
@@ -240,14 +241,15 @@ services:
       - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
 
       # Actuator
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
       - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=when-authorized
 
       # Crypto-Engine gRPC bağlantısı
-      - APP_CRYPTO_ENGINE_HOST=crypto-engine
+      - APP_CRYPTO_ENGINE_HOST=crypto-engine-kotlin
       - APP_CRYPTO_ENGINE_PORT=50051
-      - APP_GUARDIAN_COUNT=3
-      - APP_GUARDIAN_QUORUM=2
+      - APP_GUARDIAN_COUNT=5
+      - APP_GUARDIAN_QUORUM=3
+      - APP_BULLETIN_BOARD_URL=http://bulletin-board-service:8085
 
       # Logging
       - LOGGING_LEVEL_COM_CEPSANDIK_ELECTIONSERVICE=INFO
@@ -257,7 +259,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      crypto-engine:
+      crypto-engine-kotlin:
+        condition: service_started
+      bulletin-board-service:
         condition: service_healthy
     networks:
       - app-network
@@ -269,29 +273,67 @@ services:
       start_period: 60s
 
   # ============================================
-  # Crypto-Engine (Python/ElectionGuard - gRPC)
+  # Bulletin Board Service (Append-only E2E-V record)
   # ============================================
-  crypto-engine:
+  bulletin-board-service:
     build:
-      context: ../backend/crypto-engine
+      context: ../backend/bulletin-board-service
       dockerfile: Dockerfile
-    container_name: cepsandik-crypto-engine
+    container_name: cepsandik-bulletin-board-service
     restart: unless-stopped
     environment:
-      - CRYPTO_RSA_KEY_SIZE=2048
-      - CRYPTO_GRPC_PORT=50051
-      - CRYPTO_KEY_PATH=/data/keys
-      - CRYPTO_GRPC_MAX_WORKERS=10
-    volumes:
-      - crypto_keys:/data/keys
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/bulletindb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+      - SPRING_FLYWAY_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
+
+  # ============================================
+  # Notification Service (Push & Email)
+  # ============================================
+  notification-service:
+    build:
+      context: ../backend/notification-service
+      dockerfile: Dockerfile
+    container_name: cepsandik-notification-service
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - EXPO_PUSH_API_URL=https://exp.host/--/api/v2/push/send
+      - APP_USER_SERVICE_URL=http://user-service:8080
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ============================================
+  # Crypto-Engine (Kotlin/Spring Boot + electionguard-kotlin-multiplatform — gRPC)
+  # ============================================
+  crypto-engine-kotlin:
+    build:
+      context: ../backend/crypto-engine-kotlin
+      dockerfile: Dockerfile
+    container_name: cepsandik-crypto-engine-kotlin
+    restart: unless-stopped
+    networks:
+      - app-network
 
   # ============================================
   # PostgreSQL Database
@@ -387,6 +429,72 @@ services:
       - app-network
     mem_limit: 100m
 
+  # ============================================
+  # Monitoring: Loki (Log Storage)
+  # ============================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: cepsandik-loki
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app-network
+
+  # ============================================
+  # Monitoring: Promtail (Log Collector)
+  # ============================================
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: cepsandik-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+
+  # ============================================
+  # Monitoring: Grafana (Visualization)
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: cepsandik-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - app-network
+
+  # ============================================
+  # Monitoring: Prometheus (Metrics)
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: cepsandik-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - app-network
+
 # ============================================
 # Networks
 # ============================================
@@ -407,5 +515,9 @@ volumes:
     name: cepsandik-rabbitmq-data
   backup_data:
     name: cepsandik-backup-data
-  crypto_keys:
-    name: cepsandik-crypto-keys
+  loki_data:
+    name: cepsandik-loki-data
+  grafana_data:
+    name: cepsandik-grafana-data
+  prometheus_data:
+    name: cepsandik-prometheus-data

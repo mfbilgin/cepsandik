@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 
 export const NotificationInboxScreen = () => {
@@ -23,9 +23,9 @@ export const NotificationInboxScreen = () => {
     ];
 
     return (
-        <View style={tw`flex-1 bg-[#f6f7f8]`}>
+        <View style={tw`flex-1 bg-background`}>
             {/* Header */}
-            <View style={tw`bg-white border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
+            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
                 <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color="#64748b" />
                 </TouchableOpacity>
@@ -34,7 +34,7 @@ export const NotificationInboxScreen = () => {
 
             <ScrollView
                 contentContainerStyle={tw`flex-grow p-4`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1162d4']} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#41431B']} />}
             >
                 {notifications.length === 0 ? (
                     <View style={tw`flex-1 items-center justify-center p-6 mt-10`}>
@@ -49,11 +49,11 @@ export const NotificationInboxScreen = () => {
                         {notifications.map((item) => (
                             <TouchableOpacity
                                 key={item.id}
-                                style={tw`flex-row p-4 rounded-xl bg-white border ${item.isRead ? 'border-slate-100' : 'border-[#1162d4]/30'} shadow-sm`}
+                                style={tw`flex-row p-4 rounded-xl bg-surface border ${item.isRead ? 'border-slate-100' : 'border-primary/30'} shadow-sm`}
                                 activeOpacity={0.7}
                             >
-                                <View style={tw`w-12 h-12 rounded-full ${item.isRead ? 'bg-slate-100' : 'bg-[#1162d4]/10'} items-center justify-center mr-4`}>
-                                    <Ionicons name="notifications" size={24} color={item.isRead ? '#94a3b8' : '#1162d4'} />
+                                <View style={tw`w-12 h-12 rounded-full ${item.isRead ? 'bg-slate-100' : 'bg-primary/10'} items-center justify-center mr-4`}>
+                                    <Ionicons name="notifications" size={24} color={item.isRead ? '#94a3b8' : '#41431B'} />
                                 </View>
                                 <View style={tw`flex-1 flex-col`}>
                                     <View style={tw`flex-row justify-between items-start mb-1`}>

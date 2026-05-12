@@ -2,20 +2,22 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, SafeAreaView,
     ScrollView, ActivityIndicator, Platform,
-    StatusBar, Alert
+    StatusBar
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-import tw from 'twrnc';
+import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
+import { useUI } from '../../context/UIContext';
 
 export const CommunityManagementScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { id } = route.params || {};
     const { t } = useI18n();
+    const { showDialog } = useUI();
 
     const [community, setCommunity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -57,32 +59,27 @@ export const CommunityManagementScreen = () => {
     };
 
     const handleDelete = () => {
-        Alert.alert(
-            t('communityManagement.deleteTitle'),
-            t('communityManagement.deleteBody', { name: community?.name || '' }),
-            [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                    text: t('communityManagement.deleteConfirm'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await api.delete(`/communities/${id}`);
-                            Toast.show({ type: 'success', text1: t('communityManagement.deletedTitle'), text2: t('communityManagement.deletedBody') });
-                            navigation.navigate('MainTab');
-                        } catch (e: any) {
-                            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || t('communityManagement.deleteFail') });
-                        }
-                    }
+        showDialog({
+            title: t('communityManagement.deleteTitle'),
+            message: t('communityManagement.deleteBody', { name: community?.name || '' }),
+            type: 'confirm',
+            confirmText: t('communityManagement.deleteConfirm'),
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/communities/${id}`);
+                    Toast.show({ type: 'success', text1: t('communityManagement.deletedTitle'), text2: t('communityManagement.deletedBody') });
+                    navigation.navigate('MainTab');
+                } catch (e: any) {
+                    Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || t('communityManagement.deleteFail') });
                 }
-            ]
-        );
+            }
+        });
     };
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-[#f6f7f8]`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
+        <SafeAreaView style={[tw`flex-1 bg-background`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
             {/* Header */}
-            <View style={tw`flex-row items-center px-4 py-3 bg-white border-b border-slate-200`}>
+            <View style={tw`flex-row items-center px-4 py-3 bg-surface border-b border-slate-200`}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center rounded-full`}>
                     <MaterialIcons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
@@ -90,7 +87,7 @@ export const CommunityManagementScreen = () => {
                 <TouchableOpacity
                     onPress={handleSave}
                     disabled={isSaving}
-                    style={tw`bg-[#1162d4] px-4 h-8 rounded-full items-center justify-center ${isSaving ? 'opacity-50' : ''}`}
+                    style={tw`bg-primary px-4 h-8 rounded-full items-center justify-center ${isSaving ? 'opacity-50' : ''}`}
                 >
                     <Text style={tw`text-white text-sm font-bold`}>{isSaving ? '...' : t('notifications.saveChanges')}</Text>
                 </TouchableOpacity>
@@ -98,7 +95,7 @@ export const CommunityManagementScreen = () => {
 
             {isLoading ? (
                 <View style={tw`flex-1 items-center justify-center`}>
-                    <ActivityIndicator size="large" color="#1162d4" />
+                    <ActivityIndicator size="large" color={tw.color('primary')} />
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={tw`p-4 gap-4 pb-16`} showsVerticalScrollIndicator={false}>
@@ -113,7 +110,7 @@ export const CommunityManagementScreen = () => {
                     )}
 
                     {/* Edit Fields */}
-                    <View style={tw`bg-white rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
+                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
                         <Text style={tw`text-slate-900 font-bold text-base`}>{t('communityManagement.infoTitle')}</Text>
 
                         <View style={tw`gap-1`}>
@@ -145,15 +142,15 @@ export const CommunityManagementScreen = () => {
                     </View>
 
                     {/* Quick Actions */}
-                    <View style={tw`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
+                    <View style={tw`bg-surface rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
                         <Text style={tw`text-slate-900 font-bold text-base px-4 pt-4 pb-2`}>{t('communityManagement.quickActions')}</Text>
 
                         <TouchableOpacity
                             onPress={() => navigation.navigate('CreateElection', { communityId: id })}
                             style={tw`flex-row items-center gap-3 px-4 py-4 border-t border-slate-100`}
                         >
-                            <View style={tw`w-10 h-10 bg-[#1162d4]/10 rounded-full items-center justify-center`}>
-                                <MaterialIcons name="how-to-vote" size={20} color="#1162d4" />
+                            <View style={tw`w-10 h-10 bg-primary/10 rounded-full items-center justify-center`}>
+                                <MaterialIcons name="how-to-vote" size={20} color={tw.color('primary')} />
                             </View>
                             <View style={tw`flex-1`}>
                                 <Text style={tw`text-slate-900 font-semibold`}>{t('communityManagement.startElection')}</Text>
@@ -164,7 +161,7 @@ export const CommunityManagementScreen = () => {
                     </View>
 
                     {/* Danger Zone */}
-                    <View style={tw`bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden mt-4`}>
+                    <View style={tw`bg-surface rounded-2xl border border-red-100 shadow-sm overflow-hidden mt-4`}>
                         <Text style={tw`text-red-600 font-bold text-base px-4 pt-4 pb-2`}>{t('communityManagement.danger')}</Text>
                         <TouchableOpacity
                             onPress={handleDelete}

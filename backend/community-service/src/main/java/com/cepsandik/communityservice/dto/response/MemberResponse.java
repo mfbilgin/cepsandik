@@ -17,6 +17,9 @@ public class MemberResponse {
     private Long id;
     private Long communityId;
     private String userId;
+    private String firstName;
+    private String lastName;
+    private String profileImage;
     private MemberRole role;
     private MemberStatus status;
     private LocalDateTime joinedAt;

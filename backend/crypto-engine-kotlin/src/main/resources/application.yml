@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: crypto-engine-kotlin
+  main:
+    # Web server gerekmiyor; gRPC üzerinden iletişim.
+    web-application-type: none
+    banner-mode: off
+
+# devh grpc-spring-boot-starter ayarları
+grpc:
+  server:
+    port: 50051
+    address: "0.0.0.0"
+    enable-keep-alive: true
+    keep-alive-time: 30s
+
+logging:
+  level:
+    root: INFO
+    com.cepsandik: DEBUG
+    net.devh.boot.grpc: INFO

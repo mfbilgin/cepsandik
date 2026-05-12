@@ -26,5 +26,4 @@ public class AccessVerificationResponse {
     private Instant endTime;
     private Integer candidateCount;
     private List<CandidateResponse> candidates;
-    private Boolean anonymousVoting;
 }

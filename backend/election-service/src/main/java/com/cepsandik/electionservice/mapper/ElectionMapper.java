@@ -25,7 +25,6 @@ public class ElectionMapper {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .resultsPublic(request.getResultsPublic() != null ? request.getResultsPublic() : false)
-                .anonymousVoting(request.getAnonymousVoting() != null ? request.getAnonymousVoting() : true)
                 .build();
     }
 
@@ -43,13 +42,13 @@ public class ElectionMapper {
                 .startTime(election.getStartTime())
                 .endTime(election.getEndTime())
                 .resultsPublic(election.getResultsPublic())
-                .anonymousVoting(election.getAnonymousVoting())
                 .createdAt(election.getCreatedAt())
                 .updatedAt(election.getUpdatedAt())
                 .candidateCount(election.getCandidates() != null ? 
                         (int) election.getCandidates().stream().filter(c -> !c.getIsDeleted()).count() : 0)
                 .encryptedVotingEnabled(election.getElectionGuardContext() != null
                         && !election.getElectionGuardContext().isBlank())
+                .electionManifest(election.getElectionManifest())
                 .build();
     }
 

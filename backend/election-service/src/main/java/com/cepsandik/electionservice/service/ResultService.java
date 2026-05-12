@@ -1,5 +1,6 @@
 package com.cepsandik.electionservice.service;
 
+import com.cepsandik.electionservice.client.CommunityServiceClient;
 import com.cepsandik.electionservice.dto.response.CandidateResultResponse;
 import com.cepsandik.electionservice.dto.response.ElectionResultResponse;
 import com.cepsandik.electionservice.entity.Candidate;
@@ -8,16 +9,15 @@ import com.cepsandik.electionservice.entity.ElectionResult;
 import com.cepsandik.electionservice.enums.ElectionStatus;
 import com.cepsandik.electionservice.exception.ApiException;
 import com.cepsandik.electionservice.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import com.cepsandik.electionservice.client.CommunityServiceClient;
 
 @Service
 @RequiredArgsConstructor
@@ -31,179 +31,140 @@ public class ResultService {
     private final ElectionResultRepository electionResultRepository;
     private final ElectionNotificationProducer notificationProducer;
     private final CommunityServiceClient communityServiceClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Seçim sonuçlarını hesaplar ve kaydeder.
-     * Sadece CLOSED durumundaki seçimler için çalışır.
-     * Zaten hesaplanmışsa yeniden hesaplar (idempotent).
-     */
     @Transactional
     public ElectionResultResponse calculateResults(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
-        // Yetki kontrolü: sadece seçim sahibi veya ADMIN
         if (!election.getCreatedBy().equals(userId)) {
-            throw ApiException.forbidden("Bu işlem için yetkiniz yok");
+            throw ApiException.forbidden("Bu islem icin yetkiniz yok");
         }
-
-        // Seçim CLOSED veya ARCHIVED olmalı
         if (!election.isClosed() && election.getStatus() != ElectionStatus.ARCHIVED) {
-            throw ApiException.badRequest("Sonuçlar sadece kapanmış seçimler için hesaplanabilir");
+            throw ApiException.badRequest("Sonuclar sadece kapanmis secimler icin hesaplanabilir");
+        }
+        if (election.getTallyResults() == null || election.getTallyResults().isBlank()) {
+            throw ApiException.badRequest("Kriptografik tally henuz uretilmedi. Guardian quorum decryption tamamlanmadan resmi sonuc hesaplanamaz.");
         }
 
-        // Mevcut sonuçları sil (yeniden hesaplama)
         if (electionResultRepository.existsByElectionId(electionId)) {
             electionResultRepository.deleteByElectionId(electionId);
-            log.info("Mevcut sonuçlar silindi, yeniden hesaplanıyor - Election: {}", electionId);
         }
 
-        // Oy sayılarını hesapla
-        List<Object[]> voteCounts = voteRepository.countVotesByCandidateForElection(electionId);
-        long totalVotes = voteRepository.countByElectionId(electionId);
-        long totalTokens = voteTokenRepository.countByElectionId(electionId);
-
-        // Tüm adayları getir (oy almamış olanlar dahil)
-        List<Candidate> allCandidates = candidateRepository
-                .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(electionId);
-
-        // Sonuçları oluştur
-        List<ElectionResult> results = new ArrayList<>();
-        int rank = 1;
-
-        // Önce oy almış adayları sıralı ekle
-        for (Object[] row : voteCounts) {
-            Long candidateId = (Long) row[0];
-            Long count = (Long) row[1];
-            Candidate candidate = allCandidates.stream()
-                    .filter(c -> c.getId().equals(candidateId))
-                    .findFirst().orElse(null);
-
-            if (candidate != null) {
-                double pct = totalVotes > 0 ? (double) count / totalVotes * 100 : 0;
-                ElectionResult result = ElectionResult.builder()
-                        .election(election)
-                        .candidate(candidate)
-                        .voteCount(count)
-                        .percentage(Math.round(pct * 100.0) / 100.0) // 2 ondalık
-                        .rank(rank++)
-                        .build();
-                results.add(result);
-            }
-        }
-
-        // Oy almamış adayları da ekle
-        for (Candidate candidate : allCandidates) {
-            boolean alreadyAdded = results.stream()
-                    .anyMatch(r -> r.getCandidate().getId().equals(candidate.getId()));
-            if (!alreadyAdded) {
-                ElectionResult result = ElectionResult.builder()
-                        .election(election)
-                        .candidate(candidate)
-                        .voteCount(0L)
-                        .percentage(0.0)
-                        .rank(rank++)
-                        .build();
-                results.add(result);
-            }
-        }
-
-        // Kaydet
+        List<ElectionResult> results = buildResultsFromCryptographicTally(election);
         electionResultRepository.saveAll(results);
-        log.info("Sonuçlar hesaplandı - Election: {}, Toplam oy: {}", electionId, totalVotes);
+        log.info("Kriptografik tally sonuc snapshot'i kaydedildi: election={}, selections={}", electionId, results.size());
 
-        return buildResultResponse(election, results, totalVotes, totalTokens);
+        return buildResultResponse(election, results, voteRepository.countByElectionId(electionId),
+                voteTokenRepository.countByElectionId(electionId));
     }
 
-    /**
-     * Seçim sonuçlarını görüntüler.
-     * resultsPublic = true ise herkes görebilir, değilse sadece seçim sahibi.
-     */
     @Transactional(readOnly = true)
     public ElectionResultResponse getResults(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
-        // Yetki kontrolü
         boolean isOwner = election.getCreatedBy().equals(userId);
         boolean isClosed = election.isClosed() || election.getStatus() == ElectionStatus.ARCHIVED;
-
         if (!isClosed) {
-            throw ApiException.badRequest("Sonuçlar henüz yayınlanmadı");
+            throw ApiException.badRequest("Sonuclar henuz yayinlanmadi");
         }
-
         if (!election.getResultsPublic() && !isOwner) {
-            throw ApiException.forbidden("Bu seçimin sonuçları herkese açık değil");
+            throw ApiException.forbidden("Bu secimin sonuclari herkese acik degil");
         }
-
-        // Sonuçlar hesaplanmış mı
         if (!electionResultRepository.existsByElectionId(electionId)) {
-            throw ApiException.notFound("Sonuçlar henüz hesaplanmamış. Seçim sahibi sonuçları hesaplamalıdır.");
+            throw ApiException.notFound("Kriptografik sonuc snapshot'i henuz olusturulmadi");
         }
 
         List<ElectionResult> results = electionResultRepository.findByElectionIdOrderByRankAsc(electionId);
-        long totalVotes = voteRepository.countByElectionId(electionId);
-        long totalTokens = voteTokenRepository.countByElectionId(electionId);
-
-        return buildResultResponse(election, results, totalVotes, totalTokens);
+        return buildResultResponse(election, results, voteRepository.countByElectionId(electionId),
+                voteTokenRepository.countByElectionId(electionId));
     }
 
-    /**
-     * Sonuçları yayınlar ve seçimi ARCHIVED durumuna geçirir.
-     */
     @Transactional
     public ElectionResultResponse publishResults(Long electionId, String userId) {
         Election election = findElectionOrThrow(electionId);
-
         if (!election.getCreatedBy().equals(userId)) {
-            throw ApiException.forbidden("Bu işlem için yetkiniz yok");
+            throw ApiException.forbidden("Bu islem icin yetkiniz yok");
         }
-
         if (!election.isClosed()) {
-            throw ApiException.badRequest("Sadece CLOSED durumundaki seçimlerin sonuçları yayınlanabilir");
+            throw ApiException.badRequest("Sadece CLOSED durumundaki secimlerin sonuclari yayinlanabilir");
         }
-
-        // Sonuçlar henüz hesaplanmamışsa otomatik hesapla
         if (!electionResultRepository.existsByElectionId(electionId)) {
             calculateResults(electionId, userId);
         }
 
-        // Seçimi ARCHIVED durumuna geçir
         election.setStatus(ElectionStatus.ARCHIVED);
         election.setResultsPublic(true);
         electionRepository.save(election);
 
-        log.info("Sonuçlar yayınlandı, seçim arşivlendi - Election: {}", electionId);
-
-        // Topluluk üyelerine bildirim gönder
         try {
-            List<String> memberUserIds = communityServiceClient
-                    .getMemberUserIds(election.getCommunityId());
+            List<String> memberUserIds = election.getCommunityId() != null
+                    ? communityServiceClient.getMemberUserIds(election.getCommunityId())
+                    : List.of();
             if (!memberUserIds.isEmpty()) {
-                notificationProducer.notifyResultsPublished(
-                        election.getId(), election.getTitle(),
+                notificationProducer.notifyResultsPublished(election.getId(), election.getTitle(),
                         election.getCommunityId(), memberUserIds);
             }
         } catch (Exception e) {
-            log.error("Sonuç yayınlama bildirimi gönderilemedi: electionId={}, hata={}",
+            log.error("Sonuc yayinlama bildirimi gonderilemedi: electionId={}, hata={}",
                     electionId, e.getMessage());
         }
 
         List<ElectionResult> results = electionResultRepository.findByElectionIdOrderByRankAsc(electionId);
-        long totalVotes = voteRepository.countByElectionId(electionId);
-        long totalTokens = voteTokenRepository.countByElectionId(electionId);
-
-        return buildResultResponse(election, results, totalVotes, totalTokens);
+        return buildResultResponse(election, results, voteRepository.countByElectionId(electionId),
+                voteTokenRepository.countByElectionId(electionId));
     }
 
-    // ==================== Helper ====================
+    private List<ElectionResult> buildResultsFromCryptographicTally(Election election) {
+        try {
+            Map<String, Candidate> candidateBySelection = candidateRepository
+                    .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(election.getId())
+                    .stream()
+                    .collect(Collectors.toMap(c -> "candidate_" + c.getId(), c -> c));
+
+            List<ElectionResult> results = new ArrayList<>();
+            JsonNode root = objectMapper.readTree(election.getTallyResults());
+            JsonNode contests = root.isArray() ? root : root.path("results");
+            for (JsonNode contest : contests) {
+                JsonNode selections = contest.path("selections");
+                if (!selections.isArray()) {
+                    continue;
+                }
+                for (JsonNode selection : selections) {
+                    String selectionId = selection.path("selection_id").asText(selection.path("selectionId").asText());
+                    long tally = selection.path("tally").asLong(selection.path("vote_count").asLong(0L));
+                    Candidate candidate = candidateBySelection.get(selectionId);
+                    results.add(ElectionResult.builder()
+                            .election(election)
+                            .selectionId(selectionId)
+                            .optionLabel(candidate != null ? candidate.getName() : selectionId)
+                            .optionDescription(candidate != null ? candidate.getDescription() : null)
+                            .optionImageUrl(candidate != null ? candidate.getImageUrl() : null)
+                            .voteCount(tally)
+                            .build());
+                }
+            }
+
+            long totalVotes = results.stream().mapToLong(ElectionResult::getVoteCount).sum();
+            results.sort(Comparator.comparing(ElectionResult::getVoteCount).reversed());
+            for (int i = 0; i < results.size(); i++) {
+                ElectionResult result = results.get(i);
+                result.setRank(i + 1);
+                result.setPercentage(totalVotes > 0 ? Math.round(((double) result.getVoteCount() / totalVotes * 100) * 100.0) / 100.0 : 0.0);
+            }
+            return results;
+        } catch (Exception e) {
+            throw ApiException.badRequest("Kriptografik tally sonucu parse edilemedi: " + e.getMessage());
+        }
+    }
 
     private ElectionResultResponse buildResultResponse(Election election, List<ElectionResult> results,
             long totalVotes, long totalTokens) {
         List<CandidateResultResponse> candidateResults = results.stream()
                 .map(r -> CandidateResultResponse.builder()
-                        .candidateId(r.getCandidate().getId())
-                        .candidateName(r.getCandidate().getName())
-                        .candidateDescription(r.getCandidate().getDescription())
-                        .candidateImageUrl(r.getCandidate().getImageUrl())
+                        .selectionId(r.getSelectionId())
+                        .optionId(r.getSelectionId())
+                        .candidateName(r.getOptionLabel())
+                        .candidateDescription(r.getOptionDescription())
+                        .candidateImageUrl(r.getOptionImageUrl())
                         .voteCount(r.getVoteCount())
                         .percentage(r.getPercentage())
                         .rank(r.getRank())
@@ -212,7 +173,6 @@ public class ResultService {
                 .collect(Collectors.toList());
 
         double turnout = totalTokens > 0 ? (double) totalVotes / totalTokens * 100 : 0;
-
         return ElectionResultResponse.builder()
                 .electionId(election.getId())
                 .electionTitle(election.getTitle())
@@ -232,6 +192,6 @@ public class ResultService {
     private Election findElectionOrThrow(Long id) {
         return electionRepository.findById(id)
                 .filter(e -> !e.getIsDeleted())
-                .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
+                .orElseThrow(() -> ApiException.notFound("Secim bulunamadi"));
     }
 }

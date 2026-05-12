@@ -195,6 +195,23 @@ public class ElectionController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Bagimsiz dogrulama icin public election record getirir")
+    @GetMapping("/{id}/record")
+    public ResponseEntity<ApiResponse<ElectionProofResponse>> getElectionRecord(@PathVariable Long id) {
+        ElectionProofResponse response = electionService.getElectionProofs(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Mobile (E2E-V) client-side ElGamal şifrelemesi için kriptografik parametreler")
+    @GetMapping("/{id}/encryption-params")
+    public ResponseEntity<ApiResponse<EncryptionParamsResponse>> getEncryptionParams(@PathVariable Long id) {
+        EncryptionParamsResponse response = electionService.getEncryptionParams(id);
+        return ResponseEntity
+                .ok()
+                .header("Cache-Control", "public, max-age=3600, must-revalidate")
+                .body(ApiResponse.success(response));
+    }
+
     @Operation(summary = "Seçim önizleme – yayınlamadan önce tüm bilgileri ve eksikleri gösterir")
     @GetMapping("/{id}/preview")
     public ResponseEntity<ApiResponse<ElectionPreviewResponse>> previewElection(

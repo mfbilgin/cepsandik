@@ -1,0 +1,48 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.electionguard'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.electionguard"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+  // KMP fat JAR'ı zaten Kotlin stdlib + coroutines + serialization içeriyor;
+  // Android Gradle plugin'in doğrudan import'una karşı eski sınıfları packaging'den çıkar.
+  packagingOptions {
+    pickFirst 'META-INF/INDEX.LIST'
+    pickFirst 'META-INF/io.netty.versions.properties'
+    pickFirst 'DebugProbesKt.bin'
+    exclude 'META-INF/DEPENDENCIES'
+    exclude 'META-INF/LICENSE'
+    exclude 'META-INF/LICENSE.txt'
+    exclude 'META-INF/license.txt'
+    exclude 'META-INF/NOTICE'
+    exclude 'META-INF/NOTICE.txt'
+    exclude 'META-INF/notice.txt'
+    exclude 'META-INF/ASL2.0'
+    exclude 'META-INF/*.kotlin_module'
+    exclude '**/module-info.class'
+  }
+}
+
+dependencies {
+  // ElectionGuard Kotlin Multiplatform — 6.4 MB fat JAR (Spring Boot ile aynı)
+  // İçindeki kotlinx-coroutines/serialization/datetime/kotlin-stdlib paketleri
+  // Android tarafıyla DEX merger'da çakıştığı için fat JAR'dan çıkarıldı.
+  // Onların yerine Maven Central'dan ekliyoruz — KMP'nin compile-time'da
+  // ihtiyaç duyduğu metadata için zorunlu.
+  implementation files('libs/egklib-all.jar')
+
+  implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2'
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+  implementation 'org.jetbrains.kotlinx:kotlinx-datetime:0.5.0'
+}

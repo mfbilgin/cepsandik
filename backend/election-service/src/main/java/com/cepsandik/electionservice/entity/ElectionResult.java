@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "election_results", uniqueConstraints = {
-    @UniqueConstraint(name = "idx_election_results_election_candidate", columnNames = {"election_id", "candidate_id"})
+    @UniqueConstraint(name = "uk_election_result_selection", columnNames = {"election_id", "selection_id"})
 })
 @Getter
 @Setter
@@ -25,21 +25,28 @@ public class ElectionResult {
     @JoinColumn(name = "election_id", nullable = false)
     private Election election;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "candidate_id", nullable = false)
-    private Candidate candidate;
+    /** Public ElectionGuard selection id, e.g. candidate_42. */
+    @Column(name = "selection_id", nullable = false, length = 128)
+    private String selectionId;
 
-    /** Adayın aldığı oy sayısı */
+    @Column(name = "option_label", length = 200)
+    private String optionLabel;
+
+    @Column(name = "option_description", columnDefinition = "TEXT")
+    private String optionDescription;
+
+    @Column(name = "option_image_url", length = 500)
+    private String optionImageUrl;
+
+    /** Cryptographically decrypted tally for this selection. */
     @Column(name = "vote_count", nullable = false)
     @Builder.Default
     private Long voteCount = 0L;
 
-    /** Oy yüzdesi */
     @Column(nullable = false)
     @Builder.Default
     private Double percentage = 0.0;
 
-    /** Sıralama (1 = birinci) */
     @Column(nullable = false)
     @Builder.Default
     private Integer rank = 0;

@@ -11,7 +11,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class CandidateResultResponse {
 
-    private Long candidateId;
+    private String selectionId;
+    private String optionId;
     private String candidateName;
     private String candidateDescription;
     private String candidateImageUrl;

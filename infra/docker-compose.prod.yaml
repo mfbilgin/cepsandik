@@ -125,37 +125,60 @@ services:
       - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
 
       # Crypto-Engine (gRPC — kriptografik işlemler)
-      - APP_CRYPTO_ENGINE_HOST=crypto-engine
+      - APP_CRYPTO_ENGINE_HOST=crypto-engine-kotlin
       - APP_CRYPTO_ENGINE_PORT=50051
-      - APP_GUARDIAN_COUNT=3
-      - APP_GUARDIAN_QUORUM=2
+      - APP_GUARDIAN_COUNT=5
+      - APP_GUARDIAN_QUORUM=3
+      - APP_BULLETIN_BOARD_URL=http://bulletin-board-service:8085
     depends_on:
       - db
       - rabbitmq
-      - crypto-engine
+      - crypto-engine-kotlin
+      - bulletin-board-service
     networks:
       - app-net
 
-  crypto-engine:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-crypto-engine:latest
-    container_name: crypto-engine
+  bulletin-board-service:
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-bulletin-board-service:latest
+    container_name: bulletin-board-service
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: 300m
     environment:
-      - CRYPTO_RSA_KEY_SIZE=2048
-      - CRYPTO_GRPC_PORT=50051
-      - CRYPTO_KEY_PATH=/data/keys
-      - CRYPTO_GRPC_MAX_WORKERS=10
-    volumes:
-      - crypto_keys:/data/keys
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/bulletindb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
+    depends_on:
+      - db
     networks:
       - app-net
-    healthcheck:
-      test: [ "CMD", "python", "-c", "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+
+  notification-service:
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-notification-service:latest
+    container_name: notification-service
+    restart: unless-stopped
+    mem_limit: 400m
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - EXPO_PUSH_API_URL=https://exp.host/--/api/v2/push/send
+      - APP_USER_SERVICE_URL=http://user-service:8081
+    depends_on:
+      - db
+      - rabbitmq
+    networks:
+      - app-net
+
+  crypto-engine-kotlin:
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-crypto-engine-kotlin:latest
+    container_name: crypto-engine-kotlin
+    restart: unless-stopped
+    mem_limit: 768m
+    networks:
+      - app-net
 
   db:
     image: postgres:15-alpine
@@ -225,5 +248,3 @@ volumes:
   redis_data:
   rabbitmq_data:
   backup_data:
-  crypto_keys:
-    name: cepsandik-crypto-keys

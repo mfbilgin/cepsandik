@@ -1,12 +1,12 @@
 export const theme = {
   colors: {
-    primary: '#1E3A8A', // Deep blue (trust, institutional)
-    secondary: '#3B82F6', // Lighter blue
-    success: '#10B981', // Emerald green
-    danger: '#EF4444', // Red
-    warning: '#F59E0B', // Amber
-    background: '#F9FAFB', // Off-white/gray
-    surface: '#FFFFFF', // White
+    primary: '#30364F', // Primary theme color
+    secondary: '#ACBAC4', // Secondary theme color
+    surface: '#F0F0DB', // Secondary background
+    background: '#E1D9BC', // Primary background
+    success: '#5D7A62', // Muted Sage Green
+    danger: '#A85751', // Dusty Red / Terra Cotta
+    warning: '#C18C44', // Ochre / Mustard
     text: '#111827', // Dark gray
     textSecondary: '#6B7280', // Medium gray
     border: '#E5E7EB', // Light gray
