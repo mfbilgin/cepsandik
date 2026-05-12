@@ -221,8 +221,12 @@ public class CryptoEngineClient {
     }
 
     /**
-     * Dağıtık deşifre paylarını toplayıp sonucu açıklar.
+     * @deprecated Sprint 5.C.2: gerçek E2E-V için 5-stage akışı (start +
+     * partial + getChallenges + response + finalize) kullan. Bu metot
+     * sunucunun guardian private key share'ini görmesini gerektirdiği için
+     * E2E-V garantisini bozar.
      */
+    @Deprecated
     public TallyElectionResponse decryptWithShares(
             String electionId,
             String context,
@@ -230,8 +234,7 @@ public class CryptoEngineClient {
             List<String> ballots,
             List<DecryptionShare> shares) {
 
-        log.info("DecryptWithShares gRPC çağrısı: election={}, shares={}", electionId, shares.size());
-
+        log.warn("decryptWithShares DEPRECATED: election={} — distributed 5-stage flow'a geç", electionId);
         try {
             DecryptWithSharesRequest request = DecryptWithSharesRequest.newBuilder()
                     .setElectionId(electionId)
@@ -240,14 +243,101 @@ public class CryptoEngineClient {
                     .addAllCiphertextBallots(ballots)
                     .addAllShares(shares)
                     .build();
-
-            return blockingStub
-                    .withDeadlineAfter(120, TimeUnit.SECONDS)
-                    .decryptWithShares(request);
-
+            return blockingStub.withDeadlineAfter(120, TimeUnit.SECONDS).decryptWithShares(request);
         } catch (StatusRuntimeException e) {
-            log.error("DecryptWithShares gRPC hatası: {}", e.getMessage());
             throw new RuntimeException("Deşifre işlemi başarısız: " + e.getMessage(), e);
+        }
+    }
+
+    // ===== Sprint 5.C.2 — Distributed 3-round threshold decryption =====
+
+    public com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionResponse startTallyDecryptionSession(
+            String electionId,
+            String electionGuardContext,
+            String electionManifest,
+            List<String> ciphertextBallots,
+            List<String> participatingGuardianIds) {
+        log.info("startTallyDecryptionSession: election={}, ballots={}, guardians={}",
+                electionId, ciphertextBallots.size(), participatingGuardianIds.size());
+        try {
+            var request = com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionRequest.newBuilder()
+                    .setElectionId(electionId)
+                    .setElectionGuardContext(electionGuardContext)
+                    .setElectionManifest(electionManifest)
+                    .addAllCiphertextBallots(ciphertextBallots)
+                    .addAllParticipatingGuardianIds(participatingGuardianIds)
+                    .build();
+            return blockingStub.withDeadlineAfter(60, TimeUnit.SECONDS)
+                    .startTallyDecryptionSession(request);
+        } catch (StatusRuntimeException e) {
+            log.error("startTallyDecryptionSession FAIL: {}", e.getMessage());
+            throw new RuntimeException("Tally session başlatılamadı: " + e.getMessage(), e);
+        }
+    }
+
+    public com.cepsandik.electionservice.grpc.SessionAckResponse submitPartialDecryption(
+            String sessionId, String guardianId, String partialsJson) {
+        try {
+            var request = com.cepsandik.electionservice.grpc.SubmitPartialDecryptionRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .setGuardianId(guardianId)
+                    .setPartialDecryptionsJson(partialsJson)
+                    .build();
+            return blockingStub.withDeadlineAfter(30, TimeUnit.SECONDS)
+                    .submitPartialDecryption(request);
+        } catch (StatusRuntimeException e) {
+            log.error("submitPartialDecryption FAIL: session={}, guardian={}: {}",
+                    sessionId, guardianId, e.getMessage());
+            throw new RuntimeException("Partial decryption submit hatası: " + e.getMessage(), e);
+        }
+    }
+
+    public com.cepsandik.electionservice.grpc.GetChallengesResponse getChallenges(
+            String sessionId, String guardianId) {
+        try {
+            var request = com.cepsandik.electionservice.grpc.GetChallengesRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .setGuardianId(guardianId)
+                    .build();
+            // Long-poll: server'da DecryptorDoerre Fiat-Shamir bitene kadar bekler (~30s).
+            return blockingStub.withDeadlineAfter(45, TimeUnit.SECONDS)
+                    .getChallenges(request);
+        } catch (StatusRuntimeException e) {
+            log.error("getChallenges FAIL: session={}, guardian={}: {}",
+                    sessionId, guardianId, e.getMessage());
+            throw new RuntimeException("Challenges alınamadı: " + e.getMessage(), e);
+        }
+    }
+
+    public com.cepsandik.electionservice.grpc.SessionAckResponse submitChallengeResponse(
+            String sessionId, String guardianId, String responsesJson) {
+        try {
+            var request = com.cepsandik.electionservice.grpc.SubmitChallengeResponseRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .setGuardianId(guardianId)
+                    .setChallengeResponsesJson(responsesJson)
+                    .build();
+            return blockingStub.withDeadlineAfter(30, TimeUnit.SECONDS)
+                    .submitChallengeResponse(request);
+        } catch (StatusRuntimeException e) {
+            log.error("submitChallengeResponse FAIL: session={}, guardian={}: {}",
+                    sessionId, guardianId, e.getMessage());
+            throw new RuntimeException("Challenge response submit hatası: " + e.getMessage(), e);
+        }
+    }
+
+    public TallyElectionResponse finalizeTallyDecryption(String sessionId) {
+        log.info("finalizeTallyDecryption: session={}", sessionId);
+        try {
+            var request = com.cepsandik.electionservice.grpc.FinalizeTallyDecryptionRequest.newBuilder()
+                    .setSessionId(sessionId)
+                    .build();
+            // Long-poll: DecryptorDoerre background thread bitsin (~60s).
+            return blockingStub.withDeadlineAfter(90, TimeUnit.SECONDS)
+                    .finalizeTallyDecryption(request);
+        } catch (StatusRuntimeException e) {
+            log.error("finalizeTallyDecryption FAIL: session={}: {}", sessionId, e.getMessage());
+            throw new RuntimeException("Tally finalize edilemedi: " + e.getMessage(), e);
         }
     }
 }

@@ -45,6 +45,7 @@ public class ElectionLifecycleService {
     private final ElectionNotificationProducer notificationProducer;
     private final CryptoEngineClient cryptoEngineClient;
     private final BulletinBoardClient bulletinBoardClient;
+    private final DistributedTallyService distributedTallyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.guardian.count:3}")
@@ -105,7 +106,16 @@ public class ElectionLifecycleService {
                         election.getId(), election.getTitle(), totalVotes);
 
                 if (guardianDevBypass) {
+                    // Legacy server-side trust mode (Sprint 4c) — sunucu private key share'leri görür
                     autoTally(election);
+                } else {
+                    // Gerçek E2E-V (Sprint 5.C.2) — distributed 3-round threshold decryption
+                    try {
+                        distributedTallyService.startSessionForElection(election);
+                    } catch (Exception e) {
+                        log.error("Distributed tally session başlatma hatası: electionId={}",
+                                election.getId(), e);
+                    }
                 }
 
                 List<String> memberUserIds = communityServiceClient

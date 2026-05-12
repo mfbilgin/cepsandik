@@ -108,6 +108,14 @@ public class Election {
     @Column(name = "tally_results", columnDefinition = "TEXT")
     private String tallyResults;
 
+    /** Distributed tally decryption session ID (Sprint 5.C.2.5). */
+    @Column(name = "tally_session_id", length = 64)
+    private String tallySessionId;
+
+    /** EncryptedTally JSON (Sprint 5.C.2.5) — mobile guardian pull eder. */
+    @Column(name = "encrypted_tally_json", columnDefinition = "TEXT")
+    private String encryptedTallyJson;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
