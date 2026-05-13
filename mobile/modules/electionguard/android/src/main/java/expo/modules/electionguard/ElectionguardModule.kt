@@ -36,7 +36,71 @@ class ElectionguardModule : Module() {
         throw t
       }
     }
+
+    // ===== Sprint 5.B — Guardian crypto (true E2E-V) =====
+
+    AsyncFunction("generateAllGuardianKeys") { input: GenerateGuardianKeysInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val result = GuardianCryptoNative.generateAllGuardianKeys(input.electionId, input.n, input.q)
+        Log.i("Electionguard", "AsyncFunction generateAllGuardianKeys returned in ${System.currentTimeMillis() - t0}ms")
+        result
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction generateAllGuardianKeys FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
+    AsyncFunction("computePartialDecryption") { input: ComputePartialDecryptionInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val partialsJson = GuardianCryptoNative.computePartialDecryption(
+            trusteeStateJson = input.trusteeStateJson,
+            encryptedTallyJson = input.encryptedTallyJson,
+            electionGuardContextJson = input.electionGuardContextJson,
+            electionManifestJson = input.electionManifestJson,
+        )
+        Log.i("Electionguard", "AsyncFunction computePartialDecryption returned in ${System.currentTimeMillis() - t0}ms")
+        partialsJson
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction computePartialDecryption FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
+    AsyncFunction("computeChallengeResponses") { input: ComputeChallengeResponsesInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val responsesJson = GuardianCryptoNative.computeChallengeResponses(
+            trusteeStateJson = input.trusteeStateJson,
+            challengesJson = input.challengesJson,
+        )
+        Log.i("Electionguard", "AsyncFunction computeChallengeResponses returned in ${System.currentTimeMillis() - t0}ms")
+        responsesJson
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction computeChallengeResponses FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
   }
+}
+
+class GenerateGuardianKeysInput : Record {
+  @Field var electionId: String = ""
+  @Field var n: Int = 0
+  @Field var q: Int = 0
+}
+
+class ComputePartialDecryptionInput : Record {
+  @Field var trusteeStateJson: String = ""
+  @Field var encryptedTallyJson: String = ""
+  @Field var electionGuardContextJson: String = ""
+  @Field var electionManifestJson: String = ""
+}
+
+class ComputeChallengeResponsesInput : Record {
+  @Field var trusteeStateJson: String = ""
+  @Field var challengesJson: String = ""
 }
 
 class EncryptBallotInput : Record {
