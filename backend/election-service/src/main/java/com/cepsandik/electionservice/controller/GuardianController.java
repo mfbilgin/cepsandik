@@ -62,36 +62,47 @@ public class GuardianController {
     }
 
     @PostMapping("/{electionId}/partial-decryption")
-    @Operation(summary = "Round 1: lokal partial decryption sonucunu yükle")
+    @Operation(summary = "Round 1: lokal partial decryption sonucunu yükle (body.guardianId opsiyonel; leader-mode'da trustee id)")
     public ResponseEntity<Map<String, Object>> submitPartialDecryption(
             @PathVariable Long electionId,
             @AuthenticationPrincipal String userId,
             @RequestBody Map<String, String> body) {
         String partialsJson = body.get("partialsJson");
+        String guardianId = body.get("guardianId"); // opsiyonel — leader-mode için
         if (partialsJson == null || partialsJson.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "partialsJson eksik"));
         }
-        return ResponseEntity.ok(distributedTallyService.submitPartialDecryption(electionId, userId, partialsJson));
+        return ResponseEntity.ok(distributedTallyService.submitPartialDecryption(electionId, userId, partialsJson, guardianId));
     }
 
     @GetMapping("/{electionId}/challenges")
     @Operation(summary = "Round 2: challenges'ı pull et (long-poll, quorum dolana kadar bekler)")
     public ResponseEntity<Map<String, Object>> getChallenges(
             @PathVariable Long electionId,
-            @AuthenticationPrincipal String userId) {
-        return ResponseEntity.ok(distributedTallyService.getChallenges(electionId, userId));
+            @AuthenticationPrincipal String userId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String guardianId) {
+        return ResponseEntity.ok(distributedTallyService.getChallenges(electionId, userId, guardianId));
     }
 
     @PostMapping("/{electionId}/challenge-response")
-    @Operation(summary = "Round 3: lokal challenge response'unu yükle (quorum dolarsa tally finalize)")
+    @Operation(summary = "Round 3: lokal challenge response'unu yükle (body.guardianId opsiyonel)")
     public ResponseEntity<Map<String, Object>> submitChallengeResponse(
             @PathVariable Long electionId,
             @AuthenticationPrincipal String userId,
             @RequestBody Map<String, String> body) {
         String responsesJson = body.get("responsesJson");
+        String guardianId = body.get("guardianId");
         if (responsesJson == null || responsesJson.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "responsesJson eksik"));
         }
-        return ResponseEntity.ok(distributedTallyService.submitChallengeResponse(electionId, userId, responsesJson));
+        return ResponseEntity.ok(distributedTallyService.submitChallengeResponse(electionId, userId, responsesJson, guardianId));
+    }
+
+    @PostMapping("/{electionId}/finalize-tally")
+    @Operation(summary = "Leader-mode: owner explicit tally finalize (auto tetikleme yoksa kullan)")
+    public ResponseEntity<Map<String, Object>> finalizeTally(
+            @PathVariable Long electionId,
+            @AuthenticationPrincipal String userId) {
+        return ResponseEntity.ok(distributedTallyService.finalizeByOwner(electionId, userId));
     }
 }

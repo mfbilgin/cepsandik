@@ -65,14 +65,25 @@ public class ElectionLifecycleService {
 
         for (Election election : electionsToStart) {
             try {
-                // === Crypto-Engine: ElectionGuard Key Ceremony ===
-                setupElectionGuard(election);
-
-                election.setStatus(ElectionStatus.ACTIVE);
-                electionRepository.save(election);
-
-                log.info("Seçim otomatik başlatıldı: id={}, title={}",
-                        election.getId(), election.getTitle());
+                if (guardianDevBypass) {
+                    // === Legacy: Server-side auto key ceremony (Sprint 4c trust model) ===
+                    setupElectionGuard(election);
+                    election.setStatus(ElectionStatus.ACTIVE);
+                    electionRepository.save(election);
+                    log.info("Seçim otomatik başlatıldı (dev-bypass auto-ceremony): id={}", election.getId());
+                } else if (election.getElectionGuardContext() != null
+                        && !election.getElectionGuardContext().isBlank()) {
+                    // === True E2E-V (Sprint 5.A): distributed-setup endpoint zaten
+                    //     CreateJointKey RPC çağırdı, context dolu — sadece status
+                    //     güncelle. start_time geçtiğinde ACTIVE'e geçer.
+                    election.setStatus(ElectionStatus.ACTIVE);
+                    electionRepository.save(election);
+                    log.info("Seçim otomatik başlatıldı (distributed setup hazır): id={}", election.getId());
+                } else {
+                    log.warn("Seçim başlatılamadı (distributed setup beklenir, electionGuardContext null): id={}",
+                            election.getId());
+                    continue;
+                }
 
                 List<String> memberUserIds = communityServiceClient
                         .getMemberUserIds(election.getCommunityId());

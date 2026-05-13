@@ -107,6 +107,23 @@ public class ElectionController {
         return ResponseEntity.ok(ApiResponse.success("Seçim iptal edildi", response));
     }
 
+    @Operation(summary = "Distributed setup: mobile guardian'lardan publicKeysJson topla, CreateJointKey çağır, ACTIVE'e geçir (Sprint 5.A leader-mode)")
+    @PostMapping("/{id}/distributed-setup")
+    public ResponseEntity<ApiResponse<ElectionResponse>> distributedSetup(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId,
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, java.util.List<String>> body) {
+
+        java.util.List<String> publicKeysJsons = body.get("publicKeysJsons");
+        java.util.List<String> guardianIds = body.get("guardianIds");
+        if (publicKeysJsons == null || guardianIds == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("publicKeysJsons ve guardianIds gerekli"));
+        }
+
+        ElectionResponse response = electionService.completeDistributedSetup(id, userId, publicKeysJsons, guardianIds);
+        return ResponseEntity.ok(ApiResponse.success("Distributed setup tamamlandı, seçim aktif", response));
+    }
+
     // ==================== CANDIDATE MANAGEMENT ====================
 
     @Operation(summary = "Seçime aday ekler")

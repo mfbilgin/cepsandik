@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Modal, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { tw } from '../../utils/tailwind';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
+import { ownerDistributedSetup, ownerDistributedTally } from '../../utils/distributedFlow';
 
 export const ElectionDetailScreen = () => {
     const route = useRoute<any>();
@@ -19,6 +20,8 @@ export const ElectionDetailScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isVerifying, setIsVerifying] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [isSettingUp, setIsSettingUp] = useState(false);
+    const [isTallying, setIsTallying] = useState(false);
     const { user } = useAuth();
 
     // Edit Dates State
@@ -105,6 +108,72 @@ export const ElectionDetailScreen = () => {
         } finally {
             setIsPublishing(false);
         }
+    };
+
+    const handleDistributedSetup = async () => {
+        if (!election) return;
+        Alert.alert(
+            'Distributed Setup',
+            'Bu cihazda 3 emanetçi (N=3, Q=2) yaratılacak. Private anahtarlar SADECE bu cihazda kalır, sunucuya GİTMEZ. Devam?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Yarat', onPress: async () => {
+                        setIsSettingUp(true);
+                        try {
+                            const result = await ownerDistributedSetup(electionId, 3, 2);
+                            showDialog({
+                                title: 'Setup başarılı',
+                                message: `N=3, Q=2 distributed setup tamamlandı (${result.elapsed}ms). Joint key: ${result.jointPublicKey.slice(0, 16)}...`,
+                                type: 'success',
+                            });
+                            await fetchDetail();
+                        } catch (e: any) {
+                            showDialog({
+                                title: 'Hata',
+                                message: 'Setup hatası: ' + (e.response?.data?.message || e.message),
+                                type: 'error',
+                            });
+                        } finally {
+                            setIsSettingUp(false);
+                        }
+                    }
+                },
+            ]
+        );
+    };
+
+    const handleDistributedTally = async () => {
+        if (!election) return;
+        Alert.alert(
+            'Distributed Tally',
+            'Q=2 emanetçi imzalayıp tally\'i açacak. Tüm partial decryption + challenge response bu cihazda hesaplanır. Devam?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Başlat', onPress: async () => {
+                        setIsTallying(true);
+                        try {
+                            const result = await ownerDistributedTally(electionId, 2);
+                            showDialog({
+                                title: 'Tally başarılı',
+                                message: `Tally açıldı (${result.elapsed}ms): ${result.tallyResults?.slice(0, 200) || ''}`,
+                                type: 'success',
+                            });
+                            await fetchDetail();
+                        } catch (e: any) {
+                            showDialog({
+                                title: 'Hata',
+                                message: 'Tally hatası: ' + (e.response?.data?.message || e.message),
+                                type: 'error',
+                            });
+                        } finally {
+                            setIsTallying(false);
+                        }
+                    }
+                },
+            ]
+        );
     };
 
     const handleUpdateDates = async () => {
@@ -281,6 +350,46 @@ export const ElectionDetailScreen = () => {
                         )}
                     </View>
                 )}
+
+                {/* Sprint 5.A — Owner Distributed Setup */}
+                {election.status === 'SCHEDULED'
+                    && String(election.createdBy) === String(user?.id) && (
+                        <View style={tw`mx-4 mb-4`}>
+                            <TouchableOpacity
+                                onPress={handleDistributedSetup}
+                                disabled={isSettingUp}
+                                style={tw`flex-row items-center justify-center gap-2 bg-purple-600 rounded-xl py-3.5 shadow-sm ${isSettingUp ? 'opacity-50' : ''}`}
+                            >
+                                <Ionicons name="key" size={18} color="#fff" />
+                                <Text style={tw`text-sm font-bold text-white`}>
+                                    {isSettingUp ? 'Setup ediliyor...' : '🔐 Distributed Setup (E2E-V)'}
+                                </Text>
+                            </TouchableOpacity>
+                            <Text style={tw`text-xs text-slate-500 mt-1 text-center`}>
+                                Cihazınızda 3 emanetçi yarat — private anahtarlar sunucuya GİTMEZ
+                            </Text>
+                        </View>
+                    )}
+
+                {/* Sprint 5.A — Owner Distributed Tally */}
+                {election.status === 'CLOSED'
+                    && String(election.createdBy) === String(user?.id) && (
+                        <View style={tw`mx-4 mb-4`}>
+                            <TouchableOpacity
+                                onPress={handleDistributedTally}
+                                disabled={isTallying}
+                                style={tw`flex-row items-center justify-center gap-2 bg-emerald-600 rounded-xl py-3.5 shadow-sm ${isTallying ? 'opacity-50' : ''}`}
+                            >
+                                <Ionicons name="calculator" size={18} color="#fff" />
+                                <Text style={tw`text-sm font-bold text-white`}>
+                                    {isTallying ? 'Tally hesaplanıyor...' : '📊 Tally İmzala + Aç'}
+                                </Text>
+                            </TouchableOpacity>
+                            <Text style={tw`text-xs text-slate-500 mt-1 text-center`}>
+                                2 emanetçi cihazınızda imzalar, sonuç sunucuda açılır
+                            </Text>
+                        </View>
+                    )}
 
                 {election.accessibility === 'PRIVATE' && (
                     <View style={tw`mx-4 mb-4 bg-orange-50 p-4 rounded-xl border border-orange-200`}>

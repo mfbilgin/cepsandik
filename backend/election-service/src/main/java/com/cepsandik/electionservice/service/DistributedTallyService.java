@@ -80,17 +80,31 @@ public class DistributedTallyService {
             return;
         }
 
-        // KEY_UPLOADED durumdaki guardian'lar bu tally'ye katılabilir.
-        List<ElectionGuardian> eligible = guardianRepository.findAllByElectionId(election.getId()).stream()
-                .filter(g -> g.getStatus() == ElectionGuardian.GuardianStatus.KEY_UPLOADED
-                        || g.getStatus() == ElectionGuardian.GuardianStatus.SHARE_UPLOADED)
-                .toList();
-        if (eligible.size() < election.getMinGuardiansThreshold()) {
-            log.warn("Yeterli guardian yok (eligible={}, quorum={}): electionId={}",
-                    eligible.size(), election.getMinGuardiansThreshold(), election.getId());
+        // Sprint 5.A leader-mode: participating_guardian_ids JSON kolonundan al
+        // (election_guardians tablosu sadece distributed multi-cihaz akışında dolu olur)
+        List<String> participatingIds;
+        try {
+            if (election.getParticipatingGuardianIds() != null
+                    && !election.getParticipatingGuardianIds().isBlank()) {
+                participatingIds = objectMapper.readValue(
+                        election.getParticipatingGuardianIds(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            } else {
+                // Fallback: election_guardians tablosundan (distributed multi-cihaz akışı)
+                List<ElectionGuardian> eligible = guardianRepository.findAllByElectionId(election.getId()).stream()
+                        .filter(g -> g.getStatus() == ElectionGuardian.GuardianStatus.KEY_UPLOADED
+                                || g.getStatus() == ElectionGuardian.GuardianStatus.SHARE_UPLOADED)
+                        .toList();
+                participatingIds = eligible.stream().map(g -> g.getUserId().toString()).toList();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("participating_guardian_ids parse hatası", e);
+        }
+        if (participatingIds.size() < election.getMinGuardiansThreshold()) {
+            log.warn("Yeterli guardian yok (participating={}, quorum={}): electionId={}",
+                    participatingIds.size(), election.getMinGuardiansThreshold(), election.getId());
             return;
         }
-        List<String> participatingIds = eligible.stream().map(g -> g.getUserId().toString()).toList();
 
         StartTallyDecryptionSessionResponse response = cryptoEngineClient.startTallyDecryptionSession(
                 String.valueOf(election.getId()),
@@ -120,7 +134,10 @@ public class DistributedTallyService {
         Election election = electionRepository.findById(electionId)
                 .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
         ElectionGuardian guardian = guardianRepository.findByElectionIdAndUserId(electionId, UUID.fromString(userId))
-                .orElseThrow(() -> ApiException.forbidden("Bu seçim için emanetçi değilsiniz"));
+                .orElse(null);
+        if (guardian == null && !election.getCreatedBy().equals(userId)) {
+            throw ApiException.forbidden("Bu seçim için emanetçi veya owner değilsiniz");
+        }
         if (election.getTallySessionId() == null) {
             throw ApiException.badRequest("Tally session henüz başlatılmadı");
         }
@@ -134,23 +151,33 @@ public class DistributedTallyService {
         );
     }
 
-    /** Round 1 — mobile partial decryption sonucunu submit eder. */
+    /**
+     * Round 1 — mobile partial decryption sonucunu submit eder.
+     * @param guardianIdOverride leader-mode'da trustee id (user_id yerine).
+     *                            null ise user_id kullanılır (multi-cihaz distributed).
+     */
     @Transactional
-    public Map<String, Object> submitPartialDecryption(Long electionId, String userId, String partialsJson) {
+    public Map<String, Object> submitPartialDecryption(Long electionId, String userId, String partialsJson,
+                                                        String guardianIdOverride) {
         Election election = electionRepository.findById(electionId)
                 .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
         ElectionGuardian guardian = guardianRepository.findByElectionIdAndUserId(electionId, UUID.fromString(userId))
-                .orElseThrow(() -> ApiException.forbidden("Bu seçim için emanetçi değilsiniz"));
+                .orElse(null);
+        if (guardian == null && !election.getCreatedBy().equals(userId)) {
+            throw ApiException.forbidden("Bu seçim için emanetçi veya owner değilsiniz");
+        }
         if (election.getTallySessionId() == null) {
             throw ApiException.badRequest("Tally session başlatılmadı");
         }
 
-        SessionAckResponse ack = cryptoEngineClient.submitPartialDecryption(
-                election.getTallySessionId(), guardian.getUserId().toString(), partialsJson);
+        String effectiveGuardianId = (guardianIdOverride != null && !guardianIdOverride.isBlank())
+                ? guardianIdOverride
+                : (guardian != null ? guardian.getUserId().toString() : userId);
 
-        if (ack.getAccepted()) {
-            // Mevcut enum sınırlı — yeni durumu reuse ediyoruz; SHARE_UPLOADED
-            // semantiğini "round 1 tamam" olarak yeniden yorumluyoruz.
+        SessionAckResponse ack = cryptoEngineClient.submitPartialDecryption(
+                election.getTallySessionId(), effectiveGuardianId, partialsJson);
+
+        if (ack.getAccepted() && guardian != null) {
             guardian.setStatus(ElectionGuardian.GuardianStatus.SHARE_UPLOADED);
             guardianRepository.save(guardian);
         }
@@ -158,17 +185,24 @@ public class DistributedTallyService {
     }
 
     /** Round 2 — mobile challenges'ı pull eder (long-poll). */
-    public Map<String, Object> getChallenges(Long electionId, String userId) {
+    public Map<String, Object> getChallenges(Long electionId, String userId, String guardianIdOverride) {
         Election election = electionRepository.findById(electionId)
                 .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
         ElectionGuardian guardian = guardianRepository.findByElectionIdAndUserId(electionId, UUID.fromString(userId))
-                .orElseThrow(() -> ApiException.forbidden("Bu seçim için emanetçi değilsiniz"));
+                .orElse(null);
+        if (guardian == null && !election.getCreatedBy().equals(userId)) {
+            throw ApiException.forbidden("Bu seçim için emanetçi veya owner değilsiniz");
+        }
         if (election.getTallySessionId() == null) {
             throw ApiException.badRequest("Tally session başlatılmadı");
         }
 
+        String effectiveGuardianId = (guardianIdOverride != null && !guardianIdOverride.isBlank())
+                ? guardianIdOverride
+                : (guardian != null ? guardian.getUserId().toString() : userId);
+
         GetChallengesResponse response = cryptoEngineClient.getChallenges(
-                election.getTallySessionId(), guardian.getUserId().toString());
+                election.getTallySessionId(), effectiveGuardianId);
         return Map.of("challengesJson", response.getChallengesJson());
     }
 
@@ -178,27 +212,34 @@ public class DistributedTallyService {
      * otomatik finalize'ı tetikler.
      */
     @Transactional
-    public Map<String, Object> submitChallengeResponse(Long electionId, String userId, String responsesJson) {
+    public Map<String, Object> submitChallengeResponse(Long electionId, String userId, String responsesJson,
+                                                       String guardianIdOverride) {
         Election election = electionRepository.findById(electionId)
                 .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
         ElectionGuardian guardian = guardianRepository.findByElectionIdAndUserId(electionId, UUID.fromString(userId))
-                .orElseThrow(() -> ApiException.forbidden("Bu seçim için emanetçi değilsiniz"));
+                .orElse(null);
+        if (guardian == null && !election.getCreatedBy().equals(userId)) {
+            throw ApiException.forbidden("Bu seçim için emanetçi veya owner değilsiniz");
+        }
         if (election.getTallySessionId() == null) {
             throw ApiException.badRequest("Tally session başlatılmadı");
         }
 
-        SessionAckResponse ack = cryptoEngineClient.submitChallengeResponse(
-                election.getTallySessionId(), guardian.getUserId().toString(), responsesJson);
+        String effectiveGuardianId = (guardianIdOverride != null && !guardianIdOverride.isBlank())
+                ? guardianIdOverride
+                : (guardian != null ? guardian.getUserId().toString() : userId);
 
-        if (ack.getAccepted()) {
-            // SHARE_UPLOADED zaten Round 1 sonrası set edildi; Round 3 için
-            // ayrı bir enum değeri eklemek gerekecek (Sprint 5.C.2.5 iyileştirme).
-            // Şimdilik flag olarak coefficient_proofs alanını "DONE" yaparız.
+        SessionAckResponse ack = cryptoEngineClient.submitChallengeResponse(
+                election.getTallySessionId(), effectiveGuardianId, responsesJson);
+
+        // Leader-mode tek user N trustee için N kez submit eder; tally finalize
+        // tetikleyici sayacı bu durumda anlamsız (count by guardian id). Pratik
+        // basitleştirme: submit her zaman başarılı, finalize'ı body request etsin.
+        if (ack.getAccepted() && guardian != null) {
             guardian.setCoefficientProofs("ROUND_3_DONE");
             guardianRepository.save(guardian);
         }
 
-        // Tally finalize'i async kontrol et (tüm guardian'lar Round 3 tamamlamış olabilir).
         long doneCount = guardianRepository.findAllByElectionId(electionId).stream()
                 .filter(g -> "ROUND_3_DONE".equals(g.getCoefficientProofs()))
                 .count();
@@ -223,6 +264,27 @@ public class DistributedTallyService {
             }
         }
         return result;
+    }
+
+    /**
+     * Leader-mode: owner explicit finalize eder (auto-finalize tetiklenmez
+     * çünkü election_guardians boş). Idempotent — zaten yapıldıysa no-op.
+     */
+    @Transactional
+    public Map<String, Object> finalizeByOwner(Long electionId, String userId) {
+        Election election = electionRepository.findById(electionId)
+                .orElseThrow(() -> ApiException.notFound("Seçim bulunamadı"));
+        if (!election.getCreatedBy().equals(userId)) {
+            throw ApiException.forbidden("Sadece seçim sahibi finalize edebilir");
+        }
+        if (election.getTallySessionId() == null) {
+            throw ApiException.badRequest("Tally session yok");
+        }
+        if (election.getTallyProof() != null && !election.getTallyProof().isBlank()) {
+            return Map.of("alreadyFinalized", true, "tallyResults", election.getTallyResults());
+        }
+        finalize(election);
+        return Map.of("alreadyFinalized", false, "tallyResults", election.getTallyResults());
     }
 
     /** Quorum sonrası tally finalize — KMP DecryptorDoerre tamamladı. */

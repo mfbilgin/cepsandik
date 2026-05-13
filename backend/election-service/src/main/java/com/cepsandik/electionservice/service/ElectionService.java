@@ -301,6 +301,113 @@ public class ElectionService {
         return electionMapper.toDetailedResponse(saved);
     }
 
+    // ==================== DISTRIBUTED SETUP (Sprint 5.A leader-mode) ====================
+
+    /**
+     * Leader-mode distributed setup. Owner (election creator) cihazında lokal
+     * KMP ile N trustee yaratıp publicKeysJsons'ı toplu olarak buraya yollar;
+     * server CreateJointKey RPC ile joint key + ElectionInitialized üretir,
+     * election ACTIVE'e geçer.
+     *
+     * Sunucu private polynomial katsayılarını VEYA key share'leri ASLA görmez.
+     * Tüm private state mobile SecureStore'da kalır.
+     */
+    @Transactional
+    public ElectionResponse completeDistributedSetup(Long electionId, String userId,
+                                                      List<String> publicKeysJsons,
+                                                      List<String> guardianIds) {
+        Election election = findElectionOrThrow(electionId);
+        checkOwnership(election, userId);
+
+        if (!election.isScheduled()) {
+            throw ApiException.badRequest("Sadece SCHEDULED durumdaki seçimler için distributed setup yapılabilir");
+        }
+        if (publicKeysJsons == null || publicKeysJsons.isEmpty()) {
+            throw ApiException.badRequest("publicKeysJsons gerekli");
+        }
+        if (guardianIds == null || guardianIds.size() != publicKeysJsons.size()) {
+            throw ApiException.badRequest("guardianIds size publicKeysJsons size ile eşleşmeli");
+        }
+
+        int n = publicKeysJsons.size();
+        int q = election.getMinGuardiansThreshold() != null ? election.getMinGuardiansThreshold() : guardianQuorum;
+        if (q < 1 || q > n) {
+            throw ApiException.badRequest("Geçersiz quorum: q=" + q + ", n=" + n);
+        }
+
+        // Candidates → ContestInfo
+        List<Candidate> candidates = candidateRepository
+                .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(electionId);
+        if (candidates.isEmpty()) {
+            throw ApiException.badRequest("Seçim için aday/seçenek tanımlı değil");
+        }
+        com.cepsandik.electionservice.grpc.ContestInfo contestInfo =
+                com.cepsandik.electionservice.grpc.ContestInfo.newBuilder()
+                        .setContestId("contest_" + electionId)
+                        .addAllSelectionIds(candidates.stream().map(c -> "candidate_" + c.getId()).toList())
+                        .setNumberElected(election.getMaxSelections() != null ? election.getMaxSelections() : 1)
+                        .setName(election.getTitle())
+                        .build();
+
+        // PublicKeys proto build — guardian_id + coefficient_proofs (KMP PublicKeysJson serialize).
+        // public_key + commitments alanları KMP'de coefficient_proofs[0].public_key tarafından
+        // taşındığı için boş bırakılır.
+        List<com.cepsandik.electionservice.grpc.GuardianPublicKey> publicKeys = new java.util.ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            publicKeys.add(com.cepsandik.electionservice.grpc.GuardianPublicKey.newBuilder()
+                    .setGuardianId(guardianIds.get(i))
+                    .setPublicKey("")
+                    .setCommitments("")
+                    .setCoefficientProofs(extractCoefficientProofsFromPublicKeysJson(publicKeysJsons.get(i)))
+                    .build());
+        }
+
+        com.cepsandik.electionservice.grpc.CreateJointKeyResponse response = cryptoEngineClient.createJointKey(
+                String.valueOf(electionId),
+                n, q, publicKeys, List.of(contestInfo),
+                election.getStartTime() != null ? election.getStartTime().toString() : "",
+                election.getEndTime() != null ? election.getEndTime().toString() : "");
+
+        election.setElectionGuardContext(response.getElectionGuardContext());
+        election.setElectionManifest(response.getElectionManifest());
+        election.setElectionPublicKey(response.getJointPublicKey());
+        try {
+            election.setParticipatingGuardianIds(new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(guardianIds));
+        } catch (Exception e) {
+            throw new RuntimeException("participatingGuardianIds JSON serialize hatası", e);
+        }
+        election.setStatus(ElectionStatus.ACTIVE);
+        Election saved = electionRepository.save(election);
+
+        log.info("Distributed setup tamamlandı: electionId={}, n={}, q={}, jointPublicKey={}...",
+                electionId, n, q, response.getJointPublicKey().substring(0, Math.min(40, response.getJointPublicKey().length())));
+
+        return electionMapper.toDetailedResponse(saved);
+    }
+
+    /**
+     * PublicKeysJson string'inden `coefficient_proofs` alanını ayıklar.
+     * KMP `PublicKeysJson`: { guardianId, guardianXCoordinate, coefficientProofs: [...] }
+     * Bizim CreateJointKeyService bunu yine PublicKeysJson olarak kullanmak
+     * isteyebilir; mevcut proto sözleşmesi `coefficient_proofs` (List<SchnorrProofJson>)
+     * JSON string bekliyor. Burada full PublicKeysJson'dan coefficientProofs alt-array'ini
+     * çıkarırız.
+     */
+    private String extractCoefficientProofsFromPublicKeysJson(String publicKeysJson) {
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(publicKeysJson);
+            com.fasterxml.jackson.databind.JsonNode coefArray = root.get("coefficientProofs");
+            if (coefArray == null || coefArray.isNull()) {
+                throw ApiException.badRequest("PublicKeysJson içinde coefficientProofs eksik");
+            }
+            return coefArray.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("PublicKeysJson parse hatası: " + e.getMessage(), e);
+        }
+    }
+
     // ==================== CANDIDATE MANAGEMENT ====================
 
     @Transactional

@@ -116,6 +116,10 @@ public class Election {
     @Column(name = "encrypted_tally_json", columnDefinition = "TEXT")
     private String encryptedTallyJson;
 
+    /** Distributed setup'ta CreateJointKey'e katılan guardian ID'leri (JSON list). */
+    @Column(name = "participating_guardian_ids", columnDefinition = "TEXT")
+    private String participatingGuardianIds;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
