@@ -68,6 +68,65 @@ class ElectionguardModule : Module() {
       }
     }
 
+    // ===== Sprint 5.A.distributed — gerçek dağıtık key ceremony (3 fonksiyon) =====
+
+    AsyncFunction("generateSingleGuardianKey") { input: GenerateSingleGuardianKeyInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val result = GuardianCryptoNative.generateSingleGuardianKey(
+            electionId = input.electionId,
+            guardianId = input.guardianId,
+            xCoordinate = input.xCoordinate,
+            n = input.n,
+            q = input.q,
+        )
+        Log.i("Electionguard", "AsyncFunction generateSingleGuardianKey returned in ${System.currentTimeMillis() - t0}ms")
+        result
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction generateSingleGuardianKey FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
+    AsyncFunction("computeEncryptedKeyShares") { input: ComputeEncryptedKeySharesInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val result = GuardianCryptoNative.computeEncryptedKeyShares(
+            guardianId = input.guardianId,
+            xCoordinate = input.xCoordinate,
+            n = input.n,
+            q = input.q,
+            secretPolynomialJson = input.secretPolynomialJson,
+            peerPublicKeysJsons = input.peerPublicKeysJsons,
+        )
+        Log.i("Electionguard", "AsyncFunction computeEncryptedKeyShares returned in ${System.currentTimeMillis() - t0}ms")
+        result
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction computeEncryptedKeyShares FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
+    AsyncFunction("finalizeGuardianKey") { input: FinalizeGuardianKeyInput ->
+      val t0 = System.currentTimeMillis()
+      try {
+        val result = GuardianCryptoNative.finalizeGuardianKey(
+            guardianId = input.guardianId,
+            xCoordinate = input.xCoordinate,
+            n = input.n,
+            q = input.q,
+            secretPolynomialJson = input.secretPolynomialJson,
+            peerPublicKeysJsons = input.peerPublicKeysJsons,
+            encryptedSharesForMeJsons = input.encryptedSharesForMeJsons,
+        )
+        Log.i("Electionguard", "AsyncFunction finalizeGuardianKey returned in ${System.currentTimeMillis() - t0}ms")
+        result
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction finalizeGuardianKey FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
     AsyncFunction("computeChallengeResponses") { input: ComputeChallengeResponsesInput ->
       val t0 = System.currentTimeMillis()
       try {
@@ -101,6 +160,33 @@ class ComputePartialDecryptionInput : Record {
 class ComputeChallengeResponsesInput : Record {
   @Field var trusteeStateJson: String = ""
   @Field var challengesJson: String = ""
+}
+
+class GenerateSingleGuardianKeyInput : Record {
+  @Field var electionId: String = ""
+  @Field var guardianId: String = ""
+  @Field var xCoordinate: Int = 0
+  @Field var n: Int = 0
+  @Field var q: Int = 0
+}
+
+class ComputeEncryptedKeySharesInput : Record {
+  @Field var guardianId: String = ""
+  @Field var xCoordinate: Int = 0
+  @Field var n: Int = 0
+  @Field var q: Int = 0
+  @Field var secretPolynomialJson: String = ""
+  @Field var peerPublicKeysJsons: List<String> = emptyList()
+}
+
+class FinalizeGuardianKeyInput : Record {
+  @Field var guardianId: String = ""
+  @Field var xCoordinate: Int = 0
+  @Field var n: Int = 0
+  @Field var q: Int = 0
+  @Field var secretPolynomialJson: String = ""
+  @Field var peerPublicKeysJsons: List<String> = emptyList()
+  @Field var encryptedSharesForMeJsons: List<String> = emptyList()
 }
 
 class EncryptBallotInput : Record {

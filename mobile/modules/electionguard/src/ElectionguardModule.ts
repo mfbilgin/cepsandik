@@ -47,6 +47,56 @@ export type ComputeChallengeResponsesInput = {
   challengesJson: string;
 };
 
+// Sprint 5.A.distributed — gerçek dağıtık key ceremony (3 stateless fonksiyon)
+
+export type GenerateSingleGuardianKeyInput = {
+  electionId: string;
+  guardianId: string;
+  xCoordinate: number;
+  n: number;
+  q: number;
+};
+
+export type GenerateSingleGuardianKeyResult = {
+  electionId: string;
+  guardianId: string;
+  xCoordinate: number;
+  publicKeysJson: string;        // sunucuya (POST /public-key)
+  secretPolynomialJson: string;  // SecureStore (SECRET)
+  elapsedMs: number;
+};
+
+export type ComputeEncryptedKeySharesInput = {
+  guardianId: string;
+  xCoordinate: number;
+  n: number;
+  q: number;
+  secretPolynomialJson: string;
+  peerPublicKeysJsons: string[];
+};
+
+export type EncryptedKeyShareOut = {
+  toGuardianId: string;
+  encryptedKeyShareJson: string;
+};
+
+export type FinalizeGuardianKeyInput = {
+  guardianId: string;
+  xCoordinate: number;
+  n: number;
+  q: number;
+  secretPolynomialJson: string;
+  peerPublicKeysJsons: string[];
+  encryptedSharesForMeJsons: string[];
+};
+
+export type FinalizeGuardianKeyResult = {
+  guardianId: string;
+  trusteeStateJson: string; // SecureStore (SECRET, tally için)
+  isComplete: boolean;
+  elapsedMs: number;
+};
+
 declare class ElectionguardModule extends NativeModule {
   encryptBallot(input: EncryptBallotInput): Promise<EncryptBallotResult>;
 
@@ -54,6 +104,11 @@ declare class ElectionguardModule extends NativeModule {
   generateAllGuardianKeys(input: GenerateGuardianKeysInput): Promise<GenerateGuardianKeysResult>;
   computePartialDecryption(input: ComputePartialDecryptionInput): Promise<string>; // DecryptResponseJson
   computeChallengeResponses(input: ComputeChallengeResponsesInput): Promise<string>; // ChallengeResponsesJson
+
+  // Sprint 5.A.distributed — gerçek dağıtık key ceremony
+  generateSingleGuardianKey(input: GenerateSingleGuardianKeyInput): Promise<GenerateSingleGuardianKeyResult>;
+  computeEncryptedKeyShares(input: ComputeEncryptedKeySharesInput): Promise<EncryptedKeyShareOut[]>;
+  finalizeGuardianKey(input: FinalizeGuardianKeyInput): Promise<FinalizeGuardianKeyResult>;
 }
 
 // JSI-loaded native module. iOS placeholder şu an reject ediyor.

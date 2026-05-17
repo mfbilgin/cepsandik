@@ -20,9 +20,17 @@
 import * as SecureStore from 'expo-secure-store';
 import Electionguard, {
     GenerateGuardianKeysResult,
+    EncryptedKeyShareOut,
 } from '../../modules/electionguard/src/ElectionguardModule';
 
 const trusteeStateStorageKey = (electionId: number | string) => `guardian_trustee_states_${electionId}`;
+
+// Sprint 5.A.distributed — her cihaz 1 trustee. Tek kalıcı secret polinom;
+// final TrusteeJson tally için. SecureStore Android 2KB/item limiti — polinom
+// ve trustee state büyük olabilir, gerekirse parçalama eklenebilir (şimdilik
+// N=1 trustee/cihaz olduğu için tek item yeterli, ~2-3KB).
+const polyKey = (electionId: number | string) => `guardian_poly_${electionId}`;
+const trusteeKey = (electionId: number | string) => `guardian_trustee_${electionId}`;
 
 export const guardianCrypto = {
     /**
@@ -123,6 +131,132 @@ export const guardianCrypto = {
             await SecureStore.deleteItemAsync(`${trusteeStateStorageKey(electionId)}_${i}`);
         }
         await SecureStore.deleteItemAsync(`${trusteeStateStorageKey(electionId)}_count`);
+    },
+
+    // ============ Sprint 5.A.distributed — her cihaz 1 trustee ============
+
+    /**
+     * Round 1: Tek guardian key üret. Gizli polinomu SecureStore'a yazar,
+     * sunucuya gidecek PublicKeysJson'u döner.
+     */
+    async generateSingleGuardianKey(
+        electionId: number | string,
+        guardianId: string,
+        xCoordinate: number,
+        n: number,
+        q: number,
+    ): Promise<string> {
+        const res = await Electionguard.generateSingleGuardianKey({
+            electionId: String(electionId),
+            guardianId,
+            xCoordinate,
+            n,
+            q,
+        });
+        await SecureStore.setItemAsync(polyKey(electionId), res.secretPolynomialJson);
+        return res.publicKeysJson;
+    },
+
+    /**
+     * Round 2: Peer public key'lerden her peer için şifreli key share üret.
+     * Polinom SecureStore'dan okunur (trustee reconstruct edilir).
+     */
+    async computeEncryptedKeyShares(
+        electionId: number | string,
+        guardianId: string,
+        xCoordinate: number,
+        n: number,
+        q: number,
+        peerPublicKeysJsons: string[],
+    ): Promise<EncryptedKeyShareOut[]> {
+        const secretPolynomialJson = await SecureStore.getItemAsync(polyKey(electionId));
+        if (!secretPolynomialJson) {
+            throw new Error(`Polinom bulunamadı (electionId=${electionId}) — önce Round 1`);
+        }
+        return Electionguard.computeEncryptedKeyShares({
+            guardianId,
+            xCoordinate,
+            n,
+            q,
+            secretPolynomialJson,
+            peerPublicKeysJsons,
+        });
+    },
+
+    /**
+     * Round 3: Bana gelen şifreli share'lerle ceremony'i finalize et.
+     * Final TrusteeJson (tally secret'ı) SecureStore'a yazılır.
+     */
+    async finalizeGuardianKey(
+        electionId: number | string,
+        guardianId: string,
+        xCoordinate: number,
+        n: number,
+        q: number,
+        peerPublicKeysJsons: string[],
+        encryptedSharesForMeJsons: string[],
+    ): Promise<boolean> {
+        const secretPolynomialJson = await SecureStore.getItemAsync(polyKey(electionId));
+        if (!secretPolynomialJson) {
+            throw new Error(`Polinom bulunamadı (electionId=${electionId}) — önce Round 1`);
+        }
+        const res = await Electionguard.finalizeGuardianKey({
+            guardianId,
+            xCoordinate,
+            n,
+            q,
+            secretPolynomialJson,
+            peerPublicKeysJsons,
+            encryptedSharesForMeJsons,
+        });
+        await SecureStore.setItemAsync(trusteeKey(electionId), res.trusteeStateJson);
+        return res.isComplete;
+    },
+
+    /** Tally için tek-trustee state'i (Round 3'te yazılan). */
+    async getDistributedTrusteeState(electionId: number | string): Promise<string | null> {
+        return SecureStore.getItemAsync(trusteeKey(electionId));
+    },
+
+    /**
+     * Distributed tally Round 1 — cihazın kendi TrusteeJson'u ile lokal partial
+     * decryption. (Leader-mode computePartialDecryption index-bazlı; bu tek-trustee
+     * distributed key — guardian_trustee_{electionId}.)
+     */
+    async computeDistributedPartialDecryption(
+        electionId: number | string,
+        encryptedTallyJson: string,
+        electionGuardContextJson: string,
+        electionManifestJson: string,
+    ): Promise<string> {
+        const trusteeStateJson = await SecureStore.getItemAsync(trusteeKey(electionId));
+        if (!trusteeStateJson) {
+            throw new Error(`Trustee state yok (electionId=${electionId}) — ceremony tamamlanmadı`);
+        }
+        return Electionguard.computePartialDecryption({
+            trusteeStateJson,
+            encryptedTallyJson,
+            electionGuardContextJson,
+            electionManifestJson,
+        });
+    },
+
+    /** Distributed tally Round 2/3 — cihazın TrusteeJson'u ile challenge response. */
+    async computeDistributedChallengeResponses(
+        electionId: number | string,
+        challengesJson: string,
+    ): Promise<string> {
+        const trusteeStateJson = await SecureStore.getItemAsync(trusteeKey(electionId));
+        if (!trusteeStateJson) {
+            throw new Error(`Trustee state yok (electionId=${electionId}) — ceremony tamamlanmadı`);
+        }
+        return Electionguard.computeChallengeResponses({ trusteeStateJson, challengesJson });
+    },
+
+    /** STATE_RESET: ceremony sıfırlandı — lokal polinom + trustee state sil. */
+    async deleteDistributedState(electionId: number | string) {
+        await SecureStore.deleteItemAsync(polyKey(electionId));
+        await SecureStore.deleteItemAsync(trusteeKey(electionId));
     },
 
     // ============ Sprint 5.A öncesi backward-compat stub'lar ============

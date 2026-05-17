@@ -48,6 +48,19 @@ public class ElectionGuardian {
     @Column(name = "decryption_share", columnDefinition = "TEXT")
     private String decryptionShare;
 
+    /** KMP polinom x koordinatı (1-indexed). Guardian sırası yerine açık kolon. */
+    @Column(name = "x_coordinate")
+    private Integer xCoordinate;
+
+    /** Asıl guardian mı yedek mi (Sprint 5.A.distributed STATE_RESET). */
+    @Column(name = "is_backup", nullable = false)
+    @Builder.Default
+    private boolean isBackup = false;
+
+    /** Yedek listesindeki sıra (is_backup=true ise). Düşük = önce devreye girer. */
+    @Column(name = "backup_order")
+    private Integer backupOrder;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -62,8 +75,12 @@ public class ElectionGuardian {
     private LocalDateTime updatedAt;
 
     public enum GuardianStatus {
-        PENDING,        // Davet edildi/seçildi
-        KEY_UPLOADED,   // Kamu anahtarı ve taahhütler yüklendi
-        SHARE_UPLOADED  // Deşifre payı yüklendi
+        PENDING,         // Davet edildi/seçildi, henüz aksiyon yok
+        KEY_UPLOADED,    // Round 1: public key + Schnorr proof yüklendi
+        KEYS_EXCHANGED,  // Round 2: peer'lara encrypted key share üretildi/relay'lendi
+        READY,           // Round 3: ceremony finalize, trustee state cihazda — ceremony-complete ack
+        DECLINED,        // Guardian "bu seçime katılmıyorum" dedi (cezasız)
+        TIMEOUT,         // Süre doldu, aksiyon yok (abandonment — SUSPENDED_30D tetikler)
+        SHARE_UPLOADED   // Tally aşaması: partial decryption gönderildi (distributed tally)
     }
 }

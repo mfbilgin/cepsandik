@@ -1,0 +1,18 @@
+# Sprint 5.E UAT override — 3-cihaz dağıtık key ceremony.
+# Kullanım:
+#   docker compose -f docker-compose.local.yaml -f docker-compose.uat.yaml up -d
+#
+# N=3 / Q=2: 3 cihaz (2 emülatör + 1 gerçek cihaz) = 3 guardian.
+# Not: N=3 üretim politikasında kaldırıldı (koalisyon koruması sıfır), ama
+# protokol UAT'si için yeterli — kripto SelfTest'te N=3 zaten kanıtlandı.
+services:
+  election-service:
+    environment:
+      - APP_GUARDIAN_COUNT=3
+      - APP_GUARDIAN_QUORUM=2
+      - APP_GUARDIAN_DEV_BYPASS=false
+      - APP_GUARDIAN_CEREMONY_HOURS=4
+      # Önceden eksik infra config: election-service community-service'i
+      # localhost:8083 ile çağırıyordu (Docker'da Connection refused →
+      # selectGuardians 0 üye). Docker service adına sabitle.
+      - APP_COMMUNITY_SERVICE_URL=http://community-service:8083

@@ -45,4 +45,11 @@ dependencies {
   implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2'
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
   implementation 'org.jetbrains.kotlinx:kotlinx-datetime:0.5.0'
+
+  // egklib-all.jar fat-jar'a shade edilirken kotlin-result'ın .kotlin_module
+  // metadata'sı kayboldu → class'ları (Result/Ok/Err) çözülüyor ama top-level
+  // fonksiyonları (unwrap/...) çözülmüyordu. compileOnly: derleme zamanı
+  // metadata buradan (backend ile aynı 1.1.18); runtime class'lar zaten
+  // egklib-all.jar içinde → APK'ya paketlenmez, duplicate-class çakışması yok.
+  compileOnly 'com.michael-bull.kotlin-result:kotlin-result:1.1.18'
 }

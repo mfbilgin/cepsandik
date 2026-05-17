@@ -14,7 +14,11 @@ const generateCorrelationId = () => {
     });
 };
 
-export const API_URL = 'http://10.0.2.2:8088/v1';
+// Emülatör loopback'i (10.0.2.2) sadece AVD'den çalışır. Çok-cihaz UAT için
+// EXPO_PUBLIC_API_URL ile host LAN IP'si verilir (emülatör + gerçek cihaz
+// aynı ağda erişir). Tanımsızsa emülatör varsayılanına düşer.
+export const API_URL =
+    process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8088/v1';
 
 export const api = axios.create({
     baseURL: API_URL,

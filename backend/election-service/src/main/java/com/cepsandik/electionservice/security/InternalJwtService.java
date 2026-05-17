@@ -41,4 +41,24 @@ public class InternalJwtService {
         Claims claims = validateToken(token);
         return claims.getIssuer();
     }
+
+    /**
+     * Service-to-service internal token üretir. Gateway'in ürettiği token ile
+     * aynı sözleşme: HS256 + iss="api-gateway" + uid claim. Alıcı servislerin
+     * InternalJwtFilter'ı bunu kabul eder. (election→community/user iç çağrıları
+     * için; gateway sadece client→service yolunu kapsıyor — bu yol distributed
+     * guardian seçimi gelene kadar dev-bypass arkasında dormant'tı.)
+     */
+    public String generateServiceToken() {
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .issuer("api-gateway")
+                .claim("uid", "election-service")
+                .claim("roles", java.util.List.of("SERVICE"))
+                .claim("scope", java.util.List.of("community:read", "user:read"))
+                .issuedAt(new java.util.Date(now))
+                .expiration(new java.util.Date(now + 60_000))
+                .signWith(secretKey)
+                .compact();
+    }
 }

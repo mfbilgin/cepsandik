@@ -77,6 +77,10 @@ public class ElectionService {
     @Value("${app.guardian.dev-bypass:false}")
     private boolean guardianDevBypass;
 
+    /** Key ceremony süresi (saat) — publish'ten itibaren setup_deadline. */
+    @Value("${app.guardian.ceremony-hours:4}")
+    private int ceremonyHours;
+
     // ==================== ELECTION CRUD ====================
 
     @Transactional
@@ -169,6 +173,9 @@ public class ElectionService {
 
         election.setStatus(ElectionStatus.SCHEDULED);
         election.setMinGuardiansThreshold(guardianQuorum);
+        // Key ceremony deadline — publish + ceremonyHours (adaptif yedek formülü taban alır)
+        election.setSetupDeadline(java.time.Instant.now().plusSeconds(ceremonyHours * 3600L));
+        election.setSubstitutionCount(0);
         Election saved = electionRepository.save(election);
 
         log.info("Seçim yayınlandı: id={}, status=SCHEDULED, guardians_selected={}", id, guardianCount);
@@ -210,11 +217,15 @@ public class ElectionService {
                 .limit(guardianCount)
                 .toList();
 
-        // ElectionGuardian kayıtlarını oluştur
+        // ElectionGuardian kayıtlarını oluştur — xCoordinate 1-indexed, KMP
+        // polinom x'i. KMP guardianId = "trustee{xCoordinate}" (mobile bu
+        // şemayı kullanır; ceremony boyunca tutarlı olmalı).
+        int xCoord = 1;
         for (String gUserId : selectedIds) {
             ElectionGuardian guardian = ElectionGuardian.builder()
                     .election(election)
                     .userId(java.util.UUID.fromString(gUserId))
+                    .xCoordinate(xCoord++)
                     .status(ElectionGuardian.GuardianStatus.PENDING)
                     .build();
             guardianRepository.save(guardian);

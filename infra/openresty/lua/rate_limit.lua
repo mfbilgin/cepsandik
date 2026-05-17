@@ -4,13 +4,16 @@
 local _M = {}
 
 -- Configuration
+-- NOT (Sprint 5.E UAT): 3 emülatör tek Docker bridge IP'sinden gelir
+-- (paylaşımlı IP bucket) ve dağıtık ceremony 3-round çok sayıda çağrı
+-- yapar. UAT/geliştirme için limitler yükseltildi. Prod'da düşürülmeli.
 local RATE_LIMITS = {
     -- Auth endpoints (login, register, password reset)
-    auth = { limit = 10, window = 60 },  -- 10 requests per minute
+    auth = { limit = 1000, window = 60 },
     -- Protected endpoints (authenticated users)
-    protected = { limit = 60, window = 60 },  -- 60 requests per minute
+    protected = { limit = 2000, window = 60 },
     -- Default (IP-based for unknown endpoints)
-    default = { limit = 30, window = 60 }  -- 30 requests per minute
+    default = { limit = 1000, window = 60 }
 }
 
 local shared_dict = ngx.shared.rate_limit

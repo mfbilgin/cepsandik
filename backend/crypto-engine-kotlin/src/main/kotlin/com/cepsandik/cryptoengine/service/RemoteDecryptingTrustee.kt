@@ -35,7 +35,10 @@ class RemoteDecryptingTrustee(
     private val guardianId: String,
     private val xCoord: Int,
     private val publicKey: ElementModP,
-    private val timeoutMs: Long = 300_000L,
+    // Manuel çok-cihaz UAT: guardian'ların login+tap senkronu kaçınılmaz
+    // olarak 5 dk'yı aşar (3 kişi 3 cihaz). decrypt() ilk-partial bekleme
+    // penceresi geniş tutulur; challenge tarafı zaten client retry-loop'lu.
+    private val timeoutMs: Long = 1_800_000L,
 ) : DecryptingTrusteeIF {
 
     private val log = LoggerFactory.getLogger(javaClass)

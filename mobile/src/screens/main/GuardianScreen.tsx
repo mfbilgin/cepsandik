@@ -1,142 +1,263 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { tw } from '../../utils/tailwind';
 import { theme } from '../../utils/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { guardianCrypto } from '../../utils/guardianCrypto';
-import axios from 'axios';
+import { api } from '../../services/api';
+import { runKeyCeremony, declineCeremony, runDistributedTally } from '../../utils/distributedKeyCeremony';
+
+type GuardianStatus =
+    | 'PENDING' | 'KEY_UPLOADED' | 'KEYS_EXCHANGED' | 'READY'
+    | 'DECLINED' | 'TIMEOUT' | 'SHARE_UPLOADED';
 
 type GuardianDuty = {
     electionId: number;
     electionTitle: string;
     communityName?: string;
-    status: 'PENDING' | 'KEY_UPLOADED' | 'SHARE_UPLOADED';
-    electionStatus: 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'CLOSED_WAITING_DECRYPTION' | 'ARCHIVED';
-    encryptedTallyChallenge?: string | null;
+    status: GuardianStatus;
+    electionStatus: 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'CLOSED_WAITING_DECRYPTION' | 'ARCHIVED' | 'CANCELLED';
+};
+
+const STATUS_LABEL: Record<GuardianStatus, { text: string; color: string }> = {
+    PENDING:        { text: 'ANAHTAR BEKLENİYOR', color: 'text-orange-500' },
+    KEY_UPLOADED:   { text: 'ANAHTAR YÜKLENDİ (devam)', color: 'text-amber-500' },
+    KEYS_EXCHANGED: { text: 'PAYLAR DEĞİŞTİRİLDİ (devam)', color: 'text-amber-500' },
+    READY:          { text: 'HAZIR ✓', color: 'text-green-600' },
+    DECLINED:       { text: 'KATILMADINIZ', color: 'text-slate-400' },
+    TIMEOUT:        { text: 'SÜRE DOLDU', color: 'text-red-500' },
+    SHARE_UPLOADED: { text: 'TALLY PAYI GÖNDERİLDİ', color: 'text-green-600' },
 };
 
 export const GuardianScreen = () => {
     const [duties, setDuties] = useState<GuardianDuty[]>([]);
     const [loading, setLoading] = useState(true);
+    const [busyId, setBusyId] = useState<number | null>(null);
 
-    const fetchDuties = async () => {
+    const fetchDuties = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/v1/guardians/my-duties');
+            const response = await api.get('/guardians/my-duties');
             setDuties(response.data);
-        } catch (error) {
-            console.error("Görevler yüklenemedi:", error);
-            Alert.alert("Hata", "Emanetçi görevleriniz yüklenemedi.");
+        } catch (error: any) {
+            console.error('Görevler yüklenemedi:', error);
+            Alert.alert('Hata', 'Emanetçi görevleriniz yüklenemedi.');
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchDuties();
     }, []);
 
-    const handleKeySubmission = async (duty: GuardianDuty) => {
-        try {
-            Alert.alert(
-                "Anahtar Üretimi",
-                "Bu seçim için kriptografik anahtarlarınız üretilip sisteme yüklenecektir. Devam edilsin mi?",
-                [
-                    { text: "Vazgeç", style: "cancel" },
-                    { text: "Üret ve Yükle", onPress: async () => {
-                        try {
-                            const { publicKey, commitments, coefficientProofs } = await guardianCrypto.generateAndSaveKeyPair(duty.electionId);
-                            
-                            await axios.post(`/api/v1/guardians/${duty.electionId}/keys`, { 
-                                publicKey, 
-                                commitments,
-                                coefficientProofs 
-                            });
-                            
-                            Alert.alert("Başarılı", "Anahtarlarınız ve Schnorr kanıtlarınız başarıyla yüklendi.");
-                            fetchDuties();
-                        } catch (err: any) {
-                            Alert.alert("Hata", "Anahtarlar yüklenemedi: " + (err.response?.data?.message || err.message));
-                        }
-                    }}
-                ]
-            );
-        } catch (error) {
-            Alert.alert("Hata", "Anahtar üretimi sırasında bir sorun oluştu.");
-        }
-    };
+    useEffect(() => { fetchDuties(); }, [fetchDuties]);
 
-    const handleDecryption = async (duty: GuardianDuty) => {
-        try {
-            Alert.alert(
-                "Hesaplamayı Başlat",
-                "Seçim sonuçlarını doğrulamak için deşifre payınız gönderilecektir.",
-                [
-                    { text: "Vazgeç", style: "cancel" },
-                    { text: "Onayla", onPress: async () => {
+    // ---- Eylem 1: Anahtar Yükle (3 round tek tıkla, idempotent) ----
+    const handleKeyCeremony = (duty: GuardianDuty) => {
+        Alert.alert(
+            'Anahtar Üretimi',
+            'Cihazınızda kriptografik anahtarınız üretilecek ve diğer emanetçilerle ' +
+            'şifreli pay değişimi yapılacak. Gizli anahtarınız cihazınızdan ÇIKMAZ. ' +
+            'Tüm emanetçiler hazır olunca seçim aktifleşir. Devam edilsin mi?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Üret ve Yükle',
+                    onPress: async () => {
+                        setBusyId(duty.electionId);
                         try {
-                            // Backendden election detaylarını alıp encrypted_tally'yi çekmek gerekir
-                            // Şimdilik sadece API çağrısını hazırla
-                            if (!duty.encryptedTallyChallenge) {
-                                throw new Error("Desifre edilecek encrypted tally challenge bulunamadi.");
+                            const r = await runKeyCeremony(duty.electionId);
+                            if (r.completed) {
+                                Alert.alert(
+                                    'Hazır ✓',
+                                    r.jointKeyGenerated
+                                        ? 'Tüm emanetçiler tamamlandı, ortak anahtar üretildi ve seçim hazır.'
+                                        : 'Anahtar göreviniz tamamlandı. Diğer emanetçiler bekleniyor.',
+                                );
+                            } else {
+                                Alert.alert(
+                                    'Devam ediliyor',
+                                    'Bu adım tamamlandı ama diğer emanetçiler henüz hazır değil. ' +
+                                    'Lütfen bir süre sonra tekrar "Anahtar Yükle" deyin (kaldığınız yerden devam eder).',
+                                );
                             }
-                            const share = await guardianCrypto.generateDecryptionShare(duty.electionId, duty.encryptedTallyChallenge);
-                            
-                            await axios.post(`/api/v1/guardians/${duty.electionId}/decrypt`, { shareData: share });
-
-                            Alert.alert("Başarılı", "Hesaplama onayı gönderildi.");
                             fetchDuties();
                         } catch (err: any) {
-                            Alert.alert("Hata", "Deşifre payı gönderilemedi.");
+                            Alert.alert('Hata', 'Anahtar adımı başarısız: ' +
+                                (err.response?.data?.message || err.message));
+                        } finally {
+                            setBusyId(null);
                         }
-                    }}
-                ]
-            );
-        } catch (error) {
-            Alert.alert("Hata", "Hesaplama onayı gönderilemedi.");
-        }
+                    },
+                },
+            ],
+        );
     };
 
-    const renderDuty = ({ item }: { item: GuardianDuty }) => (
-        <View style={tw`bg-surface p-4 rounded-xl mb-4 border border-slate-100 shadow-sm`}>
-            <View style={tw`flex-row justify-between items-start`}>
-                <View style={tw`flex-1`}>
-                    <Text style={tw`text-primary font-bold text-lg`}>{item.electionTitle}</Text>
-                    {item.communityName && <Text style={tw`text-secondary text-sm`}>{item.communityName}</Text>}
-                </View>
-                <View style={tw`bg-primary/10 px-2 py-1 rounded`}>
-                    <Text style={tw`text-primary text-[10px] font-bold`}>EMANETÇİ #1 (SİZ)</Text>
-                </View>
-            </View>
+    // ---- Eylem 2: Bu seçime katılmıyorum (cezasız, STATE_RESET) ----
+    const handleDecline = (duty: GuardianDuty) => {
+        Alert.alert(
+            'Bu seçime katılmıyorum',
+            'Göreviniz yedek emanetçiye aktarılacak. Bu CEZASIZDIR — dürüst ' +
+            'iletişim ödüllendirilir. Ceremony yeniden başlar (diğer emanetçiler ' +
+            'anahtarlarını tekrar üretir). Onaylıyor musunuz?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Katılmıyorum',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setBusyId(duty.electionId);
+                        try {
+                            const r = await declineCeremony(duty.electionId);
+                            if (r.cancelled) {
+                                Alert.alert('Seçim İptal Edildi',
+                                    'Maksimum yedek değişim sayısına ulaşıldı, seçim iptal edildi.');
+                            } else if (r.backupAvailable === false) {
+                                Alert.alert('Yedek Yok',
+                                    r.message || 'Yedek havuzu tükendi, yönetici müdahalesi gerekli.');
+                            } else {
+                                Alert.alert('Tamam', 'Göreviniz yedeğe aktarıldı. Teşekkürler.');
+                            }
+                            fetchDuties();
+                        } catch (err: any) {
+                            Alert.alert('Hata', 'İşlem başarısız: ' +
+                                (err.response?.data?.message || err.message));
+                        } finally {
+                            setBusyId(null);
+                        }
+                    },
+                },
+            ],
+        );
+    };
 
-            <View style={tw`mt-4 flex-row items-center justify-between`}>
-                <View>
+    // ---- Tally: distributed pay hesaplama (CLOSED) ----
+    const handleTally = (duty: GuardianDuty) => {
+        Alert.alert(
+            'Hesaplamaya Katıl',
+            'Cihazınızdaki gizli anahtar payınızla şifreli toplam üzerinde kısmi ' +
+            'çözme yapılacak. Anahtarınız cihazdan ÇIKMAZ — sunucu sadece ' +
+            'payları birleştirir (Q-of-N). Devam?',
+            [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                    text: 'Hesapla',
+                    onPress: async () => {
+                        setBusyId(duty.electionId);
+                        try {
+                            const r = await runDistributedTally(duty.electionId);
+                            if (r.finalized) {
+                                Alert.alert('Sonuç Açıklandı ✓',
+                                    'Yeterli pay toplandı, seçim sonucu hesaplandı.');
+                            } else if (r.submitted) {
+                                Alert.alert('Pay Gönderildi',
+                                    'Hesaplama payınız gönderildi. Diğer emanetçiler ' +
+                                    'bekleniyor — yeterli sayıya ulaşınca sonuç açılır.');
+                            }
+                            fetchDuties();
+                        } catch (err: any) {
+                            Alert.alert('Hata', 'Tally adımı başarısız: ' +
+                                (err.response?.data?.message || err.message));
+                        } finally {
+                            setBusyId(null);
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    // ---- Eylem 3: Daha Sonra Hatırlat ----
+    const handleRemindLater = () => {
+        Alert.alert('Tamam', 'Görevi daha sonra tamamlayabilirsiniz. Süre dolmadan ' +
+            'anahtarınızı yükleyin — aksi halde görev yedeğe geçer.');
+    };
+
+    const isCeremonyPhase = (d: GuardianDuty) =>
+        d.electionStatus === 'SCHEDULED' &&
+        (d.status === 'PENDING' || d.status === 'KEY_UPLOADED' || d.status === 'KEYS_EXCHANGED');
+
+    const renderDuty = ({ item }: { item: GuardianDuty }) => {
+        const label = STATUS_LABEL[item.status] ?? { text: item.status, color: 'text-secondary' };
+        const busy = busyId === item.electionId;
+        return (
+            <View style={tw`bg-surface p-4 rounded-xl mb-4 border border-slate-100 shadow-sm`}>
+                <View style={tw`flex-row justify-between items-start`}>
+                    <View style={tw`flex-1`}>
+                        <Text style={tw`text-primary font-bold text-lg`}>{item.electionTitle}</Text>
+                        {item.communityName && (
+                            <Text style={tw`text-secondary text-sm`}>{item.communityName}</Text>
+                        )}
+                    </View>
+                    <View style={tw`bg-primary/10 px-2 py-1 rounded`}>
+                        <Text style={tw`text-primary text-[10px] font-bold`}>EMANETÇİ (SİZ)</Text>
+                    </View>
+                </View>
+
+                <View style={tw`mt-3`}>
                     <Text style={tw`text-xs text-secondary mb-1`}>Durum:</Text>
-                    <Text style={tw`text-sm font-semibold ${item.status === 'PENDING' ? 'text-orange-500' : 'text-green-500'}`}>
-                        {item.status === 'PENDING' ? 'ANAHTAR BEKLENİYOR' : 'HAZIR'}
-                    </Text>
+                    <Text style={tw`text-sm font-semibold ${label.color}`}>{label.text}</Text>
                 </View>
-                
-                {item.electionStatus === 'SCHEDULED' && item.status === 'PENDING' && (
-                    <TouchableOpacity 
-                        onPress={() => handleKeySubmission(item)}
-                        style={tw`bg-primary px-4 py-2 rounded-lg`}
-                    >
-                        <Text style={tw`text-white font-bold`}>Anahtar Yükle</Text>
-                    </TouchableOpacity>
+
+                {busy && (
+                    <View style={tw`mt-3 flex-row items-center`}>
+                        <ActivityIndicator color={theme.colors.primary} size="small" />
+                        <Text style={tw`text-secondary text-xs ml-2`}>İşleniyor — kapatmayın…</Text>
+                    </View>
                 )}
 
-                {item.electionStatus === 'CLOSED' && item.status !== 'SHARE_UPLOADED' && (
-                    <TouchableOpacity 
-                        onPress={() => handleDecryption(item)}
-                        style={tw`bg-accent-blue px-4 py-2 rounded-lg`}
-                    >
-                        <Text style={tw`text-white font-bold`}>Hesaplat</Text>
-                    </TouchableOpacity>
+                {!busy && isCeremonyPhase(item) && (
+                    <View style={tw`mt-4`}>
+                        <TouchableOpacity
+                            onPress={() => handleKeyCeremony(item)}
+                            style={tw`bg-primary px-4 py-3 rounded-lg mb-2`}
+                        >
+                            <Text style={tw`text-white font-bold text-center`}>
+                                {item.status === 'PENDING' ? 'Anahtar Yükle' : 'Devam Et'}
+                            </Text>
+                        </TouchableOpacity>
+                        <View style={tw`flex-row`}>
+                            <TouchableOpacity
+                                onPress={() => handleRemindLater()}
+                                style={tw`flex-1 bg-slate-100 px-3 py-2 rounded-lg mr-2`}
+                            >
+                                <Text style={tw`text-secondary font-semibold text-center text-xs`}>
+                                    Daha Sonra Hatırlat
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => handleDecline(item)}
+                                style={tw`flex-1 bg-red-50 px-3 py-2 rounded-lg`}
+                            >
+                                <Text style={tw`text-red-500 font-semibold text-center text-xs`}>
+                                    Katılmıyorum
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {!busy && item.status === 'READY' && item.electionStatus === 'SCHEDULED' && (
+                    <Text style={tw`mt-3 text-green-600 text-xs`}>
+                        ✓ Göreviniz tamam. Diğer emanetçiler hazır olunca seçim aktifleşir.
+                    </Text>
+                )}
+
+                {!busy && (item.electionStatus === 'CLOSED'
+                        || item.electionStatus === 'CLOSED_WAITING_DECRYPTION') && (
+                    <View style={tw`mt-4`}>
+                        <Text style={tw`text-xs text-secondary mb-2`}>
+                            Seçim kapandı. Sonucun açılması için pay hesaplamanıza ihtiyaç var.
+                            Gizli anahtarınız cihazınızdan ÇIKMAZ.
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => handleTally(item)}
+                            style={tw`bg-accent-blue px-4 py-3 rounded-lg`}
+                        >
+                            <Text style={tw`text-white font-bold text-center`}>Hesaplamaya Katıl</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
             </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <View style={tw`flex-1 bg-background p-4 pt-12`}>
@@ -153,11 +274,15 @@ export const GuardianScreen = () => {
             {loading ? (
                 <ActivityIndicator color={theme.colors.primary} style={tw`mt-20`} />
             ) : duties.length > 0 ? (
-                <FlatList 
+                <FlatList
                     data={duties}
                     keyExtractor={(item) => item.electionId.toString()}
                     renderItem={renderDuty}
                     contentContainerStyle={tw`pb-20`}
+                    refreshControl={
+                        <RefreshControl refreshing={loading} onRefresh={fetchDuties}
+                            tintColor={theme.colors.primary} />
+                    }
                 />
             ) : (
                 <View style={tw`flex-1 justify-center items-center opacity-40`}>

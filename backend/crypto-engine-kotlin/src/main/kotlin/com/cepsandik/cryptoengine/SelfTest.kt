@@ -28,8 +28,14 @@ import electionguard.input.RandomBallotProvider
 import electionguard.json2.import
 import electionguard.json2.importDecryptingTrustee
 import electionguard.json2.publishJson
+import electionguard.json2.PublicKeysJson
+import electionguard.json2.EncryptedKeyShareJson
+import electionguard.json2.TrusteeJson
+import electionguard.json2.ElementModQJson
 import electionguard.keyceremony.KeyCeremonyTrustee
+import electionguard.keyceremony.KeyCeremonyResults
 import electionguard.keyceremony.keyCeremonyExchange
+import electionguard.keyceremony.regeneratePolynomial
 import electionguard.tally.AccumulateTally
 import electionguard.publish.makeConsumer
 import electionguard.publish.makePublisher
@@ -37,6 +43,7 @@ import electionguard.publish.readElectionRecord
 import electionguard.util.ErrorMessages
 import electionguard.verifier.VerifyEncryptedBallots
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -143,6 +150,15 @@ class SelfTest(
             }
         }
         log.info("[SELFTEST proxy] total elapsed = {} ms", proxyMs)
+
+        val dkrMs = measureTimeMillis {
+            try {
+                runDistributedReconstructionTest()
+            } catch (t: Throwable) {
+                log.error("[SELFTEST dkr] FAIL — exception: {}", t.message, t)
+            }
+        }
+        log.info("[SELFTEST dkr] total elapsed = {} ms", dkrMs)
     }
 
     /**
@@ -642,6 +658,212 @@ class SelfTest(
                 alice, bob, q, n)
         } else {
             log.error("[SELFTEST dist FAIL] alice={}, bob={} (expected 2, 1), all={}",
+                alice, bob, tallies)
+        }
+    }
+
+    /**
+     * Sprint 5.A.distributed kanıtı — gerçek dağıtık key ceremony, stateless
+     * reconstruction, SADECE steps 1-4 (plaintext keyShareFor/receiveKeyShare
+     * round'u sunucudan geçemeyeceği için ATLANIR).
+     *
+     * Mobile akışın birebir simülasyonu:
+     *   - "SecureStore" per device: SADECE polinom katsayıları kalıcı
+     *   - "Server" opak relay: PublicKeysJson + EncryptedKeyShareJson (şifreli)
+     *   - Her round'da trustee objesi atılır, polinomdan yeniden kurulur
+     *     (regeneratePolynomial) — app 24h pencerede restart olabilir senaryosu
+     *
+     * Round 1 (generateSingleGuardianKey): fresh trustee → polinom SecureStore'a,
+     *          PublicKeysJson server'a. Trustee atılır.
+     * Round 2 (computeEncryptedKeyShares): reconstruct → receivePublicKeys(peers)
+     *          → encryptedKeyShareFor(peer) → server'a (opak). Trustee atılır.
+     * Round 3 (finalizeGuardianKey): reconstruct → receivePublicKeys(peers) +
+     *          receiveEncryptedKeyShare(bana gelenler) → publishJson() → TrusteeJson
+     *          SecureStore'a (tally secret). isComplete()==false beklenir (5-6 skip).
+     * Server: KeyCeremonyResults(publicKeysList) → joint key + ElectionInitialized.
+     * Tally: Q TrusteeJson → DecryptorDoerre → assert alice=2, bob=1.
+     */
+    private fun runDistributedReconstructionTest() {
+        log.info("[SELFTEST dkr] starting — distributed ceremony, reconstruction, steps 1-4 only")
+        val electionId = "selftest-dkr-1"
+        val ballotStyleId = "ballot-style-1"
+        val n = 3
+        val q = 2
+        val group = productionGroup()
+        val json = ElectionGuardSerde.json
+
+        // ---- Manifest + config (sunucu/UI tarafı public) ----
+        val builder = ManifestBuilder("election-$electionId")
+        builder.addStyle(ballotStyleId, "district-1")
+        builder.addContest("contest-presidential")
+            .setVoteVariationType(electionguard.ballot.Manifest.VoteVariationType.one_of_m, 1, 1)
+            .setGpunit("district-1")
+            .addSelection("candidate-alice", "candidate-alice")
+            .addSelection("candidate-bob", "candidate-bob")
+            .done()
+        val manifest = builder.build()
+        val manifestBytes = ElectionGuardSerde.manifestToJson(manifest).encodeToByteArray()
+        val config = makeElectionConfig(
+            protocolVersion, group.constants, n, q, manifestBytes,
+            chainConfirmationCodes = false,
+            baux0 = "cepsandik".encodeToByteArray(),
+            metadata = mapOf(
+                "CreatedBy" to "SelfTest.runDistributedReconstructionTest",
+                "CreatedOn" to getSystemDate(),
+                "ElectionId" to electionId,
+            ),
+        )
+
+        val guardianIds = (1..n).map { "trustee$it" }
+
+        // ---- Simüle stores ----
+        val secureStorePoly = HashMap<String, String>()        // gid -> JSON List<ElementModQJson> (SECRET)
+        val secureStoreTrustee = HashMap<String, String>()      // gid -> final TrusteeJson (SECRET)
+        val serverPublicKeys = HashMap<String, String>()        // gid -> PublicKeysJson (public)
+        val serverEncShares = ArrayList<Triple<String, String, String>>() // (from, to, EncryptedKeyShareJson) opak
+
+        fun reconstruct(gid: String, xCoord: Int): KeyCeremonyTrustee {
+            val coeffs = json.decodeFromString<List<ElementModQJson>>(secureStorePoly[gid]!!)
+                .map { it.import(group) ?: error("coeff import FAIL for $gid") }
+            val poly = group.regeneratePolynomial(gid, q, coeffs)
+            return KeyCeremonyTrustee(group, gid, xCoord, n, q, poly)
+        }
+
+        // ===== ROUND 1: generateSingleGuardianKey (her cihaz) =====
+        guardianIds.forEachIndexed { idx, gid ->
+            val xCoord = idx + 1
+            val t = KeyCeremonyTrustee(group, gid, xCoord, nguardians = n, quorum = q)
+            secureStorePoly[gid] = json.encodeToString(t.polynomial.coefficients.map { it.publishJson() })
+            serverPublicKeys[gid] = json.encodeToString(t.publicKeys().unwrap().publishJson())
+            // cihaz trustee objesini ATAR (sadece polinom SecureStore'da)
+        }
+        log.info("[SELFTEST dkr] round 1 done — {} polinom persisted, public keys uploaded", n)
+
+        // ===== ROUND 2: computeEncryptedKeyShares (reconstruct) =====
+        guardianIds.forEachIndexed { idx, gid ->
+            val xCoord = idx + 1
+            val t = reconstruct(gid, xCoord)
+            guardianIds.filter { it != gid }.forEach { peer ->
+                val pk = json.decodeFromString<PublicKeysJson>(serverPublicKeys[peer]!!)
+                    .import(group, ErrorMessages("pk-$peer")) ?: error("pk import FAIL $peer")
+                val rr = t.receivePublicKeys(pk)
+                if (rr is Err) error("receivePublicKeys($peer) FAIL: ${rr.error}")
+            }
+            guardianIds.filter { it != gid }.forEach { peer ->
+                val eks = t.encryptedKeyShareFor(peer).unwrap()
+                serverEncShares.add(Triple(gid, peer, json.encodeToString(eks.publishJson())))
+            }
+        }
+        log.info("[SELFTEST dkr] round 2 done — {} encrypted shares relayed (opaque)", serverEncShares.size)
+
+        // ===== ROUND 3: finalizeGuardianKey (reconstruct) =====
+        guardianIds.forEachIndexed { idx, gid ->
+            val xCoord = idx + 1
+            val t = reconstruct(gid, xCoord)
+            guardianIds.filter { it != gid }.forEach { peer ->
+                val pk = json.decodeFromString<PublicKeysJson>(serverPublicKeys[peer]!!)
+                    .import(group, ErrorMessages("pk2-$peer")) ?: error("pk import FAIL $peer")
+                t.receivePublicKeys(pk)
+            }
+            serverEncShares.filter { it.second == gid }.forEach { (from, _, eksJson) ->
+                val eks = json.decodeFromString<EncryptedKeyShareJson>(eksJson)
+                    .import(group) ?: error("eks import FAIL from=$from to=$gid")
+                val rr = t.receiveEncryptedKeyShare(eks)
+                if (rr is Err) error("receiveEncryptedKeyShare(from=$from) FAIL: ${rr.error}")
+            }
+            // STEPS 5-6 ATLANIR (keyShareFor/receiveKeyShare plaintext — sunucudan geçmez)
+            val tj = t.publishJson()
+            secureStoreTrustee[gid] = json.encodeToString(tj)
+            log.info("[SELFTEST dkr] {} finalized: isComplete={} (false beklenir, 5-6 skip), trusteeJson OK",
+                gid, t.isComplete())
+        }
+
+        // ===== SERVER: public-only joint key (KeyCeremonyResults) =====
+        val publicKeysList = guardianIds.map { gid ->
+            json.decodeFromString<PublicKeysJson>(serverPublicKeys[gid]!!)
+                .import(group, ErrorMessages("jk-$gid")) ?: error("jk pk import FAIL $gid")
+        }
+        val ceremonyResults = KeyCeremonyResults(publicKeysList)
+        val electionInit = ceremonyResults.makeElectionInitialized(
+            config, mapOf("flow" to "dkr-selftest"),
+        )
+        log.info("[SELFTEST dkr] joint key produced server-side, jointKey={}...",
+            electionInit.jointPublicKey().toString().take(40))
+
+        // ===== Encrypt 3 ballots (2 Alice, 1 Bob) → tally =====
+        val outDir = "$outputDir/dkr-roundtrip"
+        File(outDir).mkdirs()
+        val publisher = makePublisher(outDir, true, true)
+        publisher.writeElectionInitialized(electionInit)
+        val encryptor = AddEncryptedBallot(
+            group, manifest,
+            electionInit.config.chainConfirmationCodes,
+            electionInit.config.configBaux0,
+            electionInit.jointPublicKey(),
+            electionInit.extendedBaseHash,
+            "dkr-test-device",
+            outputDir = outDir,
+            invalidDir = "$outDir/invalid",
+            isJson = true,
+        )
+        val votes = listOf("candidate-alice", "candidate-alice", "candidate-bob")
+        votes.forEachIndexed { idx, choice ->
+            val plaintext = electionguard.ballot.PlaintextBallot(
+                "dkr-ballot-$idx", ballotStyleId,
+                listOf(electionguard.ballot.PlaintextBallot.Contest(
+                    "contest-presidential", 0,
+                    listOf(
+                        electionguard.ballot.PlaintextBallot.Selection(
+                            "candidate-alice", 0, if (choice == "candidate-alice") 1 else 0),
+                        electionguard.ballot.PlaintextBallot.Selection(
+                            "candidate-bob", 1, if (choice == "candidate-bob") 1 else 0),
+                    ),
+                )),
+            )
+            val ebErrs = ErrorMessages("encrypt-$idx")
+            val cb = encryptor.encrypt(plaintext, ebErrs) ?: error("encrypt fail: $ebErrs")
+            encryptor.cast(cb.confirmationCode)
+        }
+        encryptor.close()
+
+        val consumer = makeConsumer(group, outDir, false)
+        val record = readElectionRecord(consumer)
+        val encryptedBallots = record.encryptedAllBallots { true }.toList()
+        val accumulator = AccumulateTally(
+            group, manifest, "tally-$electionId",
+            electionInit.extendedBaseHash, electionInit.jointPublicKey(),
+        )
+        encryptedBallots.forEach { ballot ->
+            accumulator.addCastBallot(ballot, ErrorMessages("acc-${ballot.ballotId}"))
+        }
+        val encryptedTally = accumulator.build()
+
+        // ===== THRESHOLD DECRYPT — Q TrusteeJson SecureStore'dan =====
+        val errs = ErrorMessages("dkr")
+        val decryptingTrustees = guardianIds.take(q).map { gid ->
+            json.decodeFromString<TrusteeJson>(secureStoreTrustee[gid]!!)
+                .importDecryptingTrustee(group, errs.nested("dt-$gid"))
+                ?: error("trustee $gid importDecryptingTrustee FAIL: $errs")
+        }
+        val guardians = Guardians(group, electionInit.guardians)
+        val decryptor = DecryptorDoerre(
+            group, electionInit.extendedBaseHash, electionInit.jointPublicKey(),
+            guardians, decryptingTrustees,
+        )
+        val decryptErrs = ErrorMessages("decrypt-$electionId")
+        val decryptedTally = with(decryptor) {
+            encryptedTally.decrypt(decryptErrs)
+        } ?: error("threshold decrypt FAIL: $decryptErrs")
+
+        val tallies = decryptedTally.contests.flatMap { it.selections }
+            .associate { it.selectionId to it.tally }
+        val alice = tallies["candidate-alice"] ?: -1
+        val bob = tallies["candidate-bob"] ?: -1
+        if (alice == 2 && bob == 1) {
+            log.info("[SELFTEST dkr OK] alice={}, bob={} — distributed reconstruction (steps 1-4 only) " +
+                "Q={} of N={} threshold decrypt OK", alice, bob, q, n)
+        } else {
+            log.error("[SELFTEST dkr FAIL] alice={}, bob={} (expected 2, 1), all={}",
                 alice, bob, tallies)
         }
     }

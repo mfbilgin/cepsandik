@@ -120,6 +120,15 @@ public class Election {
     @Column(name = "participating_guardian_ids", columnDefinition = "TEXT")
     private String participatingGuardianIds;
 
+    /** Key ceremony bitiş zamanı (Sprint 5.A.distributed adaptif yedek formülü). */
+    @Column(name = "setup_deadline")
+    private Instant setupDeadline;
+
+    /** STATE_RESET sayacı — backup devreye girince artar; K=2 cap → CANCELLED. */
+    @Column(name = "substitution_count", nullable = false)
+    @Builder.Default
+    private Integer substitutionCount = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
