@@ -31,6 +31,12 @@ const trusteeStateStorageKey = (electionId: number | string) => `guardian_truste
 // N=1 trustee/cihaz olduğu için tek item yeterli, ~2-3KB).
 const polyKey = (electionId: number | string) => `guardian_poly_${electionId}`;
 const trusteeKey = (electionId: number | string) => `guardian_trustee_${electionId}`;
+// Faz 2.7 — tally app-ölümü dayanıklılığı: hangi fazda kaldık (resume/idempotent).
+const tallyCpKey = (electionId: number | string) => `guardian_tally_cp_${electionId}`;
+
+export type TallyCheckpoint = {
+    phase: 'PARTIAL_SUBMITTED' | 'CHALLENGE_SUBMITTED' | 'DONE';
+};
 
 export const guardianCrypto = {
     /**
@@ -257,6 +263,25 @@ export const guardianCrypto = {
     async deleteDistributedState(electionId: number | string) {
         await SecureStore.deleteItemAsync(polyKey(electionId));
         await SecureStore.deleteItemAsync(trusteeKey(electionId));
+        await SecureStore.deleteItemAsync(tallyCpKey(electionId));
+    },
+
+    // ============ Faz 2.7 — tally app-ölümü checkpoint ============
+
+    /** Tally fazı checkpoint'i oku (resume/idempotent). null = hiç başlanmadı. */
+    async getTallyCheckpoint(electionId: number | string): Promise<TallyCheckpoint | null> {
+        const raw = await SecureStore.getItemAsync(tallyCpKey(electionId));
+        if (!raw) return null;
+        try {
+            return JSON.parse(raw) as TallyCheckpoint;
+        } catch {
+            return null;
+        }
+    },
+
+    /** Tally fazını kalıcılaştır (app ölse de resume bilinir). */
+    async setTallyCheckpoint(electionId: number | string, cp: TallyCheckpoint) {
+        await SecureStore.setItemAsync(tallyCpKey(electionId), JSON.stringify(cp));
     },
 
     // ============ Sprint 5.A öncesi backward-compat stub'lar ============

@@ -3,17 +3,24 @@
 
 local _M = {}
 
--- Configuration
--- NOT (Sprint 5.E UAT): 3 emülatör tek Docker bridge IP'sinden gelir
--- (paylaşımlı IP bucket) ve dağıtık ceremony 3-round çok sayıda çağrı
--- yapar. UAT/geliştirme için limitler yükseltildi. Prod'da düşürülmeli.
+-- Faz 3.11 — PROD-makul varsayılanlar + env ile override (UAT bunları
+-- RL_* env'leriyle yükseltir; kod değişmeden). Gerekçe:
+--   auth: brute-force koruması (login/register/reset) — IP başına dar.
+--   protected: per-USER (IP değil) sayılır; guardian ceremony 3-round +
+--     tally challenge retry-loop (~10×) çağrı-yoğun → 50 çok dar olurdu,
+--     100/dk/kullanıcı meşru akışa yer bırakır, kötüye kullanımı sınırlar.
+--   default: kimliksiz (public /audit-record vb.) IP başına orta.
+-- Çift-oy bütünlüğü rate-limit DEĞİL kripto nullifier + DB unique (3.12) ile.
+local function env_num(name, fallback)
+    local v = tonumber(os.getenv(name) or "")
+    if v and v > 0 then return v end
+    return fallback
+end
+
 local RATE_LIMITS = {
-    -- Auth endpoints (login, register, password reset)
-    auth = { limit = 1000, window = 60 },
-    -- Protected endpoints (authenticated users)
-    protected = { limit = 2000, window = 60 },
-    -- Default (IP-based for unknown endpoints)
-    default = { limit = 1000, window = 60 }
+    auth      = { limit = env_num("RL_AUTH", 15),       window = 60 },
+    protected = { limit = env_num("RL_PROTECTED", 100), window = 60 },
+    default   = { limit = env_num("RL_DEFAULT", 60),    window = 60 }
 }
 
 local shared_dict = ngx.shared.rate_limit

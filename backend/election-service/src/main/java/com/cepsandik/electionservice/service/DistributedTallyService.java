@@ -1,6 +1,5 @@
 package com.cepsandik.electionservice.service;
 
-import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.entity.Election;
 import com.cepsandik.electionservice.entity.ElectionGuardian;
@@ -10,8 +9,10 @@ import com.cepsandik.electionservice.grpc.GetChallengesResponse;
 import com.cepsandik.electionservice.grpc.SessionAckResponse;
 import com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionResponse;
 import com.cepsandik.electionservice.grpc.TallyElectionResponse;
+import com.cepsandik.electionservice.entity.TallySubmission;
 import com.cepsandik.electionservice.repository.ElectionGuardianRepository;
 import com.cepsandik.electionservice.repository.ElectionRepository;
+import com.cepsandik.electionservice.repository.TallySubmissionRepository;
 import com.cepsandik.electionservice.repository.VoteRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -50,8 +51,91 @@ public class DistributedTallyService {
     private final ElectionGuardianRepository guardianRepository;
     private final VoteRepository voteRepository;
     private final CryptoEngineClient cryptoEngineClient;
-    private final BulletinBoardClient bulletinBoardClient;
+    private final BulletinOutboxService bulletinOutbox;
+    private final TallySubmissionRepository tallySubmissionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // ============ Faz 2.6 — Kalıcı tally session (durable replay) ============
+
+    /** Submission'ı kalıcılaştır (upsert: aynı guardian+round tekrar gönderirse güncelle). */
+    private void persistSubmission(Long electionId, String guardianId, String round, String payloadJson) {
+        TallySubmission s = tallySubmissionRepository
+                .findByElectionIdAndGuardianIdAndRound(electionId, guardianId, round)
+                .orElseGet(() -> TallySubmission.builder()
+                        .electionId(electionId).guardianId(guardianId).round(round).build());
+        s.setPayloadJson(payloadJson);
+        tallySubmissionRepository.save(s);
+    }
+
+    /** crypto-engine session kayıp mı (restart/crash sonrası)? */
+    private boolean isSessionLost(SessionAckResponse ack) {
+        if (ack == null || ack.getAccepted()) return false;
+        String e = ack.getError() == null ? "" : ack.getError().toLowerCase();
+        return e.contains("session bulunam") || e.contains("session not found");
+    }
+
+    /**
+     * crypto-engine session'ı kaybolduysa: YENİ session aç + persisted
+     * partial/challenge-response'ları SIRAYLA replay et. Q-of-N seçimi
+     * crypto-engine'de deterministik (guardianId sıralı ilk Q) olduğundan
+     * Fiat-Shamir challenge'ı aynı üretilir → persisted response'lar geçerli.
+     * Guardian (mobil) yeniden hesap YAPMAZ.
+     */
+    @Transactional
+    public void restartAndReplay(Election election) {
+        Long eid = election.getId();
+        log.warn("Tally session kayıp/yenileniyor — durable replay: electionId={}", eid);
+        election.setTallySessionId(null);
+        electionRepository.save(election);
+        // Fresh session (startSessionForElection sessionId null olunca üretir)
+        startSessionForElection(election);
+        Election fresh = electionRepository.findById(eid).orElseThrow();
+        String sid = fresh.getTallySessionId();
+        if (sid == null || sid.isBlank()) {
+            log.error("restartAndReplay: yeni session üretilemedi, electionId={}", eid);
+            return;
+        }
+        List<TallySubmission> partials = tallySubmissionRepository
+                .findByElectionIdAndRoundOrderByIdAsc(eid, TallySubmission.ROUND_PARTIAL);
+        List<TallySubmission> responses = tallySubmissionRepository
+                .findByElectionIdAndRoundOrderByIdAsc(eid, TallySubmission.ROUND_CHALLENGE_RESPONSE);
+
+        // Faz 2.7 — "tamamlanmış guardian" tercihi: app'i ölen guardian sadece
+        // partial gönderip challenge-response göndermediyse, restart sonrası o
+        // guardian quorum slotunu işgal edip tally'i kilitlememeli. Hem PARTIAL
+        // hem CHALLENGE_RESPONSE'u olan guardian'lar "complete". Eğer >= quorum
+        // complete guardian varsa SADECE onları replay et (crypto-engine
+        // deterministik ilk-Q sıralı seçtiğinden hepsi complete → kilit yok).
+        java.util.Set<String> respGuardians = responses.stream()
+                .map(TallySubmission::getGuardianId)
+                .collect(java.util.stream.Collectors.toSet());
+        int quorum = election.getMinGuardiansThreshold() != null
+                ? election.getMinGuardiansThreshold() : 2;
+        List<TallySubmission> completePartials = partials.stream()
+                .filter(p -> respGuardians.contains(p.getGuardianId()))
+                .toList();
+        List<TallySubmission> partialsToReplay =
+                completePartials.size() >= quorum ? completePartials : partials;
+        log.info("Durable replay: complete guardian={}, quorum={}, replay seti={} partial",
+                completePartials.size(), quorum, partialsToReplay.size());
+
+        for (TallySubmission p : partialsToReplay) {
+            try {
+                cryptoEngineClient.submitPartialDecryption(sid, p.getGuardianId(), p.getPayloadJson());
+            } catch (Exception ex) {
+                log.warn("replay partial FAIL guardian={}, hata={}", p.getGuardianId(), ex.getMessage());
+            }
+        }
+        for (TallySubmission r : responses) {
+            try {
+                cryptoEngineClient.submitChallengeResponse(sid, r.getGuardianId(), r.getPayloadJson());
+            } catch (Exception ex) {
+                log.warn("replay challenge-response FAIL guardian={}, hata={}", r.getGuardianId(), ex.getMessage());
+            }
+        }
+        log.info("Durable replay tamam: electionId={}, sessionId={}, partials={}, responses={}",
+                eid, sid, partials.size(), responses.size());
+    }
 
     // ============ Server-driven (lifecycle hook) ============
 
@@ -177,9 +261,23 @@ public class DistributedTallyService {
         SessionAckResponse ack = cryptoEngineClient.submitPartialDecryption(
                 election.getTallySessionId(), effectiveGuardianId, partialsJson);
 
-        if (ack.getAccepted() && guardian != null) {
-            guardian.setStatus(ElectionGuardian.GuardianStatus.SHARE_UPLOADED);
-            guardianRepository.save(guardian);
+        // Faz 2.6 — crypto-engine restart/crash → session kayıp. Yeni session
+        // aç, persisted partial/response'ları replay et, mevcut submit'i tekrarla.
+        if (isSessionLost(ack)) {
+            restartAndReplay(election);
+            Election fresh = electionRepository.findById(electionId).orElseThrow();
+            ack = cryptoEngineClient.submitPartialDecryption(
+                    fresh.getTallySessionId(), effectiveGuardianId, partialsJson);
+        }
+
+        if (ack.getAccepted()) {
+            // Durable: bu partial'ı kalıcılaştır (restart sonrası replay için)
+            persistSubmission(electionId, effectiveGuardianId,
+                    TallySubmission.ROUND_PARTIAL, partialsJson);
+            if (guardian != null) {
+                guardian.setStatus(ElectionGuardian.GuardianStatus.SHARE_UPLOADED);
+                guardianRepository.save(guardian);
+            }
         }
         return Map.of("accepted", ack.getAccepted(), "state", ack.getState(), "error", ack.getError());
     }
@@ -232,12 +330,25 @@ public class DistributedTallyService {
         SessionAckResponse ack = cryptoEngineClient.submitChallengeResponse(
                 election.getTallySessionId(), effectiveGuardianId, responsesJson);
 
+        // Faz 2.6 — session kayıpsa: yeni session + replay + tekrar dene.
+        if (isSessionLost(ack)) {
+            restartAndReplay(election);
+            Election fresh = electionRepository.findById(electionId).orElseThrow();
+            ack = cryptoEngineClient.submitChallengeResponse(
+                    fresh.getTallySessionId(), effectiveGuardianId, responsesJson);
+        }
+
         // Leader-mode tek user N trustee için N kez submit eder; tally finalize
         // tetikleyici sayacı bu durumda anlamsız (count by guardian id). Pratik
         // basitleştirme: submit her zaman başarılı, finalize'ı body request etsin.
-        if (ack.getAccepted() && guardian != null) {
-            guardian.setCoefficientProofs("ROUND_3_DONE");
-            guardianRepository.save(guardian);
+        if (ack.getAccepted()) {
+            // Durable: challenge response'u kalıcılaştır (restart replay için)
+            persistSubmission(electionId, effectiveGuardianId,
+                    TallySubmission.ROUND_CHALLENGE_RESPONSE, responsesJson);
+            if (guardian != null) {
+                guardian.setCoefficientProofs("ROUND_3_DONE");
+                guardianRepository.save(guardian);
+            }
         }
 
         long doneCount = guardianRepository.findAllByElectionId(electionId).stream()
@@ -312,16 +423,15 @@ public class DistributedTallyService {
         }
         electionRepository.save(election);
 
-        try {
-            bulletinBoardClient.appendRecord(
-                    String.valueOf(election.getId()),
-                    "TALLY_PUBLISHED",
-                    null, null,
-                    election.getTallyResults());
-        } catch (Exception bbEx) {
-            log.warn("Bulletin board TALLY_PUBLISHED yazılamadı: electionId={}, hata={}",
-                    election.getId(), bbEx.getMessage());
-        }
+        // Faz 1.1 — TALLY_PUBLISHED kritik şeffaflık kaydı: tally sonucu ile
+        // AYNI transaction'da outbox'a yazılır (atomik), publisher sıralı +
+        // retry'lı + idempotent teslim eder. Artık sessizce kaybolmaz.
+        bulletinOutbox.enqueue(
+                String.valueOf(election.getId()),
+                "TALLY_PUBLISHED",
+                null, null,
+                election.getTallyResults(),
+                true);
 
         log.info("Distributed tally publish OK: electionId={}, contests={}",
                 election.getId(), contests.size());

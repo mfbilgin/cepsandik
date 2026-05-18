@@ -17,6 +17,15 @@ export type EncryptBallotResult = {
   trackingCode: string;
 };
 
+// Faz 1.4 — Benaloh challenge / spoil. Cihaz primary nonce'ı AÇAR;
+// sunucu DecryptWithNonce ile bağımsız doğrular. Spoiled ballot sayılmaz.
+export type SpoilBallotResult = {
+  encryptedBallot: string;
+  primaryNonce: string;
+  plaintextBallot: string;
+  trackingCode: string;
+};
+
 // Sprint 5.B — Guardian crypto types
 
 export type GenerateGuardianKeysInput = {
@@ -99,6 +108,9 @@ export type FinalizeGuardianKeyResult = {
 
 declare class ElectionguardModule extends NativeModule {
   encryptBallot(input: EncryptBallotInput): Promise<EncryptBallotResult>;
+
+  // Faz 1.4 — Benaloh challenge: spoil et (cast etme), primary nonce aç
+  spoilBallot(input: EncryptBallotInput): Promise<SpoilBallotResult>;
 
   // Sprint 5.B Guardian crypto (mobile-only private state)
   generateAllGuardianKeys(input: GenerateGuardianKeysInput): Promise<GenerateGuardianKeysResult>;

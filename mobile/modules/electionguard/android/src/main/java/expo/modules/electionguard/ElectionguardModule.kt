@@ -37,6 +37,22 @@ class ElectionguardModule : Module() {
       }
     }
 
+    // Faz 1.4 — Benaloh challenge: ballot'u spoil et (cast etme), primary
+    // nonce'ı aç. Sunucu DecryptWithNonce ile bağımsız doğrular.
+    AsyncFunction("spoilBallot") { input: EncryptBallotInput ->
+      val t0 = System.currentTimeMillis()
+      val cacheRoot = appContext.reactContext?.cacheDir
+          ?: File(System.getProperty("java.io.tmpdir"), "electionguard")
+      try {
+        val result = ElectionGuardEncryptor.spoil(input, cacheRoot)
+        Log.i("Electionguard", "AsyncFunction spoilBallot returned in ${System.currentTimeMillis() - t0}ms")
+        result
+      } catch (t: Throwable) {
+        Log.e("Electionguard", "AsyncFunction spoilBallot FAILED after ${System.currentTimeMillis() - t0}ms: ${t.message}")
+        throw t
+      }
+    }
+
     // ===== Sprint 5.B — Guardian crypto (true E2E-V) =====
 
     AsyncFunction("generateAllGuardianKeys") { input: GenerateGuardianKeysInput ->
@@ -208,5 +224,17 @@ class SelectionRef : Record {
 class EncryptBallotResult : Record {
   @Field var encryptedBallot: String = ""
   @Field var zkpProof: String = ""
+  @Field var trackingCode: String = ""
+}
+
+/**
+ * Faz 1.4 — Benaloh challenge: spoil sonucu. Cihaz primary nonce'ı AÇAR
+ * (sunucu DecryptWithNonce ile bağımsız doğrular). Spoiled ballot tally'ye
+ * GİRMEZ. Aynı ciphertext bir daha cast edilemez.
+ */
+class SpoilBallotResult : Record {
+  @Field var encryptedBallot: String = ""
+  @Field var primaryNonce: String = ""        // hex — sunucuya açılır
+  @Field var plaintextBallot: String = ""     // PlaintextBallotJson — re-encrypt doğrulaması
   @Field var trackingCode: String = ""
 }

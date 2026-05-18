@@ -1,6 +1,5 @@
 package com.cepsandik.electionservice.service;
 
-import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.dto.request.SubmitDecryptionShareRequest;
 import com.cepsandik.electionservice.dto.request.SubmitGuardianKeyRequest;
@@ -38,7 +37,7 @@ public class GuardianService {
     private final CandidateRepository candidateRepository;
     private final VoteRepository voteRepository;
     private final CryptoEngineClient cryptoEngineClient;
-    private final BulletinBoardClient bulletinBoardClient;
+    private final BulletinOutboxService bulletinOutbox;
 
     public List<com.cepsandik.electionservice.dto.response.GuardianDutyResponse> getMyDuties(String userId) {
          return guardianRepository.findByUserId(UUID.fromString(userId)).stream()
@@ -128,13 +127,13 @@ public class GuardianService {
             election.setStatus(ElectionStatus.ACTIVE);
             
             electionRepository.save(election);
-            bulletinBoardClient.appendRecord(
+            bulletinOutbox.enqueue(
                     String.valueOf(election.getId()),
                     "ELECTION_SETUP",
                     null,
                     null,
-                    response.getElectionManifest()
-            );
+                    response.getElectionManifest(),
+                    true);
             log.info("Seçim {} aktif edildi ve ortak anahtar oluşturuldu.", election.getId());
 
         } catch (Exception e) {
@@ -211,13 +210,13 @@ public class GuardianService {
                     .toList();
             election.setTallyResults(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(contests));
             electionRepository.save(election);
-            bulletinBoardClient.appendRecord(
+            bulletinOutbox.enqueue(
                     String.valueOf(election.getId()),
                     "TALLY_PUBLISHED",
                     null,
                     null,
-                    election.getTallyResults()
-            );
+                    election.getTallyResults(),
+                    true);
             log.info("Seçim {} sonuçları başarıyla açıklandı.", election.getId());
 
         } catch (Exception e) {

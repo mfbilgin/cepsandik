@@ -11,6 +11,11 @@ public class AppendRecordRequest {
     private String recordType;
     private String trackingCode;
     private String ballotHash;
-    @NotBlank
+    /** Boş olabilir — bazı şeffaflık kayıtları (KEY_UPLOADED, DECLINED) payload taşımaz. */
     private String payload;
+    /**
+     * İstemci tarafı idempotency anahtarı (outbox satır UUID'si). Aynı anahtarla
+     * tekrar gelen append no-op'tur (publisher retry'da zincir çift kayıt olmasın).
+     */
+    private String idempotencyKey;
 }

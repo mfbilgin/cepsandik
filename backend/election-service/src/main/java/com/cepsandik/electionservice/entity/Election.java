@@ -129,6 +129,11 @@ public class Election {
     @Builder.Default
     private Integer substitutionCount = 0;
 
+    /** Faz 2.8 — stuck tally durable-replay deneme sayacı; cap → TALLY_FAILED. */
+    @Column(name = "tally_retry_count", nullable = false)
+    @Builder.Default
+    private Integer tallyRetryCount = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -143,6 +143,40 @@ public class CryptoEngineClient {
         }
     }
 
+    /**
+     * Faz 1.4 — Benaloh challenge: spoiled ballot'u cihazın açtığı primary
+     * nonce ile TRUSTLESS doğrular (crypto-engine DecryptWithNonce).
+     */
+    public VerifySpoiledBallotResponse verifySpoiledBallot(
+            String electionId,
+            String encryptedBallotJson,
+            String primaryNonceHex,
+            String electionGuardContext,
+            String electionManifest,
+            String plaintextBallotJson) {
+
+        log.info("VerifySpoiledBallot gRPC çağrısı: election={}", electionId);
+        try {
+            VerifySpoiledBallotRequest request = VerifySpoiledBallotRequest.newBuilder()
+                    .setElectionId(electionId)
+                    .setEncryptedBallotJson(encryptedBallotJson)
+                    .setPrimaryNonceHex(primaryNonceHex != null ? primaryNonceHex : "")
+                    .setElectionGuardContext(electionGuardContext)
+                    .setElectionManifest(electionManifest)
+                    .setPlaintextBallotJson(plaintextBallotJson != null ? plaintextBallotJson : "")
+                    .build();
+
+            return blockingStub
+                    .withDeadlineAfter(30, TimeUnit.SECONDS)
+                    .verifySpoiledBallot(request);
+
+        } catch (StatusRuntimeException e) {
+            log.error("VerifySpoiledBallot gRPC hatası: status={}, desc={}",
+                    e.getStatus().getCode(), e.getStatus().getDescription());
+            throw new RuntimeException("Crypto-Engine VerifySpoiledBallot hatası: " + e.getMessage(), e);
+        }
+    }
+
     // ==================== Tally Election ====================
 
     /**

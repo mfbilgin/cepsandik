@@ -51,6 +51,13 @@ service CryptoService {
   // sağlamaz — mobile'ın private key share'ini sunucuya yollamasını gerektirir.
   // Yerine yukarıdaki 5-stage akışı kullan.
   rpc DecryptWithShares (DecryptWithSharesRequest) returns (TallyElectionResponse);
+
+  // Faz 1.4 — Benaloh challenge (cast-as-intended). Cihaz spoil edilen
+  // ballot'un primary nonce'ını açar; sunucu DecryptWithNonce ile ciphertext'i
+  // BAĞIMSIZ çözer (trustless — cihaza güvenmez). Çözülen seçim cihazın
+  // iddiasıyla eşleşirse cihaz dürüst şifrelemiş demektir. Spoiled ballot
+  // ASLA tally'ye girmez.
+  rpc VerifySpoiledBallot (VerifySpoiledBallotRequest) returns (VerifySpoiledBallotResponse);
 }
 
 // ==================== Setup ====================
@@ -217,5 +224,31 @@ message FinalizeTallyDecryptionRequest {
 message SessionAckResponse {
   bool accepted = 1;
   string state = 2;   // örn. WAIT_PARTIAL, WAIT_CHALLENGE_RESPONSE, FINAL
+  string error = 3;
+}
+
+// ==================== Faz 1.4 — Benaloh challenge / spoil ====================
+
+message VerifySpoiledBallotRequest {
+  string election_id = 1;
+  string encrypted_ballot_json = 2;       // spoil edilen EncryptedBallot (KMP JSON)
+  string primary_nonce_hex = 3;           // cihazın açtığı ballot primary nonce
+  string election_guard_context = 4;      // composite init+config
+  string election_manifest = 5;
+  // Cihazın açtığı PlaintextBallot (KMP PlaintextBallotJson). Spoiled ballot
+  // zaten sayılmaz, plaintext ifşası tasarımın amacıdır. Sunucu bunu nonce ile
+  // YENİDEN şifreler; ciphertext submit edilenle birebir eşleşirse cihaz
+  // dürüst şifrelemiştir (re-encryption ile trustless doğrulama).
+  string plaintext_ballot_json = 6;
+}
+
+message SpoiledSelection {
+  string selection_id = 1;
+  int64 vote = 2;                         // nonce ile çözülen plaintext (0/1)
+}
+
+message VerifySpoiledBallotResponse {
+  bool verified = 1;                      // ciphertext nonce ile tutarlı mı (trustless)
+  repeated SpoiledSelection selections = 2;
   string error = 3;
 }

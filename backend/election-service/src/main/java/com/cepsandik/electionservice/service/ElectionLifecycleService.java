@@ -1,6 +1,5 @@
 package com.cepsandik.electionservice.service;
 
-import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CommunityServiceClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.config.UtcClock;
@@ -24,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,7 +44,7 @@ public class ElectionLifecycleService {
     private final CommunityServiceClient communityServiceClient;
     private final ElectionNotificationProducer notificationProducer;
     private final CryptoEngineClient cryptoEngineClient;
-    private final BulletinBoardClient bulletinBoardClient;
+    private final BulletinOutboxService bulletinOutbox;
     private final DistributedTallyService distributedTallyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -215,18 +215,14 @@ public class ElectionLifecycleService {
             election.setTallyResults(tallyResultsJson);
             electionRepository.save(election);
 
-            try {
-                bulletinBoardClient.appendRecord(
-                        String.valueOf(election.getId()),
-                        "TALLY_PUBLISHED",
-                        null,
-                        null,
-                        tallyResultsJson
-                );
-            } catch (Exception bbEx) {
-                log.warn("Bulletin board TALLY_PUBLISHED yazılamadı: electionId={}, hata={}",
-                        election.getId(), bbEx.getMessage());
-            }
+            // Faz 1.1 — outbox: sessiz kayıp yok, sıralı + retry'lı + idempotent.
+            bulletinOutbox.enqueue(
+                    String.valueOf(election.getId()),
+                    "TALLY_PUBLISHED",
+                    null,
+                    null,
+                    tallyResultsJson,
+                    true);
 
             log.info("autoTally OK: electionId={}, ballots={}, contests={}, elapsed={}ms",
                     election.getId(), ciphertextBallots.size(), contests.size(), elapsed);
@@ -237,12 +233,84 @@ public class ElectionLifecycleService {
         }
     }
 
+    // ==================== Faz 2.8 — Stuck recovery ====================
+
+    /** endTime üstünden bu kadar dakika geçmeden stuck tally retry'a girilmez. */
+    private static final long TALLY_GRACE_MINUTES = 5;
+    /** Bu kadar durable-replay denemesinden sonra election TALLY_FAILED olur. */
+    private static final int TALLY_RETRY_CAP = 8;
+
+    /**
+     * Süresi geçmiş, joint key'i hâlâ üretilmemiş ceremony'ler. Backup
+     * substitution guardian-driven'dır; bu yalnızca güvenlik ağı: süresiz
+     * SCHEDULED asılı kalmasın → CANCELLED + şeffaflık kaydı (owner yeniden
+     * kurar). substitution_count zaten K=2 cap'i ayrı yönetir.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processOverdueCeremonies() {
+        var now = utcClock.instant();
+        List<Election> overdue = electionRepository.findOverdueCeremonies(
+                ElectionStatus.SCHEDULED, now);
+        for (Election e : overdue) {
+            try {
+                e.setStatus(ElectionStatus.CANCELLED);
+                electionRepository.save(e);
+                bulletinOutbox.enqueue(String.valueOf(e.getId()), "CEREMONY_TIMEOUT",
+                        null, null,
+                        "Key ceremony setupDeadline aşıldı, joint key üretilemedi → CANCELLED",
+                        true);
+                log.warn("Ceremony süresi doldu, CANCELLED: electionId={}, setupDeadline={}",
+                        e.getId(), e.getSetupDeadline());
+            } catch (Exception ex) {
+                log.error("processOverdueCeremonies hata: electionId={}", e.getId(), ex);
+            }
+        }
+    }
+
+    /**
+     * Takılı tally'ler: CLOSED + session var ama tally_proof yok + grace
+     * geçti. Faz 2.6 durable-replay ile tekrar dener; cap aşılınca sessizce
+     * asılı bırakmaz → TALLY_FAILED + şeffaflık kaydı (owner müdahale eder).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void processStuckTallies() {
+        var graceBefore = utcClock.instant().minus(TALLY_GRACE_MINUTES, ChronoUnit.MINUTES);
+        List<Election> stuck = electionRepository.findStuckTallies(
+                ElectionStatus.CLOSED, graceBefore);
+        for (Election e : stuck) {
+            try {
+                int attempts = e.getTallyRetryCount() == null ? 0 : e.getTallyRetryCount();
+                if (attempts >= TALLY_RETRY_CAP) {
+                    e.setStatus(ElectionStatus.TALLY_FAILED);
+                    electionRepository.save(e);
+                    bulletinOutbox.enqueue(String.valueOf(e.getId()), "TALLY_FAILED",
+                            null, null,
+                            "Tally " + attempts + " durable-replay denemesine rağmen "
+                                    + "tamamlanamadı → TALLY_FAILED (owner müdahalesi)",
+                            true);
+                    log.error("Tally retry cap aşıldı → TALLY_FAILED: electionId={}, attempts={}",
+                            e.getId(), attempts);
+                    continue;
+                }
+                e.setTallyRetryCount(attempts + 1);
+                electionRepository.save(e);
+                log.warn("Stuck tally durable-replay denemesi #{}: electionId={}",
+                        attempts + 1, e.getId());
+                distributedTallyService.restartAndReplay(e);
+            } catch (Exception ex) {
+                log.error("processStuckTallies hata: electionId={}", e.getId(), ex);
+            }
+        }
+    }
+
     /**
      * Okuma API'leri öncesi veya zamanlayıcıda çağrılır; gecikme olmadan güncel durumu yansıtır.
      */
     public void processAllDueTransitions() {
         processScheduledToActive();
         processActiveToClosed();
+        processOverdueCeremonies();
+        processStuckTallies();
     }
 
     // ==================== Crypto-Engine Key Ceremony ====================

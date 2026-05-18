@@ -127,6 +127,18 @@ export async function runDistributedTally(electionId: number): Promise<{
     finalized: boolean;
     tallyResults?: unknown;
 }> {
+    // Faz 2.7 — app-ölümü dayanıklılığı. Checkpoint zaten DONE ise idempotent
+    // çık. Aksi halde baştan TEMİZ re-run: computeDistributedPartialDecryption
+    // taze instance/nonce üretir, sunucu (Q-of-N collect-fazı) guardian'ın eski
+    // partial'ını değiştirir. KMP randomConstantNonce public API ile
+    // persist edilemediğinden (1.4'te kaçınılan internal coupling) resume =
+    // temiz tam re-run; quorum kritik guardian ölürse election-service
+    // durable-replay "tamamlanmış guardian tercihi" + Q-of-N devreye girer.
+    const cp = await guardianCrypto.getTallyCheckpoint(electionId);
+    if (cp?.phase === 'DONE') {
+        return { submitted: true, finalized: true };
+    }
+
     const info = await getCeremonyInfo(electionId);
     const guardianId = info.guardianId; // "trustee{x}"
 
@@ -141,6 +153,7 @@ export async function runDistributedTally(electionId: number): Promise<{
         electionId, encryptedTallyJson, electionGuardContext, electionManifest,
     );
     await api.post(`/guardians/${electionId}/partial-decryption`, { partialsJson, guardianId });
+    await guardianCrypto.setTallyCheckpoint(electionId, { phase: 'PARTIAL_SUBMITTED' });
 
     // Round 2/3: challenges ancak TÜM katılan guardian'lar partial gönderince
     // üretilir. Sunucu getChallenges'ı ~30sn long-poll yapar; çok-cihaz manuel
@@ -167,9 +180,13 @@ export async function runDistributedTally(electionId: number): Promise<{
         responsesJson, guardianId,
     });
 
+    const finalized = !!resp.data?.finalized;
+    await guardianCrypto.setTallyCheckpoint(electionId, {
+        phase: finalized ? 'DONE' : 'CHALLENGE_SUBMITTED',
+    });
     return {
         submitted: true,
-        finalized: !!resp.data?.finalized,
+        finalized,
         tallyResults: resp.data?.tallyResults,
     };
 }

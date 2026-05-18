@@ -7,7 +7,7 @@ import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
 import { randomHex, sha256Hex } from '../../utils/ballotEncrypt';
-import { encryptBallotClientSide, EncryptionParams } from '../../utils/electionGuardClient';
+import { encryptBallotClientSide, spoilBallotClientSide, EncryptionParams } from '../../utils/electionGuardClient';
 
 export const VotingBallotScreen = () => {
     const route = useRoute<any>();
@@ -146,6 +146,81 @@ export const VotingBallotScreen = () => {
         }
     };
 
+    // Faz 1.4 — Benaloh challenge: ballot'u spoil et (cast etme). Cihaz primary
+    // nonce'ı açar, sunucu DecryptWithNonce ile BAĞIMSIZ çözer. Çözülen seçim
+    // seçmenin seçtiğiyle eşleşiyorsa cihaz dürüst şifrelemiş → cast-as-intended.
+    const handleSpoilBallot = async () => {
+        if (!selectedOptionId) {
+            showDialog({
+                title: t('voting.selectRequiredTitle'),
+                message: t('voting.selectRequiredBody'),
+                type: 'warning',
+            });
+            return;
+        }
+        setIsCasting(true);
+        try {
+            const paramsRes = await api.get(`/elections/${electionId}/encryption-params`);
+            const encryptionParams: EncryptionParams = paramsRes.data?.data;
+            if (!encryptionParams?.jointPublicKey) {
+                throw new Error(t('voting.encryptionRequired') || 'E2E-V parametreleri alınamadı.');
+            }
+            const ballotId = `spoil_${randomHex(16)}`;
+            const spoiled = await spoilBallotClientSide({
+                encryptionParams,
+                ballotId,
+                options,
+                selectedOptionId: selectedOptionId!,
+            });
+            const res = await api.post(`/elections/${electionId}/votes/spoil`, {
+                ballotId,
+                encryptedBallot: spoiled.encryptedBallot,
+                primaryNonce: spoiled.primaryNonce,
+                plaintextBallot: spoiled.plaintextBallot,
+                trackingCode: spoiled.trackingCode,
+            });
+            const data = res.data?.data;
+            const sels: Array<{ selectionId: string; vote: number }> =
+                data?.decryptedSelections || [];
+            const chosen = sels.find((s) => Number(s.vote) === 1);
+            const chosenId = chosen
+                ? Number(String(chosen.selectionId).replace('candidate_', ''))
+                : null;
+            const chosenOpt = options.find((o) => o.id === chosenId);
+            const expectedOpt = options.find((o) => o.id === selectedOptionId);
+            const honest =
+                data?.verified === true &&
+                chosenId === selectedOptionId;
+
+            showDialog({
+                title: honest
+                    ? (t('voting.spoilHonestTitle') || 'Şifreleme Dürüst ✓')
+                    : (t('voting.spoilFailTitle') || 'Uyarı: Şifreleme Doğrulanamadı'),
+                message: honest
+                    ? (t('voting.spoilHonestBody', {
+                          option: chosenOpt?.name || chosenOpt?.text || '',
+                      }) ||
+                      `Sunucu bu cihazın şifrelediği oyu nonce ile bağımsız çözdü: ` +
+                          `"${chosenOpt?.name || chosenOpt?.text || ''}". Tam olarak ` +
+                          `seçtiğiniz seçenek. Cihaz dürüst şifreliyor. Bu test oyu ` +
+                          `SAYILMAYACAK — gerçek oyunuzu vermek için "Oyu Onayla"ya basın.`)
+                    : (t('voting.spoilFailBody') ||
+                      `Sunucunun bağımsız çözdüğü seçim ("${chosenOpt?.name || '?'}") ` +
+                          `beklenenle ("${expectedOpt?.name || '?'}") eşleşmedi veya ` +
+                          `doğrulanamadı. Bu cihazla oy vermeyin, yetkiliye bildirin.`),
+                type: honest ? 'success' : 'error',
+            });
+        } catch (error: any) {
+            const msg =
+                error.response?.data?.message ||
+                (typeof error?.message === 'string' ? error.message : null) ||
+                (t('voting.castErrorBody') || 'Spoil sırasında hata.');
+            showDialog({ title: t('voting.castErrorTitle'), message: msg, type: 'error' });
+        } finally {
+            setIsCasting(false);
+        }
+    };
+
     if (isLoading || !election) {
         return (
             <View style={tw`flex-1 items-center justify-center bg-background`}>
@@ -260,6 +335,19 @@ export const VotingBallotScreen = () => {
                         {isCasting ? t('voting.encrypting') : t('voting.confirmSelection')}
                     </Text>
                     {!isCasting && <Ionicons name="arrow-forward" size={20} color="#fff" />}
+                </TouchableOpacity>
+
+                {/* Faz 1.4 — Benaloh challenge: cihazın dürüst şifrelediğini test et.
+                    Bu ballot sayılmaz; doğrulama sonrası gerçek oy verilir. */}
+                <TouchableOpacity
+                    style={tw`w-full flex-row items-center justify-center gap-2 rounded-xl border border-primary py-3 mt-2 ${!selectedOptionId || isCasting ? 'opacity-50' : ''}`}
+                    onPress={handleSpoilBallot}
+                    disabled={!selectedOptionId || isCasting}
+                >
+                    <Ionicons name="shield-checkmark-outline" size={18} color={tw.color('primary')} />
+                    <Text style={tw`text-sm font-semibold text-primary tracking-wide`}>
+                        {t('voting.spoilButton') || 'Şifrelemeyi Doğrula (test — sayılmaz)'}
+                    </Text>
                 </TouchableOpacity>
             </View>
 

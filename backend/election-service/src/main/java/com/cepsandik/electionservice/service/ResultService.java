@@ -31,6 +31,7 @@ public class ResultService {
     private final ElectionResultRepository electionResultRepository;
     private final ElectionNotificationProducer notificationProducer;
     private final CommunityServiceClient communityServiceClient;
+    private final BulletinOutboxService bulletinOutbox;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -86,6 +87,18 @@ public class ResultService {
         }
         if (!election.isClosed()) {
             throw ApiException.badRequest("Sadece CLOSED durumundaki secimlerin sonuclari yayinlanabilir");
+        }
+        // Faz 1.1 — Verifiability gate: kritik şeffaflık kayıtları (PUBLIC_KEYS,
+        // JOINT_KEY_GENERATED, BALLOT_CAST, TALLY_PUBLISHED) bulletin board'a
+        // yayımlanmadan sonuç AÇIKLANAMAZ. Aksi halde denetlenemeyen sonuç
+        // yayımlanır (E2E-V ihlali). Outbox publisher kısa sürede teslim eder;
+        // bu hata geçicidir, owner tekrar dener.
+        long pendingCritical = bulletinOutbox.unpublishedCriticalCount(String.valueOf(electionId));
+        if (pendingCritical > 0) {
+            throw ApiException.badRequest("Şeffaflık kayıtları henüz bulletin board'a "
+                    + "yayımlanmadı (" + pendingCritical + " kritik kayıt bekliyor). "
+                    + "Sonuç doğrulanabilirlik için bunlar tamamlanmadan açıklanamaz; "
+                    + "kısa süre sonra tekrar deneyin.");
         }
         if (!electionResultRepository.existsByElectionId(electionId)) {
             calculateResults(electionId, userId);

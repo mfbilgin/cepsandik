@@ -1,6 +1,8 @@
 package expo.modules.electionguard
 
 import android.util.Log
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
 import electionguard.ballot.PlaintextBallot
 import electionguard.core.ElGamalPublicKey
 import electionguard.core.GroupContext
@@ -158,6 +160,93 @@ object ElectionGuardEncryptor {
             return EncryptBallotResult().apply {
                 encryptedBallot = ciphertextJson
                 zkpProof = "embedded-in-ciphertext"
+                this.trackingCode = trackingCode
+            }
+        } finally {
+            workDir.deleteRecursively()
+        }
+    }
+
+    /**
+     * Faz 1.4 — Benaloh challenge / spoil. Ballot şifrelenir ama CAST EDİLMEZ;
+     * `challenge` ile spoiled işaretlenir ve primary nonce AÇILIR. Sunucu
+     * (crypto-engine DecryptWithNonce) ciphertext'i sadece bu nonce + joint key
+     * ile bağımsız çözüp cihazın dürüst şifrelediğini doğrular. Spoiled ballot
+     * ASLA tally'ye girmez; seçmen sonra gerçek oyu için yeni ballot şifreler.
+     */
+    fun spoil(input: EncryptBallotInput, cacheRoot: File): SpoilBallotResult {
+        require(input.electionManifest.isNotBlank()) { "electionManifest bos" }
+        require(input.electionGuardContext.isNotBlank()) { "electionGuardContext bos" }
+        require(input.jointPublicKey.isNotBlank()) { "jointPublicKey bos" }
+        require(input.selections.isNotEmpty()) { "selections bos" }
+
+        val workDir = File(cacheRoot, "eg-spoil-${UUID.randomUUID()}").apply { mkdirs() }
+        Log.i(TAG, "spoil start: ballot=${input.ballotId}, selections=${input.selections.size}")
+        try {
+            val group = productionGroup()
+            val root: JsonObject = json.parseToJsonElement(input.electionGuardContext).jsonObject
+            val initElement = root["init"] ?: error("electionGuardContext: init alani eksik")
+            val configElement = root["config"] ?: error("electionGuardContext: config alani eksik")
+            val initDto = json.decodeFromString<ElectionInitializedJson>(json.encodeToString(initElement))
+            val configDto = json.decodeFromString<ElectionConfigJson>(json.encodeToString(configElement))
+
+            val errs = ErrorMessages("mobile-spoil")
+            val manifestBytes = input.electionManifest.encodeToByteArray()
+            val config = configDto.import(group.constants, manifestBytes, errs.nested("config"))
+                ?: error("ElectionConfig import basarisiz: $errs")
+            val electionInit = initDto.import(group, config, errs.nested("init"))
+                ?: error("ElectionInitialized import basarisiz: $errs")
+            val manifestDto = json.decodeFromString<ManifestJson>(input.electionManifest)
+            val manifest = manifestDto.import()
+
+            val publisher = makePublisher(workDir.absolutePath, true, true)
+            publisher.writeElectionInitialized(electionInit)
+            val ballotStyleId = manifest.ballotStyles.firstOrNull()?.ballotStyleId ?: "ballot-style-1"
+            val device = "mobile-${UUID.randomUUID().toString().take(8)}"
+            val invalidDir = File(workDir, "invalid").apply { mkdirs() }.absolutePath
+            val encryptor = AddEncryptedBallot(
+                group, manifest,
+                electionInit.config.chainConfirmationCodes,
+                electionInit.config.configBaux0,
+                electionInit.jointPublicKey(),
+                electionInit.extendedBaseHash,
+                device,
+                outputDir = workDir.absolutePath,
+                invalidDir = invalidDir,
+                isJson = true,
+            )
+
+            val contestId = manifest.contests.firstOrNull()?.contestId
+                ?: error("Manifest'te contest yok")
+            val selections = input.selections.mapIndexed { idx, sel ->
+                val vote = if (sel.id == input.selectedOptionId) 1 else 0
+                PlaintextBallot.Selection("candidate_${sel.id}", idx, vote)
+            }
+            val plaintext = PlaintextBallot(
+                input.ballotId, ballotStyleId,
+                listOf(PlaintextBallot.Contest(contestId, 0, selections)),
+            )
+
+            val encErrs = ErrorMessages("spoil-${input.ballotId}")
+            val cballot = encryptor.encrypt(plaintext, encErrs)
+                ?: error("encrypt failed: $encErrs")
+            // CAST ETME — challenge (spoil). Primary nonce AÇILIR.
+            val primaryNonceHex = cballot.ballotNonce.toHex()
+            val challenged = when (val r = encryptor.challenge(cballot.confirmationCode)) {
+                is Ok -> r.value
+                is Err -> error("challenge (spoil) failed: ${r.error}")
+            }
+            encryptor.close()
+
+            val ciphertextJson = json.encodeToString(challenged.publishJson())
+            val plaintextJson = json.encodeToString(plaintext.publishJson())
+            val trackingCode = challenged.confirmationCode.toString()
+            Log.i(TAG, "spoil OK: ballot=${input.ballotId}, ciphertext=${ciphertextJson.length}b, plaintext açıldı, nonce açıldı")
+
+            return SpoilBallotResult().apply {
+                encryptedBallot = ciphertextJson
+                primaryNonce = primaryNonceHex
+                plaintextBallot = plaintextJson
                 this.trackingCode = trackingCode
             }
         } finally {

@@ -76,6 +76,30 @@ class CreateJointKeyService {
             error("GuardianPublicKey import hataları: $errs")
         }
 
+        // 2b. Faz 1.2 — EXPLICIT sunucu-taraflı Schnorr proof doğrulama.
+        //     Önceki kod doğrulamayı KeyCeremonyResults içinde "dolaylı"
+        //     bırakıyordu; geçersiz proof sessizce placeholder'a düşüp
+        //     ceremony'i bozuyordu. Artık her guardian'ın TÜM coefficient
+        //     Schnorr proof'ları açıkça doğrulanır; HERHANGİ biri geçersizse
+        //     joint key ÜRETİLMEZ (fail-hard, detaylı gerekçe).
+        val invalidReports = ArrayList<String>()
+        publicKeysList.forEach { pk ->
+            val vr = pk.validate()
+            if (vr is com.github.michaelbull.result.Err) {
+                invalidReports.add("guardian=${pk.guardianId} x=${pk.guardianXCoordinate}: ${vr.error}")
+                log.error("Schnorr proof GEÇERSİZ: election={}, guardian={}, sebep={}",
+                    request.electionId, pk.guardianId, vr.error)
+            } else {
+                log.info("Schnorr proof OK: election={}, guardian={}, x={}",
+                    request.electionId, pk.guardianId, pk.guardianXCoordinate)
+            }
+        }
+        if (invalidReports.isNotEmpty()) {
+            error("Schnorr proof doğrulaması başarısız (${invalidReports.size}/" +
+                "${publicKeysList.size} guardian) — joint key üretilmedi: " +
+                invalidReports.joinToString(" | "))
+        }
+
         // 3. KeyCeremonyResults: public-only joint key construction
         //    Constructor public; List<PublicKeys> tek argüman.
         val ceremonyResults = KeyCeremonyResults(publicKeysList)

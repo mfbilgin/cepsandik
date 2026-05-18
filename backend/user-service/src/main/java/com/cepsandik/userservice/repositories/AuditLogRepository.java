@@ -12,4 +12,11 @@ import java.util.UUID;
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     Page<AuditLog> findByUserId(UUID userId, Pageable pageable);
     Page<AuditLog> findByModule(String module, Pageable pageable);
+
+    // Faz 3.13 — Pre-existing build break fix: AdminService bu derived
+    // query'leri çağırıyordu ama interface'te tanımlı değildi (user-service
+    // HEAD'de derlenmiyordu → prod'a çıkamazdı). AuditLog alanları:
+    // userId(UUID), action(String), timestamp(LocalDateTime) → isimler geçerli.
+    Page<AuditLog> findByUserIdOrderByTimestampDesc(UUID userId, Pageable pageable);
+    Page<AuditLog> findByActionContainingIgnoreCaseOrderByTimestampDesc(String action, Pageable pageable);
 }

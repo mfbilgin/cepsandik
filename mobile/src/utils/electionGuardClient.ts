@@ -8,7 +8,7 @@
 // cross-impl spec uyumu garanti.
 
 import ElectionguardModule from '../../modules/electionguard';
-import type { EncryptBallotResult } from '../../modules/electionguard';
+import type { EncryptBallotResult, SpoilBallotResult } from '../../modules/electionguard';
 
 export type ElectionGuardOptionRef = {
     id: number;
@@ -50,6 +50,31 @@ export async function encryptBallotClientSide(input: {
     assertValidEncryptionParams(input.encryptionParams);
 
     return ElectionguardModule.encryptBallot({
+        electionId: input.encryptionParams.electionId,
+        ballotId: input.ballotId,
+        electionManifest: input.encryptionParams.electionManifest,
+        electionGuardContext: input.encryptionParams.electionGuardContext,
+        jointPublicKey: input.encryptionParams.jointPublicKey,
+        specVersion: input.encryptionParams.specVersion,
+        selections: input.options,
+        selectedOptionId: input.selectedOptionId,
+    });
+}
+
+/**
+ * Faz 1.4 — Benaloh challenge. Ballot şifrelenir ama CAST EDİLMEZ; spoil
+ * edilir ve primary nonce açılır. Sunucu DecryptWithNonce ile bağımsız
+ * doğrular (cihaz dürüst mü). Spoiled ballot tally'ye girmez.
+ */
+export async function spoilBallotClientSide(input: {
+    encryptionParams: EncryptionParams;
+    ballotId: string;
+    options: ElectionGuardOptionRef[];
+    selectedOptionId: number;
+}): Promise<SpoilBallotResult> {
+    assertValidEncryptionParams(input.encryptionParams);
+
+    return ElectionguardModule.spoilBallot({
         electionId: input.encryptionParams.electionId,
         ballotId: input.ballotId,
         electionManifest: input.encryptionParams.electionManifest,

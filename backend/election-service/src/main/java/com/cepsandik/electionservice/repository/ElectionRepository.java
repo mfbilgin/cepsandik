@@ -48,6 +48,30 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
        List<Election> findElectionsToEnd(@Param("active") ElectionStatus active,
                      @Param("now") Instant now);
 
+       /**
+        * Faz 2.8 — Süresi geçmiş, joint key'i HÂLÂ üretilmemiş ceremony'ler
+        * (SCHEDULED + setupDeadline geçti + electionPublicKey yok). Süresiz
+        * asılı kalmasın diye scheduler bunları CANCELLED'a alır.
+        */
+       @Query("SELECT e FROM Election e WHERE e.status = :scheduled " +
+                     "AND e.setupDeadline IS NOT NULL AND e.setupDeadline < :now " +
+                     "AND (e.electionPublicKey IS NULL OR e.electionPublicKey = '') " +
+                     "AND e.isDeleted = false")
+       List<Election> findOverdueCeremonies(@Param("scheduled") ElectionStatus scheduled,
+                     @Param("now") Instant now);
+
+       /**
+        * Faz 2.8 — Takılı tally'ler: CLOSED + tally session var ama tally_proof
+        * yok + endTime üstünden grace süresi geçti. Scheduler durable-replay
+        * ile tekrar dener; cap aşılınca TALLY_FAILED.
+        */
+       @Query("SELECT e FROM Election e WHERE e.status = :closed " +
+                     "AND e.tallySessionId IS NOT NULL " +
+                     "AND (e.tallyProof IS NULL OR e.tallyProof = '') " +
+                     "AND e.endTime < :graceBefore AND e.isDeleted = false")
+       List<Election> findStuckTallies(@Param("closed") ElectionStatus closed,
+                     @Param("graceBefore") Instant graceBefore);
+
        /** Topluluk bazlı aktif seçimleri getir */
        @Query("SELECT e FROM Election e WHERE e.communityId = :communityId " +
                      "AND e.status = 'ACTIVE' AND e.isDeleted = false")

@@ -4,6 +4,7 @@ import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 
 @Component
@@ -66,11 +69,19 @@ public class InternalJwtFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // User ID'yi çıkar ve request attribute olarak ayarla
+            // User ID'yi DOĞRULANMIŞ internal token'dan çıkar (güven kaynağı).
             String userId = jwtService.extractUserId(internalToken);
             request.setAttribute("userId", userId);
 
+            // Faz 3.10 — X-User-Id güven modeli: controller'lar @RequestHeader
+            // ("X-User-Id") okuyor. İstemci-sağlanan ham header'a GÜVENME;
+            // doğrulanmış token uid'i ile EZ. Internal secret sızsa/servis
+            // token'ı kötüye kullanılsa bile X-User-Id taklit edilemez.
+            HttpServletRequest wrapped = new TrustedUserIdRequest(request, userId);
+
             log.debug("İstek doğrulandı, kullanıcı: {}", userId);
+            filterChain.doFilter(wrapped, response);
+            return;
 
         } catch (JwtException e) {
             log.error("JWT doğrulama hatası: {}", e.getMessage());
@@ -79,7 +90,51 @@ public class InternalJwtFilter extends OncePerRequestFilter {
             response.getWriter().write("{\"success\":false,\"message\":\"Yetkisiz: Geçersiz token\"}");
             return;
         }
+    }
 
-        filterChain.doFilter(request, response);
+    /**
+     * Faz 3.10 — "X-User-Id" header'ını her zaman doğrulanmış internal token
+     * uid'i ile döndürür (case-insensitive). İstemcinin gönderdiği X-User-Id
+     * yok sayılır → kimlik sahteciliği engellenir. Diğer tüm header'lar
+     * olduğu gibi geçer.
+     */
+    private static final class TrustedUserIdRequest extends HttpServletRequestWrapper {
+        private static final String HDR = "X-User-Id";
+        private final String trustedUserId;
+
+        TrustedUserIdRequest(HttpServletRequest request, String trustedUserId) {
+            super(request);
+            this.trustedUserId = trustedUserId;
+        }
+
+        @Override
+        public String getHeader(String name) {
+            if (HDR.equalsIgnoreCase(name)) {
+                return trustedUserId;
+            }
+            return super.getHeader(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaders(String name) {
+            if (HDR.equalsIgnoreCase(name)) {
+                return Collections.enumeration(Collections.singletonList(trustedUserId));
+            }
+            return super.getHeaders(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaderNames() {
+            // İstemci hiç X-User-Id göndermediyse bile listeye dahil et.
+            java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+            Enumeration<String> orig = super.getHeaderNames();
+            if (orig != null) {
+                while (orig.hasMoreElements()) {
+                    names.add(orig.nextElement());
+                }
+            }
+            names.add(HDR);
+            return Collections.enumeration(names);
+        }
     }
 }

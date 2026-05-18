@@ -1,2 +1,2 @@
 export { default } from './src/ElectionguardModule';
-export type { EncryptBallotInput, EncryptBallotResult } from './src/ElectionguardModule';
+export type { EncryptBallotInput, EncryptBallotResult, SpoilBallotResult } from './src/ElectionguardModule';

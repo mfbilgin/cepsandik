@@ -94,4 +94,10 @@ COPY --from=egk-builder /egk/out/test-data /app/egk-test-data
 
 EXPOSE 50051
 
+# Faz 3.13 — non-root çalıştır (container hardening). SelfTest çıktısı
+# /tmp/selftest-output'a (non-root yazabilir), test-data /app altında
+# world-readable → chown gerekmez. gRPC 50051>1024 root gerektirmez.
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

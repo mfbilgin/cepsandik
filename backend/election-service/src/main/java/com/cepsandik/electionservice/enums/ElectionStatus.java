@@ -23,7 +23,14 @@ public enum ElectionStatus {
     
     /** Arşivlendi - sonuçlar yayınlandı */
     ARCHIVED,
-    
+
     /** İptal edildi */
-    CANCELLED
+    CANCELLED,
+
+    /**
+     * Faz 2.8 — Tally tekrar tekrar başarısız oldu (retry cap aşıldı).
+     * Election CLOSED'tan bu duruma geçer; sessizce asılı kalmaz. Owner
+     * inceleyip manuel müdahale eder (oylar + bulletin korunur).
+     */
+    TALLY_FAILED
 }

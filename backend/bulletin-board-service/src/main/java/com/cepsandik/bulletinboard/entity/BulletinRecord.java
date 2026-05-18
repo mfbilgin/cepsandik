@@ -40,6 +40,11 @@ public class BulletinRecord {
     @Field("record_hash")
     private String recordHash;
 
+    /** İstemci idempotency anahtarı — sparse unique (publisher retry dedupe). */
+    @Indexed(unique = true, sparse = true)
+    @Field("idempotency_key")
+    private String idempotencyKey;
+
     @CreatedDate
     @Field("created_at")
     private Instant createdAt;

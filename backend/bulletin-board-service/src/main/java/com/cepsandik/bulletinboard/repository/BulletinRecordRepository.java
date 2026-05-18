@@ -12,4 +12,5 @@ public interface BulletinRecordRepository extends MongoRepository<BulletinRecord
     List<BulletinRecord> findByElectionIdOrderByIdAsc(String electionId);
     Optional<BulletinRecord> findTopByElectionIdOrderByIdDesc(String electionId);
     Optional<BulletinRecord> findByElectionIdAndTrackingCode(String electionId, String trackingCode);
+    Optional<BulletinRecord> findByIdempotencyKey(String idempotencyKey);
 }

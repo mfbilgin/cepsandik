@@ -4,6 +4,7 @@ import com.cepsandik.cryptoengine.service.BallotValidationService
 import com.cepsandik.cryptoengine.service.CreateJointKeyService
 import com.cepsandik.cryptoengine.service.DistributedTallySessionService
 import com.cepsandik.cryptoengine.service.ElectionSetupService
+import com.cepsandik.cryptoengine.service.SpoiledBallotService
 import com.cepsandik.cryptoengine.service.TallyDecryptionService
 import com.cepsandik.electionservice.grpc.CryptoServiceGrpc
 import com.cepsandik.electionservice.grpc.SetupElectionRequest
@@ -23,6 +24,8 @@ import com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionRequest
 import com.cepsandik.electionservice.grpc.StartTallyDecryptionSessionResponse
 import com.cepsandik.electionservice.grpc.SubmitChallengeResponseRequest
 import com.cepsandik.electionservice.grpc.SubmitPartialDecryptionRequest
+import com.cepsandik.electionservice.grpc.VerifySpoiledBallotRequest
+import com.cepsandik.electionservice.grpc.VerifySpoiledBallotResponse
 import io.grpc.Status
 import io.grpc.stub.StreamObserver
 import net.devh.boot.grpc.server.service.GrpcService
@@ -45,6 +48,7 @@ class CryptoServiceImpl(
     private val tallyDecryptionService: TallyDecryptionService,
     private val createJointKeyService: CreateJointKeyService,
     private val distributedTallySessionService: DistributedTallySessionService,
+    private val spoiledBallotService: SpoiledBallotService,
 ) : CryptoServiceGrpc.CryptoServiceImplBase() {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -93,6 +97,22 @@ class CryptoServiceImpl(
             log.error("tallyElection FAILED: election={}", request.electionId, t)
             responseObserver.onError(
                 Status.INTERNAL.withDescription("tallyElection: ${t.message}").asRuntimeException()
+            )
+        }
+    }
+
+    override fun verifySpoiledBallot(
+        request: VerifySpoiledBallotRequest,
+        responseObserver: StreamObserver<VerifySpoiledBallotResponse>
+    ) {
+        try {
+            val response = spoiledBallotService.verifySpoiled(request)
+            responseObserver.onNext(response)
+            responseObserver.onCompleted()
+        } catch (t: Throwable) {
+            log.error("verifySpoiledBallot FAILED: election={}", request.electionId, t)
+            responseObserver.onError(
+                Status.INTERNAL.withDescription("verifySpoiledBallot: ${t.message}").asRuntimeException()
             )
         }
     }

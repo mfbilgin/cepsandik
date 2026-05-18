@@ -6,6 +6,21 @@
 # Not: N=3 üretim politikasında kaldırıldı (koalisyon koruması sıfır), ama
 # protokol UAT'si için yeterli — kripto SelfTest'te N=3 zaten kanıtlandı.
 services:
+  # Faz 3.11 — UAT'ta rate-limit'i yükselt (prod default 15/100/60; 3 emülatör
+  # tek Docker IP + dağıtık ceremony/tally çağrı-yoğun). Kod değişmeden override.
+  gateway:
+    environment:
+      - RL_AUTH=2000
+      - RL_PROTECTED=5000
+      - RL_DEFAULT=2000
+
+  # Faz 4.14 — manuel 3-emülatör UAT'ta guardian senkronu yavaş; prod 15dk
+  # proxy timeout yetmez. UAT'ta 30dk + TTL 90dk.
+  crypto-engine-kotlin:
+    environment:
+      - TALLY_PROXY_TIMEOUT_MS=1800000
+      - TALLY_SESSION_TTL_MS=5400000
+
   election-service:
     environment:
       - APP_GUARDIAN_COUNT=3

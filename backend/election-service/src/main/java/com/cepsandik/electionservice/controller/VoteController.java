@@ -1,8 +1,10 @@
 package com.cepsandik.electionservice.controller;
 
 import com.cepsandik.electionservice.dto.request.CastVoteRequest;
+import com.cepsandik.electionservice.dto.request.SpoilBallotRequest;
 import com.cepsandik.electionservice.dto.request.VerifyAccessCodeRequest;
 import com.cepsandik.electionservice.dto.response.*;
+import com.cepsandik.electionservice.service.SpoiledBallotService;
 import com.cepsandik.electionservice.service.VoteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +21,21 @@ import org.springframework.web.bind.annotation.*;
 public class VoteController {
 
     private final VoteService voteService;
+    private final SpoiledBallotService spoiledBallotService;
+
+    @Operation(summary = "Benaloh challenge: bir ballot'u spoil et (cast-as-intended doğrula)")
+    @PostMapping("/spoil")
+    public ResponseEntity<ApiResponse<SpoilBallotResponse>> spoilBallot(
+            @PathVariable Long electionId,
+            @Valid @RequestBody SpoilBallotRequest request) {
+
+        SpoilBallotResponse response = spoiledBallotService.spoilBallot(electionId, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                response.isVerified()
+                        ? "Şifreleme doğrulandı (bu ballot sayılmayacak)"
+                        : "Şifreleme doğrulanamadı",
+                response));
+    }
 
     @Operation(summary = "Verify an access code and return election data")
     @PostMapping("/verify-access")

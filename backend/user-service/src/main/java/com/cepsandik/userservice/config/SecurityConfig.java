@@ -52,11 +52,26 @@ public class SecurityConfig {
                                 .permitAll()
                                 .anyRequest().authenticated());
                 http.cors(cors -> cors.configurationSource(request -> {
+                        // Faz 3.13 — CORS env-driven. "*" + allowCredentials(true)
+                        // sömürülebilir kombinasyondu; APP_CORS_ALLOWED_ORIGINS
+                        // (virgülle) ile kısıtla. Set edilmezse cross-origin
+                        // KAPALI (en güvenli; gateway üzerinden same-origin çalışır).
                         var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-                        corsConfig.setAllowedOriginPatterns(List.of("*")); // dev için açık, prod'da domainle sınırla
+                        String originsEnv = System.getenv("APP_CORS_ALLOWED_ORIGINS");
+                        java.util.List<String> origins = (originsEnv == null || originsEnv.isBlank())
+                                ? java.util.List.of()
+                                : java.util.Arrays.stream(originsEnv.split(","))
+                                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
+                        if (origins.contains("*")) {
+                                // Wildcard yalnızca credentials KAPALI iken güvenli.
+                                corsConfig.setAllowedOriginPatterns(List.of("*"));
+                                corsConfig.setAllowCredentials(false);
+                        } else {
+                                corsConfig.setAllowedOrigins(origins);
+                                corsConfig.setAllowCredentials(true);
+                        }
                         corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                         corsConfig.setAllowedHeaders(List.of("*"));
-                        corsConfig.setAllowCredentials(true);
                         return corsConfig;
                 }));
                 http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);

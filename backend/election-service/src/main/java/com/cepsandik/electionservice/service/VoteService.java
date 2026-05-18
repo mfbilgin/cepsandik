@@ -1,6 +1,5 @@
 package com.cepsandik.electionservice.service;
 
-import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
 import com.cepsandik.electionservice.config.UtcClock;
 import com.cepsandik.electionservice.dto.request.CastVoteRequest;
@@ -10,6 +9,7 @@ import com.cepsandik.electionservice.exception.ApiException;
 import com.cepsandik.electionservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,8 @@ public class VoteService {
     private final VoteTokenRepository voteTokenRepository;
     private final VoteRepository voteRepository;
     private final VoteNullifierRepository voteNullifierRepository;
-    private final BulletinBoardClient bulletinBoardClient;
+    private final SpoiledBallotRepository spoiledBallotRepository;
+    private final BulletinOutboxService bulletinOutbox;
     private final CryptoEngineClient cryptoEngineClient;
     private final UtcClock utcClock;
 
@@ -183,6 +184,17 @@ public class VoteService {
         }
         ballotHash = validation.getBallotHash().isBlank() ? ballotHash : validation.getBallotHash();
 
+        // Faz 1.4 — GİZLİLİK koruması: spoil edilmiş bir ciphertext ASLA cast
+        // edilemez. Spoil sırasında primary nonce açıldığı için bu ballot
+        // herkesçe çözülebilir; cast edilirse o seçmenin oyu ifşa olur.
+        if ((ballotHash != null && spoiledBallotRepository
+                .existsByElectionIdAndBallotHash(electionId, ballotHash))
+                || spoiledBallotRepository
+                .existsByElectionIdAndTrackingCode(electionId, trackingCode)) {
+            throw ApiException.badRequest("Bu ballot spoil edilmiş (nonce açık) — "
+                    + "gizlilik nedeniyle cast EDİLEMEZ. Lütfen yeni bir ballot şifreleyin.");
+        }
+
         Vote vote = Vote.builder()
                 .election(election)
                 .ballotId(request.getBallotId())
@@ -191,23 +203,42 @@ public class VoteService {
                 .zkpProof(request.getZkpProof())
                 .ballotHash(ballotHash)
                 .build();
-        vote = voteRepository.save(vote);
+        // Faz 3.12 — Double-vote: DB unique constraint'ler (uk_vote_nullifier_
+        // election_hash, uk_vote_election_ballot/tracking) çift oyu KESİN engeller.
+        // Pre-check (line ~142) ile DB constraint arası TOCTOU race'te ikinci
+        // eşzamanlı submit constraint'e takılır → 500 yerine TEMİZ 409 dön
+        // (tx rollback-only olduğundan aynı tx'te re-query yapılamaz; 409 doğru).
+        try {
+            vote = voteRepository.save(vote);
 
-        voteNullifierRepository.save(VoteNullifier.builder()
-                .election(election)
-                .nullifierHash(request.getNullifierHash())
-                .ballotId(request.getBallotId())
-                .build());
+            voteNullifierRepository.save(VoteNullifier.builder()
+                    .election(election)
+                    .nullifierHash(request.getNullifierHash())
+                    .ballotId(request.getBallotId())
+                    .build());
+            voteRepository.flush();
+            voteNullifierRepository.flush();
+        } catch (DataIntegrityViolationException dup) {
+            log.warn("Double-vote race engellendi (DB constraint): election={}, ballot={}",
+                    electionId, request.getBallotId());
+            throw ApiException.conflict("Bu anonim oy zaten kullanılmış "
+                    + "(eşzamanlı tekrar gönderim engellendi).");
+        }
         credential.markAsUsed(utcClock.instant());
         voteTokenRepository.save(credential);
 
-        bulletinBoardClient.appendRecord(
+        // Faz 1.1 — BALLOT_CAST kritik şeffaflık kaydı. Outbox: Vote satırı ile
+        // AYNI transaction'da atomik → BB geçici kapalıyken bile oy KAYBOLMAZ ve
+        // seçmen oy verebilir; publisher kaydı kısa sürede + idempotent teslim
+        // eder (seçmen tracking-code ile sonradan doğrular). Eski raw appendRecord
+        // BB outage'da seçmeni bloke ediyordu.
+        bulletinOutbox.enqueue(
                 String.valueOf(electionId),
                 "BALLOT_CAST",
                 vote.getTrackingCode(),
                 vote.getBallotHash(),
-                vote.getEncryptedBallot()
-        );
+                vote.getEncryptedBallot(),
+                true);
 
         log.info("Anonim E2E-V oy kaydedildi: election={}, ballot={}, hash={}",
                 electionId, request.getBallotId(), ballotHash);

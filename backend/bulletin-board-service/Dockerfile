@@ -9,4 +9,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8085
+# Faz 3.13 — non-root çalıştır (container hardening)
+RUN addgroup -S app && adduser -S app -G app
+USER app
 ENTRYPOINT ["java", "-jar", "app.jar"]

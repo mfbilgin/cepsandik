@@ -41,8 +41,22 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        // Faz 3.13 — CORS env-driven (APP_CORS_ALLOWED_ORIGINS, virgülle).
+        // Set edilmezse cross-origin KAPALI; gateway-internal servis olduğu
+        // için bu zaten canlı saldırı yüzeyi değil ama defense-in-depth.
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
+        String originsEnv = System.getenv("APP_CORS_ALLOWED_ORIGINS");
+        List<String> origins = (originsEnv == null || originsEnv.isBlank())
+                ? List.of()
+                : Arrays.stream(originsEnv.split(","))
+                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
+        if (origins.contains("*")) {
+            configuration.setAllowedOriginPatterns(List.of("*"));
+            configuration.setAllowCredentials(false);
+        } else {
+            configuration.setAllowedOrigins(origins);
+            configuration.setAllowCredentials(true);
+        }
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("*"));

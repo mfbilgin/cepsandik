@@ -1,7 +1,8 @@
 package com.cepsandik.electionservice.service;
 
-import com.cepsandik.electionservice.client.BulletinBoardClient;
 import com.cepsandik.electionservice.client.CryptoEngineClient;
+import com.cepsandik.electionservice.config.NotificationRabbitConfig;
+import com.cepsandik.electionservice.dto.GuardianAssignmentEvent;
 import com.cepsandik.electionservice.entity.Candidate;
 import com.cepsandik.electionservice.entity.Election;
 import com.cepsandik.electionservice.entity.ElectionGuardian;
@@ -19,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,8 +54,38 @@ public class DistributedKeyCeremonyService {
     private final GuardianKeyShareRepository keyShareRepository;
     private final CandidateRepository candidateRepository;
     private final CryptoEngineClient cryptoEngineClient;
-    private final BulletinBoardClient bulletinBoardClient;
+    private final BulletinOutboxService bulletinOutbox;
+    private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Faz 4.16 — Ceremony round bariyeri aşıldığında guardian'lara push.
+     * Guardian'lar artık "Devam Et"i manuel deneme-yanılma yapmasın; sıra
+     * geldiğinde bildirim alır. KANITLANMIŞ GuardianAssignmentEvent yolunu
+     * yeniden kullanır (yeni RabbitMQ tipi/routing/listener YOK — risk minimal).
+     * Bildirim hatası ceremony'i ASLA bozmamalı (fire-and-forget).
+     */
+    private void notifyCeremonyAdvance(Election election, List<ElectionGuardian> active, String step) {
+        try {
+            GuardianAssignmentEvent event = GuardianAssignmentEvent.builder()
+                    .electionId(election.getId())
+                    .electionTitle(election.getTitle())
+                    .communityName("")
+                    .selectedGuardianIds(active.stream()
+                            .map(ElectionGuardian::getUserId).toList())
+                    .category("CEREMONY_ADVANCE")
+                    .build();
+            rabbitTemplate.convertAndSend(
+                    NotificationRabbitConfig.NOTIFICATION_EXCHANGE,
+                    NotificationRabbitConfig.ELECTION_NOTIFICATION_ROUTING_KEY + ".guardian",
+                    event);
+            log.info("Ceremony advance push: electionId={}, step={}, guardians={}",
+                    election.getId(), step, active.size());
+        } catch (Exception e) {
+            log.warn("Ceremony advance push gönderilemedi (ceremony devam eder): "
+                    + "electionId={}, hata={}", election.getId(), e.getMessage());
+        }
+    }
 
     @Value("${app.guardian.quorum:2}")
     private int defaultQuorum;
@@ -68,17 +100,26 @@ public class DistributedKeyCeremonyService {
     }
 
     /**
-     * Bulletin board şeffaflık logu — AUXILIARY. Hata ceremony'i bloklamamalı
-     * (aksi halde @Transactional rollback olur, status kaydı geri alınır).
-     * Legacy autoTally ile aynı fail-safe pattern.
+     * Faz 1.1 — Şeffaflık kaydını transactional outbox'a yazar. Çağıranın
+     * @Transactional'ı içinde atomik commit olur (ceremony state ile birlikte).
+     * Eski "hatayı yutan" davranış kaldırıldı: kayıt artık ASLA sessizce
+     * kaybolmaz; teslim {@link BulletinOutboxPublisher} tarafından sıralı +
+     * retry'lı yapılır. Tüm ceremony kayıtları verifiability için critical.
      */
     private void safeBulletin(String electionId, String recordType,
                               String trackingCode, String ballotHash, String payload) {
+        bulletinOutbox.enqueue(electionId, recordType, trackingCode, ballotHash, payload, true);
+    }
+
+    /** Ceremony transcript attestation için SHA-256 hex (bulletin denetimi). */
+    private static String sha256Hex(String value) {
         try {
-            bulletinBoardClient.appendRecord(electionId, recordType, trackingCode, ballotHash, payload);
-        } catch (Exception e) {
-            log.warn("Bulletin board yazılamadı (ceremony devam eder): electionId={}, type={}, hata={}",
-                    electionId, recordType, e.getMessage());
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest((value == null ? "" : value)
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 yok", e);
         }
     }
 
@@ -143,6 +184,15 @@ public class DistributedKeyCeremonyService {
         safeBulletin(String.valueOf(electionId),
                 "KEY_UPLOADED", null, kmpGuardianId(me), null);
         log.info("Round1 KEY_UPLOADED: electionId={}, guardianId={}", electionId, kmpGuardianId(me));
+
+        // Faz 4.16 — Round 1 bariyeri: tüm aktif guardian'lar key yükledi mi?
+        // Öyleyse herkes Round 2 (key-share) yapabilir → push.
+        List<ElectionGuardian> active1 = activeGuardians(electionId);
+        boolean round1Done = !active1.isEmpty() && active1.stream()
+                .allMatch(g -> g.getStatus() != ElectionGuardian.GuardianStatus.PENDING);
+        if (round1Done) {
+            notifyCeremonyAdvance(election, active1, "Round 2: key-share değişimi");
+        }
     }
 
     // ==================== Round 2: peer keys + encrypted shares ====================
@@ -199,6 +249,16 @@ public class DistributedKeyCeremonyService {
         guardianRepository.save(me);
         log.info("Round2 KEYS_EXCHANGED: electionId={}, from={}, shares={}",
                 electionId, fromGid, shares.size());
+
+        // Faz 4.16 — Round 2 bariyeri: tüm aktif guardian'lar key-share
+        // değişimini bitirdi mi? Öyleyse herkes Round 3 (finalize) yapabilir.
+        List<ElectionGuardian> active2 = activeGuardians(electionId);
+        boolean round2Done = !active2.isEmpty() && active2.stream()
+                .allMatch(g -> g.getStatus() == ElectionGuardian.GuardianStatus.KEYS_EXCHANGED
+                        || g.getStatus() == ElectionGuardian.GuardianStatus.READY);
+        if (round2Done) {
+            notifyCeremonyAdvance(election, active2, "Round 3: finalize");
+        }
     }
 
     /** Guardian'a gelen şifreli key share'leri döner (sadece kendisi çözebilir). */
@@ -296,6 +356,33 @@ public class DistributedKeyCeremonyService {
 
             safeBulletin(String.valueOf(election.getId()),
                     "JOINT_KEY_GENERATED", null, null, response.getElectionManifest());
+
+            // Faz 1.2 — CEREMONY_TRANSCRIPT: CreateJointKeyService bu noktaya
+            // ulaşıldıysa TÜM guardian'ların Schnorr proof'ları sunucuda
+            // explicit doğrulandı (aksi halde fail-hard). Transcript, joint
+            // key'in yalnızca vetlenmiş guardian'lardan üretildiğinin
+            // denetlenebilir kanıtıdır (her guardian proof'unun SHA-256'sı +
+            // joint key hash'i). Denetçi bunu BB'den çekip doğrular.
+            try {
+                List<Map<String, String>> gAttest = new ArrayList<>();
+                for (ElectionGuardian g : guardians) {
+                    gAttest.add(Map.of(
+                            "guardianId", kmpGuardianId(g),
+                            "xCoordinate", String.valueOf(g.getXCoordinate()),
+                            "coefficientProofsSha256",
+                            sha256Hex(extractCoefficientProofs(g.getCoefficientProofs()))));
+                }
+                String transcript = objectMapper.writeValueAsString(Map.of(
+                        "n", n, "q", q,
+                        "guardians", gAttest,
+                        "jointPublicKeySha256", sha256Hex(response.getJointPublicKey()),
+                        "schnorrValidatedServerSide", true));
+                safeBulletin(String.valueOf(election.getId()),
+                        "CEREMONY_TRANSCRIPT", null, null, transcript);
+            } catch (Exception txEx) {
+                throw new RuntimeException("Ceremony transcript üretilemedi: "
+                        + txEx.getMessage(), txEx);
+            }
             log.info("Joint key üretildi (distributed): electionId={}, n={}, q={}, jointKey={}...",
                     election.getId(), n, q,
                     response.getJointPublicKey().substring(0,

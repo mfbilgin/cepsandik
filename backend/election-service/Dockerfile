@@ -17,4 +17,8 @@ COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8082
 
+# Faz 3.13 — non-root çalıştır (container hardening; 8082>1024 root gerekmez)
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
