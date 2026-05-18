@@ -48,6 +48,33 @@ public class AuditService {
         }
     }
 
+    /**
+     * Faz 4.15 — Pre-existing build break fix: AuditService.log 7-arg'a
+     * çevrilmiş (commit 5b94eff7) ama AuditLoggingAspect/RateLimitFilter/
+     * JwtAuthenticationEntryPoint hâlâ 4-arg çağırıyordu → user-service o
+     * commit'ten beri DERLENMİYORDU (prod imkansız). Bu convenience overload
+     * ip'i doğrudan alır (request yok), makul default'larla kaydeder.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void log(UUID userId, String action, String details, String ip) {
+        try {
+            AuditLog auditEntry = AuditLog.builder()
+                    .userId(userId)
+                    .module("GENERAL")
+                    .action(action)
+                    .status("N/A")
+                    .level(AuditLog.LogLevel.INFO)
+                    .details(details)
+                    .ipAddress(ip != null ? ip : "127.0.0.1")
+                    .userAgent("System")
+                    .build();
+            auditLogRepository.save(auditEntry);
+        } catch (Exception e) {
+            log.error("Audit Log kaydı veritabanına yapılamadı: {}", e.getMessage());
+        }
+    }
+
     private String getClientIp(HttpServletRequest request) {
         if (request == null) return "127.0.0.1";
         String remoteAddr = request.getHeader("X-FORWARDED-FOR");

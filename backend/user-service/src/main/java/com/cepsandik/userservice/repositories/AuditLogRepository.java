@@ -19,4 +19,6 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     // userId(UUID), action(String), timestamp(LocalDateTime) → isimler geçerli.
     Page<AuditLog> findByUserIdOrderByTimestampDesc(UUID userId, Pageable pageable);
     Page<AuditLog> findByActionContainingIgnoreCaseOrderByTimestampDesc(String action, Pageable pageable);
+    // AdminService.getAllAuditLogs — pre-existing build break fix (devam).
+    Page<AuditLog> findAllByOrderByTimestampDesc(Pageable pageable);
 }
