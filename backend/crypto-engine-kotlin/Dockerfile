@@ -97,7 +97,17 @@ EXPOSE 50051
 # Faz 3.13 — non-root çalıştır (container hardening). SelfTest çıktısı
 # /tmp/selftest-output'a (non-root yazabilir), test-data /app altında
 # world-readable → chown gerekmez. gRPC 50051>1024 root gerektirmez.
+#
+# Faz 4.15b regresyon fix: egklib-all.jar kendi logback.xml'ini classpath'e
+# koyuyor; içinde CWD'ye `egkServer.log` yazan bir FILE appender var. WORKDIR
+# /app root'a ait → non-root `app` yazamaz → Spring "Logging system failed to
+# initialize" ile FATAL düşüyordu (crypto-engine hiç ayağa kalkmıyordu).
+# Çözüm: app'in sahibi olduğu yazılabilir bir çalışma dizini ver, CWD onu
+# yapsın; egkServer.log oraya düşer. app.jar/egk-test-data absolute yolda,
+# etkilenmez. (egklib logback'inin bizim config'i ezmesi ayrı bir residual.)
 RUN addgroup -S app && adduser -S app -G app
+RUN mkdir -p /work && chown app:app /work
+WORKDIR /work
 USER app
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
