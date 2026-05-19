@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { AuthService } from '../../services/auth.service';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Button } from '../../components/ui';
 
 export const VerificationPendingScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -13,6 +15,7 @@ export const VerificationPendingScreen = () => {
     const route = useRoute<any>();
     const { t } = useI18n();
     const { email, password } = route.params || {};
+    const c = theme.colors;
 
     const handleResendEmail = async () => {
         if (!email || !password) {
@@ -20,74 +23,63 @@ export const VerificationPendingScreen = () => {
             navigation.navigate('Login');
             return;
         }
-
         setIsLoading(true);
         try {
             await AuthService.resendVerification(email, password);
-            Toast.show({ 
-                type: 'success', 
-                text1: 'Başarılı', 
-                text2: 'Doğrulama e-postası tekrar gönderildi. Lütfen gelen kutunuzu kontrol edin.' 
-            });
+            Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Doğrulama e-postası tekrar gönderildi. Lütfen gelen kutunuzu kontrol edin.' });
         } catch (error: any) {
-            Toast.show({ 
-                type: 'error', 
-                text1: 'Hata', 
-                text2: error.response?.data?.message || 'E-posta gönderilemedi.' 
-            });
+            Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'E-posta gönderilemedi.' });
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <SafeAreaView style={tw`flex-1 bg-background`}>
-            <View style={tw`flex-1 px-6 justify-center items-center`}>
-                <View style={tw`w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-6`}>
-                    <Ionicons name="mail-unread-outline" size={40} color={tw.color('primary')} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }}>
+            <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg, justifyContent: 'center', alignItems: 'center' }}>
+                <View
+                    style={{
+                        width: 80, height: 80, borderRadius: 40, backgroundColor: c.primaryTint,
+                        alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+                    }}
+                >
+                    <Ionicons name="mail-unread-outline" size={38} color={c.primary} />
                 </View>
 
-                <Text style={tw`text-2xl font-bold text-slate-900 mb-2 text-center`}>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: c.text, marginBottom: 8, textAlign: 'center' }}>
                     E-posta Doğrulaması Bekleniyor
                 </Text>
-                
-                <Text style={tw`text-slate-500 text-base text-center mb-8 px-4`}>
-                    Hesabınız henüz doğrulanmamış. Lütfen <Text style={tw`font-bold text-slate-700`}>{email}</Text> adresine gönderdiğimiz bağlantıya tıklayın.
+                <Text style={{ fontSize: 15, color: c.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 21 }}>
+                    Hesabınız henüz doğrulanmamış. Lütfen{' '}
+                    <Text style={{ fontWeight: '700', color: c.text }}>{email}</Text>
+                    {' '}adresine gönderdiğimiz bağlantıya tıklayın.
                 </Text>
 
-                <View style={tw`w-full gap-4`}>
-                    <TouchableOpacity
-                        style={tw`w-full bg-primary h-12 rounded-lg items-center justify-center flex-row gap-2 ${isLoading ? 'opacity-70' : ''}`}
+                <View style={{ width: '100%', gap: 12 }}>
+                    <Button
+                        title="Yeniden Gönder"
+                        icon="send-outline"
+                        loading={isLoading}
                         onPress={handleResendEmail}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <>
-                                <Ionicons name="send-outline" size={18} color="white" />
-                                <Text style={tw`text-white font-semibold text-base`}>Yeniden Gönder</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={tw`w-full h-12 rounded-lg items-center justify-center`}
+                    />
+                    <Button
+                        title="Giriş Ekranına Dön"
+                        variant="ghost"
                         onPress={() => navigation.navigate('Login')}
-                    >
-                        <Text style={tw`text-primary font-medium`}>Giriş Ekranına Dön</Text>
-                    </TouchableOpacity>
+                    />
                 </View>
 
-                <View style={tw`mt-12 p-4 bg-slate-50 rounded-xl border border-slate-100`}>
-                    <View style={tw`flex-row gap-3 items-start`}>
-                        <Ionicons name="information-circle-outline" size={20} color="#64748b" />
-                        <View style={tw`flex-1`}>
-                            <Text style={tw`text-sm text-slate-600 leading-5`}>
-                                E-posta gelmediyse Spam/Gereksiz klasörünü kontrol etmeyi unutmayın.
-                            </Text>
-                        </View>
-                    </View>
+                <View
+                    style={{
+                        marginTop: 40, padding: 14, backgroundColor: c.surfaceAlt,
+                        borderRadius: theme.borderRadius.md, borderWidth: 1, borderColor: c.border,
+                        flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+                    }}
+                >
+                    <Ionicons name="information-circle-outline" size={20} color={c.textSecondary} />
+                    <Text style={{ flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 19 }}>
+                        E-posta gelmediyse Spam/Gereksiz klasörünü kontrol etmeyi unutmayın.
+                    </Text>
                 </View>
             </View>
         </SafeAreaView>
