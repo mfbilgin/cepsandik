@@ -27,6 +27,12 @@ services:
       - APP_GUARDIAN_QUORUM=2
       - APP_GUARDIAN_DEV_BYPASS=false
       - APP_GUARDIAN_CEREMONY_HOURS=4
+      # Faz 4.15b — dağıtık manuel tally insan-hızında (3 cihaz elle
+      # partial+challenge gönderir, pilotta 10-30dk). Default 5dk stuck-grace
+      # bunun için saçma. Kod fix'i zaten "submission yoksa atla" yapıyor;
+      # bu override submission başladıktan sonraki replay penceresini de
+      # gerçekçi tutar (240dk).
+      - APP_TALLY_GRACE_MINUTES=240
       # Önceden eksik infra config: election-service community-service'i
       # localhost:8083 ile çağırıyordu (Docker'da Connection refused →
       # selectGuardians 0 üye). Docker service adına sabitle.

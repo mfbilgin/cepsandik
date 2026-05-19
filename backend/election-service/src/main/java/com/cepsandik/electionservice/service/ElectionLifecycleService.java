@@ -13,6 +13,7 @@ import com.cepsandik.electionservice.grpc.SetupElectionResponse;
 import com.cepsandik.electionservice.grpc.TallyElectionResponse;
 import com.cepsandik.electionservice.repository.CandidateRepository;
 import com.cepsandik.electionservice.repository.ElectionRepository;
+import com.cepsandik.electionservice.repository.TallySubmissionRepository;
 import com.cepsandik.electionservice.repository.VoteRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +47,7 @@ public class ElectionLifecycleService {
     private final CryptoEngineClient cryptoEngineClient;
     private final BulletinOutboxService bulletinOutbox;
     private final DistributedTallyService distributedTallyService;
+    private final TallySubmissionRepository tallySubmissionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.guardian.count:3}")
@@ -56,6 +58,22 @@ public class ElectionLifecycleService {
 
     @Value("${app.guardian.dev-bypass:false}")
     private boolean guardianDevBypass;
+
+    /**
+     * Faz 4.15b — Stuck-tally grace/cap artık env-override edilebilir. Default
+     * 5dk/8: TEK-NODE auto-tally için makul (saniyeler sürer, 5dk = gerçekten
+     * takılı). DAĞITIK manuel tally bambaşka: guardian'lar ayrı cihazlarda
+     * elle partial+challenge gönderir, pilotta 10-30dk normaldir. Bu yüzden
+     * dağıtık deployment APP_TALLY_GRACE_MINUTES'i yüksek set etmeli
+     * (docker-compose.uat.yaml + prod). Not: findStuckTallies yalnızca
+     * tallySessionId IS NOT NULL seçer → SADECE dağıtık tally; auto-tally
+     * (dev-bypass) session set etmez, bu sete hiç girmez.
+     */
+    @Value("${app.tally.grace-minutes:5}")
+    private long tallyGraceMinutes;
+
+    @Value("${app.tally.retry-cap:8}")
+    private int tallyRetryCap;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processScheduledToActive() {
@@ -235,10 +253,8 @@ public class ElectionLifecycleService {
 
     // ==================== Faz 2.8 — Stuck recovery ====================
 
-    /** endTime üstünden bu kadar dakika geçmeden stuck tally retry'a girilmez. */
-    private static final long TALLY_GRACE_MINUTES = 5;
-    /** Bu kadar durable-replay denemesinden sonra election TALLY_FAILED olur. */
-    private static final int TALLY_RETRY_CAP = 8;
+    // Faz 4.15b: grace/cap artık @Value alanları (tallyGraceMinutes /
+    // tallyRetryCap, yukarıda) — env-override edilebilir.
 
     /**
      * Süresi geçmiş, joint key'i hâlâ üretilmemiş ceremony'ler. Backup
@@ -274,13 +290,27 @@ public class ElectionLifecycleService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processStuckTallies() {
-        var graceBefore = utcClock.instant().minus(TALLY_GRACE_MINUTES, ChronoUnit.MINUTES);
+        var graceBefore = utcClock.instant().minus(tallyGraceMinutes, ChronoUnit.MINUTES);
         List<Election> stuck = electionRepository.findStuckTallies(
                 ElectionStatus.CLOSED, graceBefore);
         for (Election e : stuck) {
             try {
+                // Faz 4.15b — Asıl doğruluk fix'i: hiç partial submission
+                // yoksa bu tally "takılı" DEĞİL, guardian'ları bekliyor.
+                // durable-replay'in replay edecek hiçbir şeyi yok (no-op),
+                // ama eski kod yine de her 60sn retry sayacını artırıp cap'te
+                // TALLY_FAILED yapıyordu → dağıtık manuel tally daha
+                // başlamadan "başarısız" oluyordu. Replay yalnızca guardian'lar
+                // partial gönderip session kaybolduğunda anlamlı (Faz 2.6/2.8
+                // gerçek amacı). Submission yoksa atla — owner/operatör
+                // izleyip gerekirse müdahale eder; sayaç yakılmaz.
+                if (tallySubmissionRepository.countByElectionId(e.getId()) == 0) {
+                    log.debug("Stuck-tally atlandı (henüz submission yok, "
+                            + "guardian bekleniyor): electionId={}", e.getId());
+                    continue;
+                }
                 int attempts = e.getTallyRetryCount() == null ? 0 : e.getTallyRetryCount();
-                if (attempts >= TALLY_RETRY_CAP) {
+                if (attempts >= tallyRetryCap) {
                     e.setStatus(ElectionStatus.TALLY_FAILED);
                     electionRepository.save(e);
                     bulletinOutbox.enqueue(String.valueOf(e.getId()), "TALLY_FAILED",

@@ -15,4 +15,10 @@ public interface TallySubmissionRepository extends JpaRepository<TallySubmission
 
     /** Replay sırası: round'a göre id ASC (gönderim sırası korunur). */
     List<TallySubmission> findByElectionIdAndRoundOrderByIdAsc(Long electionId, String round);
+
+    /**
+     * Faz 4.15b — Stuck-tally ayrımı: 0 ise hiç guardian partial göndermemiş
+     * → tally "takılı" değil, guardian bekliyor (durable-replay anlamsız).
+     */
+    long countByElectionId(Long electionId);
 }
