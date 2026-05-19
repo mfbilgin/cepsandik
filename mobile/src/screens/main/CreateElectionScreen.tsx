@@ -133,6 +133,9 @@ export const CreateElectionScreen = () => {
 
     const handleCreate = async () => {
         if (!validateStep2()) return;
+        // Adayları doldururken zaman geçmiş olabilir — backend'in jenerik
+        // "Doğrulama Hatası"sına bırakmadan spesifik mesajla geri uyar.
+        if (!validateStep1()) return;
         setIsCreating(true);
 
         try {
@@ -179,9 +182,9 @@ export const CreateElectionScreen = () => {
                             onConfirm: async () => {
                                 await Clipboard.setStringAsync(accessCode);
                                 Toast.show({ type: 'success', text1: t('createElection.codeCopied') || 'Kod kopyalandı' });
-                                navigation.navigate('ElectionDetail', { electionId });
+                                navigation.replace('ElectionDetail', { electionId });
                             },
-                            onCancel: () => navigation.navigate('ElectionDetail', { electionId }),
+                            onCancel: () => navigation.replace('ElectionDetail', { electionId }),
                         });
                         return;
                     }
@@ -192,7 +195,7 @@ export const CreateElectionScreen = () => {
             }
 
             Toast.show({ type: 'success', text1: t('createElection.createSuccessTitle'), text2: t('createElection.createSuccessBody') });
-            navigation.navigate('ElectionDetail', { electionId: electionId });
+            navigation.replace('ElectionDetail', { electionId: electionId });
         } catch (e: any) {
             Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || t('createElection.createFailBody') });
         } finally {

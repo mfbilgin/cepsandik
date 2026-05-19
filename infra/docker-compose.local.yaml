@@ -151,6 +151,10 @@ services:
       - POSTGRES_PASSWORD=postgres
     volumes:
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      # Named volume — container recreate'lerinde veri kaybolmasın
+      # (yokken local stack'in postgres datası container layer'da kalıyor
+      # ve recreate ile siliniyordu; bkz 2026-05-20 kurtarma)
+      - cepsandik-postgres-data:/var/lib/postgresql/data
     networks:
       - app-network
     healthcheck:
@@ -167,6 +171,8 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - cepsandik-rabbitmq-data:/var/lib/rabbitmq
     networks:
       - app-network
     healthcheck:
@@ -197,3 +203,12 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  # Mevcut named volume'lar (compose project = cepsandik). Adı koruyarak
+  # tanımlandı; bunlar 2026-05-20 felaketinden sonra kurtarılan postgres
+  # ve rabbitmq verilerini içeriyor.
+  cepsandik-postgres-data:
+    external: true
+  cepsandik-rabbitmq-data:
+    external: true
