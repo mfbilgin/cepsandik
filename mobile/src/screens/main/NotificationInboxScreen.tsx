@@ -2,71 +2,80 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Screen, AppHeader, EmptyState } from '../../components/ui';
 
 export const NotificationInboxScreen = () => {
     const navigation = useNavigation<any>();
     const { t } = useI18n();
     const [refreshing, setRefreshing] = useState(false);
+    const c = theme.colors;
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        // Simulate fetch
         setTimeout(() => setRefreshing(false), 1000);
     }, []);
 
-    // Placeholder mock notifications
     const notifications = [
         { id: '1', title: t('inbox.mock1Title'), message: t('inbox.mock1Body'), time: t('inbox.mockTime1'), isRead: false },
         { id: '2', title: t('inbox.mock2Title'), message: t('inbox.mock2Body'), time: t('inbox.mockTime2'), isRead: true },
     ];
 
     return (
-        <View style={tw`flex-1 bg-background`}>
-            {/* Header */}
-            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
-                <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={24} color="#64748b" />
-                </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('inbox.title')}</Text>
+        <Screen scroll={false} padded={false}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('inbox.title')} onBack={() => navigation.goBack()} />
             </View>
 
             <ScrollView
-                contentContainerStyle={tw`flex-grow p-4`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#41431B']} />}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: 24, gap: 10 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
             >
                 {notifications.length === 0 ? (
-                    <View style={tw`flex-1 items-center justify-center p-6 mt-10`}>
-                        <View style={tw`w-24 h-24 bg-slate-100 rounded-full items-center justify-center mb-4`}>
-                            <Ionicons name="notifications-off-outline" size={40} color="#94a3b8" />
-                        </View>
-                        <Text style={tw`text-lg font-bold text-slate-700 text-center mb-1`}>{t('inbox.emptyTitle')}</Text>
-                        <Text style={tw`text-sm text-slate-500 text-center`}>{t('inbox.emptyBody')}</Text>
-                    </View>
+                    <EmptyState
+                        icon="notifications-off-outline"
+                        title={t('inbox.emptyTitle')}
+                        subtitle={t('inbox.emptyBody')}
+                    />
                 ) : (
-                    <View style={tw`flex-col gap-3`}>
-                        {notifications.map((item) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={tw`flex-row p-4 rounded-xl bg-surface border ${item.isRead ? 'border-slate-100' : 'border-primary/30'} shadow-sm`}
-                                activeOpacity={0.7}
+                    notifications.map((item) => (
+                        <TouchableOpacity
+                            key={item.id}
+                            activeOpacity={0.7}
+                            style={{
+                                flexDirection: 'row', padding: 14, borderRadius: theme.borderRadius.lg,
+                                backgroundColor: c.surface, borderWidth: 1,
+                                borderColor: item.isRead ? c.border : c.primary,
+                                gap: 14, ...theme.shadows.card,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 44, height: 44, borderRadius: 22,
+                                    backgroundColor: item.isRead ? c.surfaceAlt : c.primaryTint,
+                                    alignItems: 'center', justifyContent: 'center',
+                                }}
                             >
-                                <View style={tw`w-12 h-12 rounded-full ${item.isRead ? 'bg-slate-100' : 'bg-primary/10'} items-center justify-center mr-4`}>
-                                    <Ionicons name="notifications" size={24} color={item.isRead ? '#94a3b8' : '#41431B'} />
+                                <Ionicons name="notifications" size={22} color={item.isRead ? c.textTertiary : c.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
+                                    <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, flex: 1 }}>
+                                        {item.title}
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: c.textTertiary, marginLeft: 8 }}>{item.time}</Text>
                                 </View>
-                                <View style={tw`flex-1 flex-col`}>
-                                    <View style={tw`flex-row justify-between items-start mb-1`}>
-                                        <Text style={tw`text-base font-bold ${item.isRead ? 'text-slate-700' : 'text-slate-900'}`}>{item.title}</Text>
-                                        <Text style={tw`text-xs text-slate-400`}>{item.time}</Text>
-                                    </View>
-                                    <Text style={tw`text-sm leading-snug ${item.isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>{item.message}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                                <Text style={{ fontSize: 13, color: item.isRead ? c.textSecondary : c.text, lineHeight: 18 }}>
+                                    {item.message}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))
                 )}
             </ScrollView>
-        </View>
+        </Screen>
     );
 };

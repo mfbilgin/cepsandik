@@ -1,45 +1,55 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Screen, AppHeader, Card } from '../../components/ui';
 
 export const AboutScreen = () => {
     const navigation = useNavigation<any>();
     const { t } = useI18n();
+    const c = theme.colors;
 
     return (
-        <View style={tw`flex-1 bg-background`}>
-            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
-                <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={24} color="#64748b" />
-                </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('about.title')}</Text>
+        <Screen scroll padded={false}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('about.title')} onBack={() => navigation.goBack()} />
             </View>
 
-            <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6`}>
-                <View style={tw`items-center justify-center py-6`}>
-                    <View style={tw`w-24 h-24 bg-primary rounded-3xl items-center justify-center shadow-lg mb-4`}>
-                        <Ionicons name="cube-outline" size={48} color="white" />
+            <ScrollView
+                contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: 32 }}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={{ alignItems: 'center', paddingVertical: theme.spacing.lg }}>
+                    <View
+                        style={{
+                            width: 92, height: 92, borderRadius: theme.borderRadius.xl,
+                            backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center',
+                            marginBottom: 14, ...theme.shadows.card,
+                        }}
+                    >
+                        <Ionicons name="cube-outline" size={44} color="#fff" />
                     </View>
-                    <Text style={tw`text-2xl font-bold text-slate-900 mb-1`}>CepSandık</Text>
-                    <Text style={tw`text-base text-slate-500`}>{t('about.version')}</Text>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>CepSandık</Text>
+                    <Text style={{ fontSize: 14, color: c.textSecondary, marginTop: 4 }}>
+                        {t('about.version')}
+                    </Text>
                 </View>
 
-                <View style={tw`bg-surface rounded-2xl shadow-sm border border-slate-100 p-6`}>
-                    <Text style={tw`text-sm text-slate-600 leading-relaxed mb-4`}>
+                <Card>
+                    <Text style={{ fontSize: 14, color: c.textSecondary, lineHeight: 21, marginBottom: 12 }}>
                         {t('about.description1')}
                     </Text>
-                    <Text style={tw`text-sm text-slate-600 leading-relaxed`}>
+                    <Text style={{ fontSize: 14, color: c.textSecondary, lineHeight: 21 }}>
                         {t('about.description2')}
                     </Text>
-                </View>
+                </Card>
 
-                <View style={tw`items-center mt-8`}>
-                    <Text style={tw`text-xs text-slate-400`}>{t('about.copyright')}</Text>
-                </View>
+                <Text style={{ fontSize: 12, color: c.textTertiary, textAlign: 'center', marginTop: 32 }}>
+                    {t('about.copyright')}
+                </Text>
             </ScrollView>
-        </View>
+        </Screen>
     );
 };
