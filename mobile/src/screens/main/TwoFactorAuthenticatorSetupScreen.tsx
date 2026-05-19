@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Platform, StatusBar, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { AppHeader, Card, Button } from '../../components/ui';
 
 export const TwoFactorAuthenticatorSetupScreen = () => {
     const { user } = useAuth();
@@ -20,6 +21,7 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
     const [backupCodes, setBackupCodes] = useState<string[]>([]);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const { t } = useI18n();
+    const c = theme.colors;
 
     useEffect(() => {
         const generate2FA = async () => {
@@ -51,147 +53,124 @@ export const TwoFactorAuthenticatorSetupScreen = () => {
         }
     };
 
+    const StepRow = ({ n, label }: { n: number; label: string }) => (
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: c.onPrimary, fontSize: 12, fontWeight: '700' }}>{n}</Text>
+            </View>
+            <Text style={{ fontSize: 14, lineHeight: 20, color: c.text, flex: 1, marginTop: 2 }}>{label}</Text>
+        </View>
+    );
+
     return (
-        <SafeAreaView style={[tw`flex-1 bg-background`]}>
-            <View style={tw`flex-1 w-full max-w-md mx-auto flex-col overflow-hidden`}>
-                {/* Top Navigation */}
-                <View style={tw`flex-row items-center px-4 py-4 justify-between bg-transparent`}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={tw`flex h-12 w-12 items-center justify-center shrink-0`}
-                    >
-                        <Ionicons name="arrow-back" size={28} color="#0f172a" />
-                    </TouchableOpacity>
-                    <Text style={tw`text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 text-center pr-12`}>
-                        {t('twoFactor.setup.title')}
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'bottom']}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('twoFactor.setup.title')} onBack={() => navigation.goBack()} />
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: theme.spacing.md }}>
+                <View style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: c.primaryTint }} />
+                <View style={{ height: 8, width: 32, borderRadius: 4, backgroundColor: c.primary }} />
+                <View style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: c.primaryTint }} />
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
+                <View style={{ alignItems: 'center', marginTop: theme.spacing.sm }}>
+                    <Text style={{ fontSize: 22, textAlign: 'center', fontWeight: '700', color: c.text, marginBottom: 8 }}>
+                        {t('twoFactor.authSetup.title')}
+                    </Text>
+                    <Text style={{ fontSize: 14, textAlign: 'center', lineHeight: 20, color: c.textSecondary }}>
+                        {t('twoFactor.authSetup.desc')}
                     </Text>
                 </View>
 
-                {/* Progress Indicator */}
-                <View style={tw`flex w-full flex-row items-center justify-center gap-3 py-4`}>
-                    <View style={tw`h-2 w-2 rounded-full bg-primary/20`} />
-                    <View style={tw`h-2 w-8 rounded-full bg-primary`} />
-                    <View style={tw`h-2 w-2 rounded-full bg-primary/20`} />
-                </View>
-
-                <ScrollView contentContainerStyle={tw`flex-grow px-6 pb-50`} showsVerticalScrollIndicator={false}>
-                    {/* Header Content */}
-                    <View style={tw`text-center mt-4`}>
-                        <Text style={tw`text-2xl text-center font-bold leading-tight text-slate-900 mb-2`}>
-                            {t('twoFactor.authSetup.title')}
-                        </Text>
-                        <Text style={tw`text-sm text-center font-normal leading-relaxed text-slate-600`}>
-                            {t('twoFactor.authSetup.desc')}
-                        </Text>
+                {isLoading ? (
+                    <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+                        <ActivityIndicator size="large" color={c.primary} />
+                        <Text style={{ marginTop: 16, color: c.textSecondary }}>{t('twoFactor.authSetup.loading')}</Text>
                     </View>
-
-                    {isLoading ? (
-                        <View style={tw`flex-1 items-center justify-center`}>
-                            <ActivityIndicator size="large" color={tw.color('primary')} />
-                            <Text style={tw`mt-4 text-slate-500`}>{t('twoFactor.authSetup.loading')}</Text>
+                ) : fetchError ? (
+                    <View style={{ alignItems: 'center', justifyContent: 'center', padding: 16, paddingTop: 40 }}>
+                        <Ionicons name="warning-outline" size={56} color={c.danger} />
+                        <Text style={{ marginTop: 16, fontSize: 18, fontWeight: '700', textAlign: 'center', color: c.text }}>{t('twoFactor.authSetup.failedTitle')}</Text>
+                        <Text style={{ marginTop: 8, fontSize: 14, textAlign: 'center', color: c.textSecondary }}>{fetchError}</Text>
+                        <Text style={{ marginTop: 16, textAlign: 'center', fontSize: 12, color: c.textTertiary, backgroundColor: c.surfaceAlt, padding: 12, borderRadius: theme.borderRadius.md, borderWidth: 1, borderColor: c.border }}>
+                            {t('twoFactor.authSetup.backendHint')}
+                        </Text>
+                        <View style={{ marginTop: 24, width: '100%' }}>
+                            <Button title={t('twoFactor.authSetup.back')} variant="secondary" onPress={() => navigation.goBack()} />
                         </View>
-                    ) : fetchError ? (
-                        <View style={tw`flex-1 items-center justify-center p-4`}>
-                            <Ionicons name="warning-outline" size={64} color="#f43f5e" />
-                            <Text style={tw`mt-4 text-xl font-bold text-center text-slate-800`}>{t('twoFactor.authSetup.failedTitle')}</Text>
-                            <Text style={tw`mt-2 text-sm text-center text-slate-600`}>{fetchError}</Text>
-                            <Text style={tw`mt-4 text-center text-xs text-slate-400 bg-slate-50 p-3 rounded-lg border border-slate-100`}>{t('twoFactor.authSetup.backendHint')}</Text>
-                            <TouchableOpacity style={tw`mt-6 bg-primary/10 p-3 px-6 rounded-xl`} onPress={() => navigation.goBack()}>
-                                <Text style={tw`text-primary font-bold`}>{t('twoFactor.authSetup.back')}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <>
-                            {/* QR Code Container */}
-                            {qrCodeUrl && (
-                                <View style={tw`mt-8 flex-col items-center`}>
-                                    <View style={tw`p-6 bg-surface rounded-2xl shadow-sm border border-slate-200`}>
-                                        <Image
-                                            source={{ uri: qrCodeUrl.startsWith('data:image') ? qrCodeUrl : `data:image/png;base64,${qrCodeUrl}` }}
-                                            style={tw`w-48 h-48`}
-                                            resizeMode="contain"
-                                        />
-                                    </View>
+                    </View>
+                ) : (
+                    <>
+                        {qrCodeUrl && (
+                            <View style={{ marginTop: theme.spacing.xl, alignItems: 'center' }}>
+                                <View style={{ padding: 20, backgroundColor: c.surface, borderRadius: theme.borderRadius.xl, borderWidth: 1, borderColor: c.border, ...theme.shadows.card }}>
+                                    <Image
+                                        source={{ uri: qrCodeUrl.startsWith('data:image') ? qrCodeUrl : `data:image/png;base64,${qrCodeUrl}` }}
+                                        style={{ width: 192, height: 192 }}
+                                        resizeMode="contain"
+                                    />
                                 </View>
-                            )}
+                            </View>
+                        )}
 
-                            {/* Manual Entry Section */}
-                            <View style={tw`mt-8 flex-col gap-3`}>
-                                <Text style={tw`text-xs font-semibold uppercase tracking-wider text-center text-slate-500`}>{t('twoFactor.authSetup.cantScan')}</Text>
-                                <View style={tw`flex-row items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/20`}>
-                                    <View style={tw`flex-col`}>
-                                        <Text style={tw`text-[10px] text-primary font-bold uppercase`}>{t('twoFactor.authSetup.manualKey')}</Text>
-                                        <Text style={tw`font-mono font-bold tracking-widest text-slate-900 mt-1`}>
-                                            {manualKey || 'XXXX XXXX XXXX XXXX'}
-                                        </Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={copyToClipboard}
-                                        style={tw`flex items-center justify-center h-10 w-10 hover:bg-primary/10 rounded-lg`}
-                                    >
-                                        <Ionicons name="copy-outline" size={24} color={tw.color('primary')} />
-                                    </TouchableOpacity>
+                        <View style={{ marginTop: theme.spacing.xl, gap: 12 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', color: c.textSecondary }}>
+                                {t('twoFactor.authSetup.cantScan')}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: c.primaryTint, borderRadius: theme.borderRadius.lg, borderWidth: 1, borderColor: c.border }}>
+                                <View>
+                                    <Text style={{ fontSize: 10, color: c.primaryDark, fontWeight: '700', textTransform: 'uppercase' }}>{t('twoFactor.authSetup.manualKey')}</Text>
+                                    <Text style={{ fontFamily: 'monospace', fontWeight: '700', letterSpacing: 2, color: c.text, marginTop: 4 }}>
+                                        {manualKey || 'XXXX XXXX XXXX XXXX'}
+                                    </Text>
                                 </View>
-                                <TouchableOpacity
-                                    style={tw`mt-2 flex-row items-center justify-center gap-2 py-3.5 bg-slate-100 rounded-xl border border-slate-200`}
-                                    onPress={() => {
-                                        if (manualKey) {
-                                            const emailParam = user?.email ? `:${user.email}` : '';
-                                            const otpAuthUrl = `otpauth://totp/CepSandik${emailParam}?secret=${manualKey}&issuer=CepSandik`;
-                                            Linking.openURL(otpAuthUrl).catch(() => {
-                                                Toast.show({ type: 'error', text1: t('twoFactor.authSetup.noAppTitle'), text2: t('twoFactor.authSetup.noAppBody') });
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <Ionicons name="open-outline" size={20} color="#475569" />
-                                    <Text style={tw`text-slate-700 font-bold`}>{t('twoFactor.authSetup.openApp')}</Text>
+                                <TouchableOpacity onPress={copyToClipboard} style={{ alignItems: 'center', justifyContent: 'center', height: 40, width: 40 }}>
+                                    <Ionicons name="copy-outline" size={22} color={c.primary} />
                                 </TouchableOpacity>
                             </View>
+                            <TouchableOpacity
+                                style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, backgroundColor: c.surfaceAlt, borderRadius: theme.borderRadius.lg, borderWidth: 1, borderColor: c.border }}
+                                onPress={() => {
+                                    if (manualKey) {
+                                        const emailParam = user?.email ? `:${user.email}` : '';
+                                        const otpAuthUrl = `otpauth://totp/CepSandik${emailParam}?secret=${manualKey}&issuer=CepSandik`;
+                                        Linking.openURL(otpAuthUrl).catch(() => {
+                                            Toast.show({ type: 'error', text1: t('twoFactor.authSetup.noAppTitle'), text2: t('twoFactor.authSetup.noAppBody') });
+                                        });
+                                    }
+                                }}
+                            >
+                                <Ionicons name="open-outline" size={20} color={c.textSecondary} />
+                                <Text style={{ color: c.text, fontWeight: '700' }}>{t('twoFactor.authSetup.openApp')}</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                            {/* Instructions List */}
-                            <View style={tw`mt-8 flex-col gap-4`}>
-                                <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
-                                        <Text style={tw`text-white text-xs font-bold`}>1</Text>
-                                    </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step1')}</Text>
-                                </View>
-                                <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
-                                        <Text style={tw`text-white text-xs font-bold`}>2</Text>
-                                    </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step2')}</Text>
-                                </View>
-                                <View style={tw`flex-row gap-4 items-start`}>
-                                    <View style={tw`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary`}>
-                                        <Text style={tw`text-white text-xs font-bold`}>3</Text>
-                                    </View>
-                                    <Text style={tw`text-sm leading-snug text-slate-700 flex-1 mt-0.5`}>{t('twoFactor.authSetup.step3')}</Text>
-                                </View>
-                            </View>
-                        </>
-                    )}
-                </ScrollView>
-
-                {/* Sticky Bottom Button */}
-                {!fetchError && (
-                    <View style={tw`absolute bottom-0 w-full p-6 bg-background border-t border-slate-200 z-10`}>
-                        <TouchableOpacity
-                            style={tw`w-full h-14 bg-primary flex-row items-center justify-center gap-2 rounded-xl shadow-lg ${isLoading ? 'opacity-50' : ''}`}
-                            onPress={() => navigation.navigate('TwoFactorVerification', { backupCodes })}
-                            disabled={isLoading}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={tw`text-white font-bold text-base`}>{t('twoFactor.setup.continue')}</Text>
-                            <Ionicons name="arrow-forward" size={20} color="white" />
-                        </TouchableOpacity>
-                        <Text style={tw`mt-4 text-center text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em]`}>
-                            {t('twoFactor.authSetup.secured')}
-                        </Text>
-                    </View>
+                        <View style={{ marginTop: theme.spacing.xl, gap: 16 }}>
+                            <StepRow n={1} label={t('twoFactor.authSetup.step1')} />
+                            <StepRow n={2} label={t('twoFactor.authSetup.step2')} />
+                            <StepRow n={3} label={t('twoFactor.authSetup.step3')} />
+                        </View>
+                    </>
                 )}
-            </View>
+            </ScrollView>
+
+            {!fetchError && (
+                <View style={{ position: 'absolute', bottom: 0, width: '100%', padding: theme.spacing.lg, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
+                    <Button
+                        title={t('twoFactor.setup.continue')}
+                        icon="arrow-forward"
+                        iconPosition="right"
+                        size="lg"
+                        disabled={isLoading}
+                        onPress={() => navigation.navigate('TwoFactorVerification', { backupCodes })}
+                    />
+                    <Text style={{ marginTop: 16, textAlign: 'center', color: c.textTertiary, fontSize: 10, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 2 }}>
+                        {t('twoFactor.authSetup.secured')}
+                    </Text>
+                </View>
+            )}
         </SafeAreaView>
     );
 };

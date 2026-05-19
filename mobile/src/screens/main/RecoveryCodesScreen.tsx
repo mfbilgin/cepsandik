@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
+import { theme } from '../../utils/theme';
+import { AppHeader, Button } from '../../components/ui';
 
 export const RecoveryCodesScreen = () => {
     const navigation = useNavigation<any>();
@@ -18,6 +19,7 @@ export const RecoveryCodesScreen = () => {
     const [confirmed, setConfirmed] = useState(false);
     const { t } = useI18n();
     const { showDialog } = useUI();
+    const c = theme.colors;
 
     const copyAll = async () => {
         await Clipboard.setStringAsync(codes.join('\n'));
@@ -78,89 +80,91 @@ export const RecoveryCodesScreen = () => {
     };
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-surface`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
-            {/* Header */}
-            <View style={tw`flex-row items-center bg-surface/80 px-4 py-3 border-b border-slate-200 justify-between`}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center`}>
-                    <Ionicons name="arrow-back" size={24} color={tw.color('primary')} />
-                </TouchableOpacity>
-                <Text style={tw`text-lg font-bold text-slate-900 flex-1 text-center`}>{t('recovery.title')}</Text>
-                <View style={tw`w-10`} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'bottom']}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('recovery.title')} onBack={() => navigation.goBack()} />
             </View>
 
-            <ScrollView contentContainerStyle={tw`pb-8`} showsVerticalScrollIndicator={false}>
-                {/* Hero Icon */}
-                <View style={tw`items-center pt-8 pb-4 px-6`}>
-                    <View style={tw`bg-primary/10 p-4 rounded-full mb-6`}>
-                        <MaterialIcons name="shield" size={48} color={tw.color('primary')} />
+            <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+                <View style={{ alignItems: 'center', paddingTop: theme.spacing.lg, paddingBottom: theme.spacing.md, paddingHorizontal: theme.spacing.lg }}>
+                    <View
+                        style={{
+                            width: 80, height: 80, borderRadius: 40, backgroundColor: c.primaryTint,
+                            alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.lg,
+                        }}
+                    >
+                        <MaterialIcons name="shield" size={44} color={c.primary} />
                     </View>
-                    <Text style={tw`text-2xl font-bold text-slate-900 text-center tracking-tight mb-3`}>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: c.text, textAlign: 'center', marginBottom: 10 }}>
                         {t('recovery.heroTitle')}
                     </Text>
-                    <Text style={tw`text-sm text-slate-600 text-center font-medium leading-relaxed`}>
+                    <Text style={{ fontSize: 14, color: c.textSecondary, textAlign: 'center', lineHeight: 20 }}>
                         {t('recovery.heroBody')}
                     </Text>
                 </View>
 
-                {/* 2-Column Grid of Codes */}
-                <View style={tw`px-6 pb-4`}>
-                    <View style={tw`flex-row flex-wrap gap-3`}>
+                <View style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                         {codes.length > 0 ? codes.map((code: string, idx: number) => (
-                            <View key={idx} style={[tw`bg-slate-50 border border-slate-200 rounded-lg p-4 flex-row items-center gap-2`, { width: '47.5%' }]}>
-                                <MaterialIcons name="verified-user" size={18} color="#41431B80" />
-                                <Text style={tw`font-mono font-bold text-slate-900 text-sm tracking-widest`}>{code}</Text>
+                            <View
+                                key={idx}
+                                style={{
+                                    backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border,
+                                    borderRadius: theme.borderRadius.md, padding: 14, flexDirection: 'row',
+                                    alignItems: 'center', gap: 8, width: '47.5%',
+                                }}
+                            >
+                                <MaterialIcons name="verified-user" size={18} color={c.textTertiary} />
+                                <Text style={{ fontFamily: 'monospace', fontWeight: '700', color: c.text, fontSize: 13, letterSpacing: 2 }}>{code}</Text>
                             </View>
                         )) : (
-                            <View style={tw`w-full items-center p-6`}>
-                                <Text style={tw`text-slate-400 font-medium`}>{t('recovery.empty')}</Text>
+                            <View style={{ width: '100%', alignItems: 'center', padding: 24 }}>
+                                <Text style={{ color: c.textTertiary, fontWeight: '500' }}>{t('recovery.empty')}</Text>
                             </View>
                         )}
                     </View>
                 </View>
 
-                {/* Utility Buttons */}
-                <View style={tw`px-6 py-2 gap-3`}>
-                    <View style={tw`flex-row gap-3`}>
+                <View style={{ paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm }}>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
                         <TouchableOpacity
                             onPress={downloadTxt}
-                            style={tw`flex-1 bg-primary/10 h-12 rounded-xl flex-row items-center justify-center gap-2`}
+                            style={{ flex: 1, backgroundColor: c.primaryTint, height: 48, borderRadius: theme.borderRadius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                         >
-                            <MaterialIcons name="download" size={20} color={tw.color('primary')} />
-                            <Text style={tw`text-primary font-bold text-sm`}>{t('recovery.downloadTxt')}</Text>
+                            <MaterialIcons name="download" size={20} color={c.primary} />
+                            <Text style={{ color: c.primary, fontWeight: '700', fontSize: 14 }}>{t('recovery.downloadTxt')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={copyAll}
-                            style={tw`flex-1 bg-primary/10 h-12 rounded-xl flex-row items-center justify-center gap-2`}
+                            style={{ flex: 1, backgroundColor: c.primaryTint, height: 48, borderRadius: theme.borderRadius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                         >
-                            <MaterialIcons name="content-copy" size={20} color={tw.color('primary')} />
-                            <Text style={tw`text-primary font-bold text-sm`}>{t('recovery.copyAll')}</Text>
+                            <MaterialIcons name="content-copy" size={20} color={c.primary} />
+                            <Text style={{ color: c.primary, fontWeight: '700', fontSize: 14 }}>{t('recovery.copyAll')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Confirmation + Done */}
-                <View style={tw`px-6 pt-4 border-t border-slate-100 mt-6`}>
+                <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, borderTopWidth: 1, borderTopColor: c.border, marginTop: theme.spacing.lg }}>
                     <TouchableOpacity
                         onPress={() => setConfirmed(!confirmed)}
-                        style={tw`flex-row items-center gap-3 mb-6`}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: theme.spacing.lg, marginTop: theme.spacing.md }}
                     >
-                        <View style={tw`w-5 h-5 rounded border-2 ${confirmed ? 'bg-primary border-primary' : 'border-slate-400 bg-surface'} items-center justify-center`}>
-                            {confirmed && <MaterialIcons name="check" size={14} color="white" />}
+                        <View
+                            style={{
+                                width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                                backgroundColor: confirmed ? c.primary : c.surface,
+                                borderColor: confirmed ? c.primary : c.borderStrong,
+                                alignItems: 'center', justifyContent: 'center',
+                            }}
+                        >
+                            {confirmed && <MaterialIcons name="check" size={14} color={c.onPrimary} />}
                         </View>
-                        <Text style={tw`text-sm font-semibold text-primary flex-1 leading-snug`}>
+                        <Text style={{ fontSize: 14, fontWeight: '500', color: c.text, flex: 1, lineHeight: 19 }}>
                             {t('recovery.checkbox')}
                         </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={handleDone}
-                        style={tw`w-full h-14 bg-primary rounded-xl items-center justify-center shadow-lg shadow-blue-500/30`}
-                    >
-                        <Text style={tw`text-white font-bold text-base tracking-wide`}>{t('recovery.done')}</Text>
-                    </TouchableOpacity>
-
-                    {/* iOS Home Bar */}
-                    <View style={tw`w-32 h-1 bg-slate-300/60 rounded-full mx-auto mt-6`} />
+                    <Button title={t('recovery.done')} size="lg" onPress={handleDone} />
                 </View>
             </ScrollView>
         </SafeAreaView>
