@@ -241,7 +241,7 @@ export const CreateElectionScreen = () => {
                                 onPress={() => setElectionType(t.key)}
                                 style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${electionType === t.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50'}`}
                             >
-                                <MaterialIcons name={t.icon as any} size={22} color={electionType === t.key ? '#41431B' : '#94a3b8'} />
+                                <MaterialIcons name={t.icon as any} size={22} color={electionType === t.key ? (tw.color('primary') as string) : '#94a3b8'} />
                                 <View style={tw`flex-1`}>
                                     <Text style={tw`font-semibold ${electionType === t.key ? 'text-primary' : 'text-slate-700'}`}>{t.label}</Text>
                                     <Text style={tw`text-xs text-slate-400`}>{t.desc}</Text>
@@ -263,7 +263,7 @@ export const CreateElectionScreen = () => {
                                 }}
                                 style={tw`flex-row items-center gap-3 p-3 rounded-xl border ${candidateType === t.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50'}`}
                             >
-                                <MaterialIcons name={t.icon as any} size={22} color={candidateType === t.key ? '#41431B' : '#94a3b8'} />
+                                <MaterialIcons name={t.icon as any} size={22} color={candidateType === t.key ? (tw.color('primary') as string) : '#94a3b8'} />
                                 <View style={tw`flex-1`}>
                                     <Text style={tw`font-semibold ${candidateType === t.key ? 'text-primary' : 'text-slate-700'}`}>{t.label}</Text>
                                     <Text style={tw`text-xs text-slate-400`}>{t.desc}</Text>
