@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Keyboard, Switch } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Keyboard, Switch, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { api } from '../../services/api';
+import * as ImagePicker from 'expo-image-picker';
 import Toast from 'react-native-toast-message';
+import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { Screen, AppHeader, Card, Input, Button } from '../../components/ui';
@@ -16,6 +17,32 @@ export const CreateCommunityScreen = () => {
     const [description, setDescription] = useState('');
     const [isPrivate, setIsPrivate] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [logoUri, setLogoUri] = useState<string | null>(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+
+    const pickLogo = async () => {
+        try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Toast.show({ type: 'error', text1: t('profile.permissionDeniedTitle') || 'İzin Gerekli', text2: 'Galeriye erişim izni gerekli' });
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets?.[0]) {
+                const asset = result.assets[0];
+                setLogoUri(asset.uri);
+            }
+        } catch (error) {
+            Toast.show({ type: 'error', text1: t('common.error'), text2: 'Resim seçerken hata oluştu' });
+        }
+    };
 
     const handleCreate = async () => {
         if (!name.trim() || !description.trim()) {
@@ -27,11 +54,42 @@ export const CreateCommunityScreen = () => {
         Keyboard.dismiss();
 
         try {
-            await api.post('/communities', {
+            // 1) Topluluğu oluştur (logo URL'siz — gerçek upload sonraki adımda)
+            const response = await api.post('/communities', {
                 name: name.trim(),
                 description: description.trim(),
-                visibility: isPrivate ? 'PRIVATE' : 'PUBLIC'
+                visibility: isPrivate ? 'PRIVATE' : 'PUBLIC',
             });
+            const newCommunityId = response.data?.data?.id;
+
+            // 2) Logo seçildiyse multipart yükle (community-service S3 endpoint'i)
+            if (newCommunityId && logoUri) {
+                try {
+                    setUploadingLogo(true);
+                    const form = new FormData();
+                    // RN FormData için { uri, name, type } üçlüsü zorunlu
+                    const fileName = logoUri.split('/').pop() || 'logo.jpg';
+                    const mime = fileName.toLowerCase().endsWith('.png') ? 'image/png'
+                        : fileName.toLowerCase().endsWith('.webp') ? 'image/webp'
+                        : fileName.toLowerCase().endsWith('.gif') ? 'image/gif'
+                        : 'image/jpeg';
+                    form.append('file', { uri: logoUri, name: fileName, type: mime } as any);
+                    await api.post(`/communities/${newCommunityId}/logo`, form, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                        transformRequest: (data) => data, // axios FormData'yı JSON'a çevirmesin
+                    });
+                } catch (uploadErr: any) {
+                    // Topluluk yine de oluştu; logo eksik
+                    Toast.show({
+                        type: 'info',
+                        text1: t('createCommunity.logoUploadFailedTitle') || 'Logo yüklenemedi',
+                        text2: t('createCommunity.logoUploadFailedBody') || 'Topluluk oluştu ama logo yüklenemedi. Yönet ekranından tekrar deneyebilirsiniz.',
+                    });
+                } finally {
+                    setUploadingLogo(false);
+                }
+            }
+
             Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('createCommunity.successBody') });
             setTimeout(() => {
                 navigation.goBack();
@@ -58,16 +116,25 @@ export const CreateCommunityScreen = () => {
                 <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl, marginTop: theme.spacing.sm }}>
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => Toast.show({ type: 'info', text1: t('profile.comingSoonTitle'), text2: t('createCommunity.logoSoon') })}
+                        onPress={pickLogo}
+                        disabled={uploadingLogo}
                     >
                         <View
                             style={{
-                                width: 112, height: 112, borderRadius: 56, backgroundColor: c.surfaceAlt,
+                                width: 112, height: 112, borderRadius: 56, backgroundColor: logoUri ? c.primary : c.surfaceAlt,
                                 alignItems: 'center', justifyContent: 'center', borderWidth: 2,
-                                borderStyle: 'dashed', borderColor: c.borderStrong, overflow: 'hidden',
+                                borderStyle: logoUri ? 'solid' : 'dashed', 
+                                borderColor: logoUri ? c.primary : c.borderStrong, 
+                                overflow: 'hidden',
                             }}
                         >
-                            <Ionicons name="camera-outline" size={36} color={c.textTertiary} />
+                            {logoUri ? (
+                                <Image source={{ uri: logoUri }} style={{ width: '100%', height: '100%' }} />
+                            ) : uploadingLogo ? (
+                                <ActivityIndicator size="large" color={c.primary} />
+                            ) : (
+                                <Ionicons name="camera-outline" size={36} color={c.textTertiary} />
+                            )}
                         </View>
                         <View
                             style={{
@@ -76,12 +143,17 @@ export const CreateCommunityScreen = () => {
                                 alignItems: 'center', justifyContent: 'center',
                             }}
                         >
-                            <Ionicons name="add" size={16} color={c.onPrimary} />
+                            <Ionicons name={logoUri ? 'checkmark' : 'add'} size={16} color={c.onPrimary} />
                         </View>
                     </TouchableOpacity>
                     <Text style={{ marginTop: 12, fontSize: 14, fontWeight: '600', color: c.primary }}>
-                        {t('createCommunity.uploadLogo')}
+                        {logoUri ? (t('createCommunity.logoSelected') || 'Logo Seçildi') : (t('createCommunity.uploadLogo') || 'Logo Yükle')}
                     </Text>
+                    {logoUri && (
+                        <TouchableOpacity onPress={() => setLogoUri(null)} style={{ marginTop: 8 }}>
+                            <Text style={{ fontSize: 13, color: c.danger }}>Değiştir</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <Input

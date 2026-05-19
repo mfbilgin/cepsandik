@@ -9,8 +9,10 @@ import com.cepsandik.communityservice.service.CommunityService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/communities")
@@ -75,6 +77,16 @@ public class CommunityController {
 
         PageResponse<CommunityResponse> communities = communityService.searchCommunities(query, page, size);
         return ResponseEntity.ok(ApiResponse.success(communities));
+    }
+
+    @PostMapping(value = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<CommunityResponse>> uploadLogo(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader("X-User-Id") String userId) {
+
+        CommunityResponse response = communityService.uploadLogo(id, userId, file);
+        return ResponseEntity.ok(ApiResponse.success("Topluluk logosu güncellendi", response));
     }
 
     @GetMapping("/unsplash")

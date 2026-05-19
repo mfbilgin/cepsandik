@@ -61,6 +61,12 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
       - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
       - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+      - AWS_S3_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_S3_SECRET_KEY=${AWS_SECRET_KEY}
+      - AWS_S3_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_BUCKET}
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=10MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=10MB
     depends_on:
       - postgres
     networks:
@@ -114,12 +120,16 @@ services:
       - "8084:8084"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/notificationdb
+      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
       - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - EXPO_PUSH_API_URL=https://exp.host/--/api/v2/push/send
       - APP_USER_SERVICE_URL=http://user-service:8080
     depends_on:
+      - postgres
       - rabbitmq
     networks:
       - app-network

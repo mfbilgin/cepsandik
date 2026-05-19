@@ -22,6 +22,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,7 @@ public class CommunityService {
     private final CommunityRepository communityRepository;
     private final CommunityMemberRepository memberRepository;
     private final CommunityMapper communityMapper;
+    private final FileUploadService fileUploadService;
 
     @Transactional
     public CommunityResponse createCommunity(CreateCommunityRequest request, String userId) {
@@ -171,6 +173,37 @@ public class CommunityService {
                 .collect(Collectors.toList());
 
         return PageResponse.of(responses, page, size, communities.getTotalElements());
+    }
+
+    /**
+     * Topluluk logosunu S3'e yükler, eski logoyu temizler ve yeni URL'i kaydeder.
+     * Yalnızca OWNER/ADMIN yapabilir.
+     */
+    @Transactional
+    public CommunityResponse uploadLogo(Long communityId, String userId, MultipartFile file) {
+        Community community = communityRepository.findByIdAndIsDeletedFalse(communityId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Topluluk bulunamadı"));
+
+        CommunityMember member = memberRepository.findByCommunityIdAndUserId(communityId, userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "Bu topluluğun üyesi değilsiniz"));
+
+        if (member.getRole() != MemberRole.OWNER && member.getRole() != MemberRole.ADMIN) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Logo güncelleme yetkiniz yok");
+        }
+
+        String oldUrl = community.getCoverImageUrl();
+        String newUrl = fileUploadService.uploadCommunityLogo(communityId, file);
+
+        community.setCoverImageUrl(newUrl);
+        Community saved = communityRepository.save(community);
+
+        // En son: eski S3 nesnesini temizle (best-effort; S3 dışı URL'ler dokunulmaz)
+        if (oldUrl != null && !oldUrl.equals(newUrl)) {
+            fileUploadService.deleteLogo(oldUrl);
+        }
+
+        log.info("Topluluk logosu güncellendi: communityId={}, userId={}", communityId, userId);
+        return buildCommunityResponse(saved, userId);
     }
 
     private CommunityResponse buildCommunityResponse(Community community, String userId) {
