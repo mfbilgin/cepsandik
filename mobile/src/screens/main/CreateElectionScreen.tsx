@@ -8,9 +8,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
+import * as Clipboard from 'expo-clipboard';
 import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
+import { useUI } from '../../context/UIContext';
 
 type CandidateType = 'PERSON' | 'TEXT_OPTION' | 'IMAGE_OPTION';
 type ElectionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
@@ -28,6 +30,7 @@ export const CreateElectionScreen = () => {
     const route = useRoute<any>();
     const { communityId } = route.params || {};
     const { t } = useI18n();
+    const { showDialog } = useUI();
 
     // === Step ===
     const [step, setStep] = useState(1); // 1 = Basic info, 2 = Candidates
@@ -103,8 +106,10 @@ export const CreateElectionScreen = () => {
     };
 
     const selectMember = (member: any) => {
-        const displayName = member.displayName || member.userId || t('createElection.unknownMember');
-        const avatarUrl = member.avatarUrl || '';
+        const displayName = member.displayName || 
+            (member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : null) ||
+            member.userId || t('createElection.unknownMember');
+        const avatarUrl = member.profileImage || member.avatarUrl || '';
         setCandidates(prev => prev.map((c, i) => i === pickerTargetIndex
             ? { ...c, name: displayName, imageUrl: avatarUrl, memberUserId: member.userId }
             : c
@@ -157,6 +162,33 @@ export const CreateElectionScreen = () => {
                     candidateType: c.candidateType,
                     memberUserId: c.memberUserId || null,
                 });
+            }
+
+            // 3. Topluluk bağımsız seçim → paylaşılabilir 6 haneli erişim kodu üret
+            if (!communityId) {
+                try {
+                    const codeRes = await api.post(`/elections/${electionId}/access-codes`, {});
+                    const accessCode = codeRes.data?.data?.code;
+                    if (accessCode) {
+                        showDialog({
+                            title: t('createElection.codeReadyTitle') || 'Seçim Hazır',
+                            message: (t('createElection.codeReadyBody') || 'Katılımcılar bu 6 haneli kodu ana sayfada girerek seçime erişebilir:\n\n{code}').replace('{code}', accessCode),
+                            type: 'success',
+                            confirmText: t('createElection.copyCode') || 'Kodu Kopyala',
+                            cancelText: t('common.continue') || 'Devam',
+                            onConfirm: async () => {
+                                await Clipboard.setStringAsync(accessCode);
+                                Toast.show({ type: 'success', text1: t('createElection.codeCopied') || 'Kod kopyalandı' });
+                                navigation.navigate('ElectionDetail', { electionId });
+                            },
+                            onCancel: () => navigation.navigate('ElectionDetail', { electionId }),
+                        });
+                        return;
+                    }
+                } catch (codeErr) {
+                    // Kod üretilemese de seçim oluşturuldu; sessiz geç
+                    console.warn('Access code generation failed', codeErr);
+                }
             }
 
             Toast.show({ type: 'success', text1: t('createElection.createSuccessTitle'), text2: t('createElection.createSuccessBody') });
@@ -451,7 +483,9 @@ export const CreateElectionScreen = () => {
                                             <MaterialIcons name="person" size={22} color={tw.color('primary')} />
                                         </View>
                                         <View>
-                                            <Text style={tw`text-slate-900 font-semibold`}>{item.displayName || item.userId}</Text>
+                                            <Text style={tw`text-slate-900 font-semibold`}>
+                                                {item.displayName || (item.firstName && item.lastName ? `${item.firstName} ${item.lastName}` : item.userId)}
+                                            </Text>
                                             <Text style={tw`text-slate-400 text-xs`}>{item.role}</Text>
                                         </View>
                                     </TouchableOpacity>

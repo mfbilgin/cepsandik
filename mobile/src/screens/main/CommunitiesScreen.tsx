@@ -52,16 +52,27 @@ export const CommunitiesScreen = () => {
     useEffect(() => { initialFetch(); }, []);
 
     useEffect(() => {
+        let filtered = communities;
+
+        // Filter by tab - managed tab should only show communities where user is OWNER or ADMIN
+        if (activeTab === 'managed') {
+            filtered = communities.filter((x) => x.userRole === 'OWNER' || x.userRole === 'ADMIN');
+        } else {
+            // memberships tab shows all communities where user is a member (any role including MEMBER)
+            filtered = communities.filter((x) => x.userRole); // Has any role
+        }
+
+        // Apply search filter
         if (!searchQuery) {
-            setFilteredCommunities(communities);
+            setFilteredCommunities(filtered);
         } else {
             const q = searchQuery.toLowerCase();
             setFilteredCommunities(
-                communities.filter((x) =>
+                filtered.filter((x) =>
                     x.name?.toLowerCase().includes(q) || x.description?.toLowerCase().includes(q)),
             );
         }
-    }, [searchQuery, communities]);
+    }, [searchQuery, communities, activeTab]);
 
     const IconBtn = ({ name, onPress }: { name: any; onPress: () => void }) => (
         <TouchableOpacity
@@ -105,6 +116,7 @@ export const CommunitiesScreen = () => {
                             <Text style={{ fontSize: 24, fontWeight: '700', color: c.text }}>{t('communities.title')}</Text>
                             <View style={{ flexDirection: 'row', gap: 8 }}>
                                 <IconBtn name="search" onPress={() => setIsSearchOpen(true)} />
+                                <IconBtn name="add-circle-outline" onPress={() => navigation.navigate('CreateElection')} />
                                 <IconBtn name="notifications-outline" onPress={() => navigation.navigate('NotificationInbox')} />
                             </View>
                         </>
