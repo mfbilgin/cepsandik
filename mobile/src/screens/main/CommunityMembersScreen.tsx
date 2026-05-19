@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Image, StatusBar, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { api } from '../../services/api';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { AppHeader, Badge, EmptyState } from '../../components/ui';
 
 export const CommunityMembersScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { communityId, communityName } = route.params || {};
     const { t } = useI18n();
+    const c = theme.colors;
 
     const [members, setMembers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -19,7 +22,6 @@ export const CommunityMembersScreen = () => {
     const fetchMembers = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Getting up to 500 members to do local search
             const res = await api.get(`/communities/${communityId}/members?size=500`);
             setMembers(res.data?.data?.content || []);
         } catch (error) {
@@ -49,84 +51,80 @@ export const CommunityMembersScreen = () => {
     };
 
     return (
-        <View style={tw`flex-1 bg-background`}>
-            <StatusBar barStyle="dark-content" />
-
-            {/* Header */}
-            <View style={[tw`px-4 bg-surface/90 border-b border-borderDefault flex-row items-center justify-between pb-2 z-30`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 44 : 48 }]}>
-                <View style={tw`flex-row items-center gap-3`}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={tw`items-center justify-center rounded-full active:opacity-60`}>
-                        <MaterialIcons name="arrow-back" size={24} color={tw.color('primary')} />
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={tw`text-lg font-bold text-textDefault tracking-tight`}>{t('communityMembers.title') || 'Tüm Üyeler'}</Text>
-                        {!!communityName && <Text style={tw`text-xs text-textSecondary`}>{communityName}</Text>}
-                    </View>
-                </View>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader
+                    title={t('communityMembers.title') || 'Tüm Üyeler'}
+                    subtitle={communityName || undefined}
+                    onBack={() => navigation.goBack()}
+                />
             </View>
 
             {/* Search Bar */}
-            <View style={tw`px-4 py-3 bg-surface border-b border-borderDefault`}>
-                <View style={tw`flex-row items-center bg-background rounded-full px-4 h-11 border border-borderDefault`}>
-                    <Ionicons name="search" size={20} color={tw.color('textSecondary')} />
+            <View style={{ paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.md }}>
+                <View
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
+                        borderRadius: theme.borderRadius.round, paddingHorizontal: 16, height: 44,
+                        borderWidth: 1, borderColor: c.border,
+                    }}
+                >
+                    <Ionicons name="search" size={20} color={c.textTertiary} />
                     <TextInput
-                        style={tw`flex-1 h-full px-3 text-textDefault text-base`}
+                        style={{ flex: 1, height: '100%', paddingHorizontal: 12, color: c.text, fontSize: 15 }}
                         placeholder={t('communityMembers.searchPlaceholder') || 'Üye ara...'}
-                        placeholderTextColor={tw.color('textSecondary')}
+                        placeholderTextColor={c.textTertiary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color={tw.color('textSecondary')} />
+                            <Ionicons name="close-circle" size={20} color={c.textTertiary} />
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
 
-            {/* Member List */}
             {isLoading ? (
-                <View style={tw`flex-1 justify-center items-center`}>
-                    <ActivityIndicator size="large" color={tw.color('primary')} />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={c.primary} />
                 </View>
             ) : (
                 <FlatList
                     data={filteredMembers}
                     keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={tw`p-4 pb-24`}
-                    ItemSeparatorComponent={() => <View style={tw`h-[1px] bg-borderDefault my-3`} />}
-                    renderItem={({ item }) => (
-                        <View style={tw`flex-row items-center justify-between`}>
-                            <View style={tw`flex-row items-center gap-3`}>
-                                {item.profileImage ? (
-                                    <Image source={{ uri: item.profileImage }} style={tw`w-12 h-12 rounded-full border border-borderDefault`} />
-                                ) : (
-                                    <View style={tw`w-12 h-12 bg-primary/10 rounded-full items-center justify-center border border-primary/20`}>
-                                        <MaterialIcons name="person" size={24} color={tw.color('primary')} />
-                                    </View>
-                                )}
-                                <View>
-                                    <Text style={tw`text-base font-bold text-textDefault`}>
-                                        {item.firstName ? `${item.firstName} ${item.lastName}` : (item.displayName || `#${String(item.userId).slice(-8).toUpperCase()}`)}
-                                    </Text>
-                                    <View style={tw`flex-row items-center gap-1 mt-0.5`}>
-                                        <Text style={tw`text-xs text-textSecondary font-medium`}>{roleLabel(item.role)}</Text>
-                                        {(item.role === 'OWNER' || item.role === 'ADMIN') && (
-                                            <MaterialIcons name="verified" size={12} color={tw.color('primary')} />
-                                        )}
+                    contentContainerStyle={{ padding: theme.spacing.md, paddingBottom: 96 }}
+                    ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: c.border, marginVertical: 12 }} />}
+                    renderItem={({ item }) => {
+                        const privileged = item.role === 'OWNER' || item.role === 'ADMIN';
+                        return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                    {item.profileImage ? (
+                                        <Image source={{ uri: item.profileImage }} style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border }} />
+                                    ) : (
+                                        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                                            <MaterialIcons name="person" size={24} color={c.textSecondary} />
+                                        </View>
+                                    )}
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
+                                            {item.firstName ? `${item.firstName} ${item.lastName}` : (item.displayName || `#${String(item.userId).slice(-8).toUpperCase()}`)}
+                                        </Text>
+                                        <Text style={{ fontSize: 12, color: c.textSecondary, fontWeight: '500', marginTop: 2 }}>
+                                            {roleLabel(item.role)}
+                                        </Text>
                                     </View>
                                 </View>
+                                {privileged && <Badge label={roleLabel(item.role)} tone="primary" />}
                             </View>
-                        </View>
-                    )}
+                        );
+                    }}
                     ListEmptyComponent={
-                        <View style={tw`items-center justify-center mt-12`}>
-                            <Ionicons name="people-outline" size={48} color={tw.color('borderDefault')} />
-                            <Text style={tw`text-textSecondary font-medium mt-4`}>Üye bulunamadı</Text>
-                        </View>
+                        <EmptyState icon="people-outline" title="Üye bulunamadı" />
                     }
                 />
             )}
-        </View>
+        </SafeAreaView>
     );
 };

@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-    View, Text, TextInput, TouchableOpacity, SafeAreaView,
-    ScrollView, ActivityIndicator, Platform,
-    StatusBar
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
+import { theme } from '../../utils/theme';
+import { AppHeader, Card, Button } from '../../components/ui';
 
 export const CommunityManagementScreen = () => {
     const navigation = useNavigation<any>();
@@ -18,6 +16,7 @@ export const CommunityManagementScreen = () => {
     const { id } = route.params || {};
     const { t } = useI18n();
     const { showDialog } = useUI();
+    const c = theme.colors;
 
     const [community, setCommunity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -76,107 +75,127 @@ export const CommunityManagementScreen = () => {
         });
     };
 
+    const inputStyle = {
+        backgroundColor: c.surface, borderWidth: 1.5, borderColor: c.borderStrong,
+        borderRadius: theme.borderRadius.md, paddingHorizontal: 14, paddingVertical: 12,
+        color: c.text, fontSize: 15,
+    };
+    const labelStyle = { fontSize: 12, fontWeight: '600' as const, color: c.textSecondary, textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 6 };
+
     return (
-        <SafeAreaView style={[tw`flex-1 bg-background`, { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }]}>
-            {/* Header */}
-            <View style={tw`flex-row items-center px-4 py-3 bg-surface border-b border-slate-200`}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`w-10 h-10 items-center justify-center rounded-full`}>
-                    <MaterialIcons name="arrow-back" size={24} color="#0f172a" />
-                </TouchableOpacity>
-                <Text style={tw`flex-1 text-lg font-bold text-center text-slate-900`}>{t('communityManagement.title')}</Text>
-                <TouchableOpacity
-                    onPress={handleSave}
-                    disabled={isSaving}
-                    style={tw`bg-primary px-4 h-8 rounded-full items-center justify-center ${isSaving ? 'opacity-50' : ''}`}
-                >
-                    <Text style={tw`text-white text-sm font-bold`}>{isSaving ? '...' : t('notifications.saveChanges')}</Text>
-                </TouchableOpacity>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader
+                    title={t('communityManagement.title')}
+                    onBack={() => navigation.goBack()}
+                    right={
+                        <TouchableOpacity
+                            onPress={handleSave}
+                            disabled={isSaving}
+                            style={{
+                                backgroundColor: isSaving ? c.border : c.primary, paddingHorizontal: 16,
+                                height: 34, borderRadius: theme.borderRadius.round, alignItems: 'center', justifyContent: 'center',
+                            }}
+                        >
+                            <Text style={{ color: isSaving ? c.textTertiary : c.onPrimary, fontSize: 13, fontWeight: '700' }}>
+                                {isSaving ? '...' : t('notifications.saveChanges')}
+                            </Text>
+                        </TouchableOpacity>
+                    }
+                />
             </View>
 
             {isLoading ? (
-                <View style={tw`flex-1 items-center justify-center`}>
-                    <ActivityIndicator size="large" color={tw.color('primary')} />
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="large" color={c.primary} />
                 </View>
             ) : (
-                <ScrollView contentContainerStyle={tw`p-4 gap-4 pb-16`} showsVerticalScrollIndicator={false}>
-                    {/* Name Change Count Badge */}
+                <ScrollView contentContainerStyle={{ padding: theme.spacing.md, gap: theme.spacing.md, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
                     {community?.nameChangeCount > 0 && (
-                        <View style={tw`bg-amber-50 border border-amber-200 rounded-xl p-3 flex-row items-center gap-2`}>
-                            <MaterialIcons name="info" size={18} color="#d97706" />
-                            <Text style={tw`text-amber-700 text-sm font-medium flex-1`}>
+                        <View
+                            style={{
+                                backgroundColor: c.warningTint, borderWidth: 1, borderColor: c.warningTint,
+                                borderRadius: theme.borderRadius.lg, padding: 12, flexDirection: 'row',
+                                alignItems: 'center', gap: 8,
+                            }}
+                        >
+                            <MaterialIcons name="info" size={18} color={c.warning} />
+                            <Text style={{ color: c.warning, fontSize: 13, fontWeight: '500', flex: 1 }}>
                                 {t('communityManagement.nameChanged', { count: community.nameChangeCount })}
                             </Text>
                         </View>
                     )}
 
-                    {/* Edit Fields */}
-                    <View style={tw`bg-surface rounded-2xl p-4 border border-slate-100 shadow-sm gap-4`}>
-                        <Text style={tw`text-slate-900 font-bold text-base`}>{t('communityManagement.infoTitle')}</Text>
+                    <Card padding={theme.spacing.md} style={{ gap: theme.spacing.md }}>
+                        <Text style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>{t('communityManagement.infoTitle')}</Text>
 
-                        <View style={tw`gap-1`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('communityManagement.nameLabel')}</Text>
+                        <View>
+                            <Text style={labelStyle}>{t('communityManagement.nameLabel')}</Text>
                             <TextInput
                                 value={name}
                                 onChangeText={setName}
-                                style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
+                                style={inputStyle}
                                 placeholder={t('communityManagement.namePlaceholder')}
-                                placeholderTextColor="#94a3b8"
+                                placeholderTextColor={c.textTertiary}
                                 maxLength={100}
                             />
                         </View>
 
-                        <View style={tw`gap-1`}>
-                            <Text style={tw`text-xs font-semibold text-slate-500 uppercase tracking-wide`}>{t('communityManagement.descriptionLabel')}</Text>
+                        <View>
+                            <Text style={labelStyle}>{t('communityManagement.descriptionLabel')}</Text>
                             <TextInput
                                 value={description}
                                 onChangeText={setDescription}
-                                style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium min-h-[100px]`}
+                                style={[inputStyle, { minHeight: 100 }]}
                                 placeholder={t('communityManagement.descriptionPlaceholder')}
-                                placeholderTextColor="#94a3b8"
+                                placeholderTextColor={c.textTertiary}
                                 multiline
                                 textAlignVertical="top"
                                 maxLength={2000}
                             />
-                            <Text style={tw`text-xs text-slate-400 text-right`}>{description.length}/2000</Text>
+                            <Text style={{ fontSize: 12, color: c.textTertiary, textAlign: 'right', marginTop: 4 }}>{description.length}/2000</Text>
                         </View>
-                    </View>
+                    </Card>
 
                     {/* Quick Actions */}
-                    <View style={tw`bg-surface rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
-                        <Text style={tw`text-slate-900 font-bold text-base px-4 pt-4 pb-2`}>{t('communityManagement.quickActions')}</Text>
-
+                    <Card padding={0}>
+                        <Text style={{ color: c.text, fontWeight: '700', fontSize: 15, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+                            {t('communityManagement.quickActions')}
+                        </Text>
                         <TouchableOpacity
                             onPress={() => navigation.navigate('CreateElection', { communityId: id })}
-                            style={tw`flex-row items-center gap-3 px-4 py-4 border-t border-slate-100`}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: c.border }}
                         >
-                            <View style={tw`w-10 h-10 bg-primary/10 rounded-full items-center justify-center`}>
-                                <MaterialIcons name="how-to-vote" size={20} color={tw.color('primary')} />
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+                                <MaterialIcons name="how-to-vote" size={20} color={c.primary} />
                             </View>
-                            <View style={tw`flex-1`}>
-                                <Text style={tw`text-slate-900 font-semibold`}>{t('communityManagement.startElection')}</Text>
-                                <Text style={tw`text-slate-500 text-xs`}>{t('communityManagement.startElectionSub')}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: c.text, fontWeight: '600', fontSize: 15 }}>{t('communityManagement.startElection')}</Text>
+                                <Text style={{ color: c.textSecondary, fontSize: 12, marginTop: 2 }}>{t('communityManagement.startElectionSub')}</Text>
                             </View>
-                            <MaterialIcons name="chevron-right" size={22} color="#94a3b8" />
+                            <MaterialIcons name="chevron-right" size={22} color={c.textTertiary} />
                         </TouchableOpacity>
-                    </View>
+                    </Card>
 
                     {/* Danger Zone */}
-                    <View style={tw`bg-surface rounded-2xl border border-red-100 shadow-sm overflow-hidden mt-4`}>
-                        <Text style={tw`text-red-600 font-bold text-base px-4 pt-4 pb-2`}>{t('communityManagement.danger')}</Text>
+                    <Card padding={0} style={{ borderColor: c.dangerTint }}>
+                        <Text style={{ color: c.danger, fontWeight: '700', fontSize: 15, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+                            {t('communityManagement.danger')}
+                        </Text>
                         <TouchableOpacity
                             onPress={handleDelete}
-                            style={tw`flex-row items-center gap-3 px-4 py-4 border-t border-red-100`}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: c.dangerTint }}
                         >
-                            <View style={tw`w-10 h-10 bg-red-50 rounded-full items-center justify-center`}>
-                                <MaterialIcons name="delete-forever" size={20} color="#ef4444" />
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.dangerTint, alignItems: 'center', justifyContent: 'center' }}>
+                                <MaterialIcons name="delete-forever" size={20} color={c.danger} />
                             </View>
-                            <View style={tw`flex-1`}>
-                                <Text style={tw`text-red-600 font-semibold`}>{t('communityManagement.deleteCommunity')}</Text>
-                                <Text style={tw`text-red-400 text-xs`}>{t('communityManagement.deleteCommunitySub')}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: c.danger, fontWeight: '600', fontSize: 15 }}>{t('communityManagement.deleteCommunity')}</Text>
+                                <Text style={{ color: c.danger, opacity: 0.7, fontSize: 12, marginTop: 2 }}>{t('communityManagement.deleteCommunitySub')}</Text>
                             </View>
-                            <MaterialIcons name="chevron-right" size={22} color="#ef4444" />
+                            <MaterialIcons name="chevron-right" size={22} color={c.danger} />
                         </TouchableOpacity>
-                    </View>
+                    </Card>
                 </ScrollView>
             )}
         </SafeAreaView>
