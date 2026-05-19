@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Platform, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { AppHeader, Button } from '../../components/ui';
 
 type ParamList = {
     TwoFactorLogin: { tempToken: string };
@@ -19,6 +20,7 @@ export const TwoFactorLoginScreen = () => {
     const { tempToken } = route.params;
     const { signIn } = useAuth();
     const { t } = useI18n();
+    const c = theme.colors;
     const [code, setCode] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRecoveryMode, setIsRecoveryMode] = useState(false);
@@ -66,14 +68,24 @@ export const TwoFactorLoginScreen = () => {
     const renderInputBoxes = () => {
         const boxes = [];
         for (let i = 0; i < maxCodeLength; i++) {
+            const active = code.length === i;
             boxes.push(
-                <View key={i} style={[
-                    tw`bg-surface border-2 rounded-xl flex items-center justify-center`,
-                    { width: isRecoveryMode ? 35 : 48, height: 56, marginHorizontal: isRecoveryMode ? 2 : 4 },
-                    code.length === i ? tw`border-primary` : tw`border-slate-200`
-                ]}>
-                    <Text style={tw`${isRecoveryMode ? 'text-xl' : 'text-2xl'} font-bold text-slate-900`}>
-                        {code[i] || (code.length === i ? '' : '·')}
+                <View
+                    key={i}
+                    style={{
+                        width: isRecoveryMode ? 35 : 48,
+                        height: 56,
+                        marginHorizontal: isRecoveryMode ? 2 : 4,
+                        backgroundColor: c.surface,
+                        borderWidth: 2,
+                        borderColor: active ? c.primary : c.border,
+                        borderRadius: theme.borderRadius.lg,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <Text style={{ fontSize: isRecoveryMode ? 20 : 24, fontWeight: '700', color: c.text }}>
+                        {code[i] || (active ? '' : '·')}
                     </Text>
                 </View>
             );
@@ -89,73 +101,75 @@ export const TwoFactorLoginScreen = () => {
     ];
 
     return (
-        <SafeAreaView style={[tw`flex-1 bg-background`]}>
-            {/* Top Navigation Bar */}
-            <View style={tw`flex-row items-center justify-between px-4 py-3 bg-background border-b border-primary/10`}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex items-center justify-center h-10 w-10 rounded-full hover:bg-primary/10`}>
-                    <Ionicons name="chevron-back" size={24} color="#334155" />
-                </TouchableOpacity>
-                <Text style={tw`text-lg font-bold tracking-tight text-slate-900`}>{t('auth.twoFactor.title')}</Text>
-                <View style={tw`h-10 w-10`} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'bottom']}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('auth.twoFactor.title')} onBack={() => navigation.goBack()} />
             </View>
 
-            <ScrollView contentContainerStyle={tw`flex-grow flex-col items-center px-6 pt-6 max-w-md w-full self-center`}>
-                {/* Icon/Logo Placeholder */}
-                <View style={tw`mb-8 p-4 bg-primary/10 rounded-full`}>
-                    <MaterialIcons name="security" size={56} color={tw.color('primary')} />
+            <ScrollView
+                contentContainerStyle={{ flexGrow: 1, alignItems: 'center', paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, width: '100%', maxWidth: 420, alignSelf: 'center' }}
+            >
+                <View
+                    style={{
+                        marginBottom: theme.spacing.xl, width: 88, height: 88, borderRadius: 44,
+                        backgroundColor: c.primaryTint, alignItems: 'center', justifyContent: 'center',
+                    }}
+                >
+                    <MaterialIcons name="security" size={48} color={c.primary} />
                 </View>
 
-                {/* Heading & Instructions */}
-                <View style={tw`text-center mb-8 flex-col items-center`}>
-                    <Text style={tw`text-2xl font-bold mb-3 text-slate-900`}>
+                <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
+                    <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 10, color: c.text, textAlign: 'center' }}>
                         {isRecoveryMode ? t('auth.twoFactor.recoveryCode') : t('auth.twoFactor.verificationCode')}
                     </Text>
-                    <Text style={tw`text-slate-600 text-base text-center`}>
+                    <Text style={{ fontSize: 15, color: c.textSecondary, textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
                         {isRecoveryMode
                             ? t('auth.twoFactor.recoveryDesc')
                             : t('auth.twoFactor.verificationDesc')}
                     </Text>
                 </View>
 
-                {/* OTP Input Fields */}
-                <View style={tw`flex-row justify-between w-full gap-2 mb-8`}>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', width: '100%', marginBottom: theme.spacing.xl }}>
                     {renderInputBoxes()}
                 </View>
 
-                {/* Action Buttons */}
-                <View style={tw`w-full flex-col gap-4 mt-auto mb-2`}>
-                    <TouchableOpacity
-                        style={tw`w-full bg-primary flex-row items-center justify-center py-4 rounded-xl shadow-lg border border-transparent ${isLoading ? 'opacity-50' : ''}`}
+                <View style={{ width: '100%', gap: 16, marginTop: 'auto', marginBottom: theme.spacing.sm }}>
+                    <Button
+                        title={isLoading ? t('auth.twoFactor.waiting') : t('auth.twoFactor.signIn')}
+                        loading={isLoading}
                         onPress={handleVerify}
-                        disabled={isLoading}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('auth.twoFactor.waiting') : t('auth.twoFactor.signIn')}</Text>
-                    </TouchableOpacity>
-
+                    />
                     <TouchableOpacity
                         onPress={() => {
                             setIsRecoveryMode(!isRecoveryMode);
                             setCode('');
                         }}
-                        style={tw`py-2`}
+                        style={{ paddingVertical: 8 }}
                     >
-                        <Text style={tw`text-primary text-center font-medium`}>
+                        <Text style={{ color: c.primary, textAlign: 'center', fontWeight: '600', fontSize: 14 }}>
                             {isRecoveryMode ? t('auth.twoFactor.useAppCode') : t('auth.twoFactor.useRecoveryCode')}
                         </Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
 
-            {/* iOS Styled Numeric Keypad */}
-            <View style={tw`bg-[#e2e8f0]/50 pt-4 pb-8 px-4 border-t border-slate-300 w-full`}>
-                <View style={tw`flex-row flex-wrap justify-between max-w-xs mx-auto`}>
+            <View
+                style={{
+                    backgroundColor: c.surfaceAlt, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.xl,
+                    paddingHorizontal: theme.spacing.md, borderTopWidth: 1, borderTopColor: c.border, width: '100%',
+                }}
+            >
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', maxWidth: 320, marginHorizontal: 'auto' }}>
                     {padKeys.map((key, index) => {
-                        if (key.val === 'empty') return <View key={index} style={tw`w-[30%] h-12 mb-3`} />;
+                        if (key.val === 'empty') return <View key={index} style={{ width: '30%', height: 48, marginBottom: 12 }} />;
                         if (key.val === 'backspace') {
                             return (
-                                <TouchableOpacity key={index} onPress={() => handleKeyPress('backspace')} style={tw`w-[30%] h-12 flex items-center justify-center mb-3 rounded-lg active:bg-primary/10`}>
-                                    <Ionicons name="backspace-outline" size={28} color="#475569" />
+                                <TouchableOpacity
+                                    key={index}
+                                    onPress={() => handleKeyPress('backspace')}
+                                    style={{ width: '30%', height: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderRadius: theme.borderRadius.md }}
+                                >
+                                    <Ionicons name="backspace-outline" size={28} color={c.textSecondary} />
                                 </TouchableOpacity>
                             );
                         }
@@ -163,18 +177,21 @@ export const TwoFactorLoginScreen = () => {
                             <TouchableOpacity
                                 key={index}
                                 onPress={() => handleKeyPress(key.val)}
-                                style={tw`w-[30%] h-14 flex flex-col items-center justify-center bg-surface rounded-xl shadow-sm mb-3 active:bg-slate-200`}
+                                style={{
+                                    width: '30%', height: 56, alignItems: 'center', justifyContent: 'center',
+                                    backgroundColor: c.surface, borderRadius: theme.borderRadius.lg, marginBottom: 12,
+                                    ...theme.shadows.card,
+                                }}
                             >
-                                <Text style={tw`text-2xl font-medium text-slate-900`}>{key.val}</Text>
+                                <Text style={{ fontSize: 24, fontWeight: '500', color: c.text }}>{key.val}</Text>
                                 {key.letters ? (
-                                    <Text style={tw`text-[10px] tracking-widest text-slate-500`}>{key.letters}</Text>
+                                    <Text style={{ fontSize: 10, letterSpacing: 2, color: c.textTertiary }}>{key.letters}</Text>
                                 ) : null}
                             </TouchableOpacity>
                         );
                     })}
                 </View>
-                {/* iOS Home Indicator */}
-                <View style={tw`w-32 h-1 bg-slate-400/50 rounded-full mx-auto mt-4`} />
+                <View style={{ width: 128, height: 4, backgroundColor: c.borderStrong, borderRadius: 2, marginHorizontal: 'auto', marginTop: theme.spacing.md }} />
             </View>
         </SafeAreaView>
     );

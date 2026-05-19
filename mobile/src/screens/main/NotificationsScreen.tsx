@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, Switch, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, Switch, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { api } from '../../services/api';
+import { theme } from '../../utils/theme';
+import { Screen, AppHeader, Card, Button } from '../../components/ui';
 
 interface Preference {
     category: string;
@@ -16,6 +16,7 @@ interface Preference {
 export const NotificationsScreen = () => {
     const navigation = useNavigation<any>();
     const { t } = useI18n();
+    const c = theme.colors;
 
     const [preferences, setPreferences] = useState<Preference[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -37,9 +38,9 @@ export const NotificationsScreen = () => {
     };
 
     const togglePreference = (category: string, channel: string) => {
-        setPreferences(prev => prev.map(p => 
-            (p.category === category && p.channel === channel) 
-            ? { ...p, enabled: !p.enabled } 
+        setPreferences(prev => prev.map(p =>
+            (p.category === category && p.channel === channel)
+            ? { ...p, enabled: !p.enabled }
             : p
         ));
     };
@@ -62,66 +63,70 @@ export const NotificationsScreen = () => {
 
     if (isLoading) {
         return (
-            <View style={tw`flex-1 bg-background items-center justify-center`}>
-                <ActivityIndicator size="large" color={tw.color('primary') as string} />
+            <View style={{ flex: 1, backgroundColor: c.background, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color={c.primary} />
             </View>
         );
     }
 
     return (
-        <View style={tw`flex-1 bg-background`}>
-            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
-                <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={24} color="#64748b" />
-                </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('notifications.settingsTitle')}</Text>
+        <Screen scroll padded={false}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('notifications.settingsTitle')} onBack={() => navigation.goBack()} />
             </View>
 
-            <ScrollView contentContainerStyle={tw`flex-grow p-6 flex-col gap-6`} showsVerticalScrollIndicator={false}>
-                {categories.map((cat, idx) => (
-                    <View key={cat} style={tw`flex-col bg-surface rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4`}>
-                        <View style={tw`bg-slate-50 p-4 border-b border-slate-100`}>
-                            <Text style={tw`text-sm font-bold text-slate-700 uppercase tracking-wider`}>
+            <View style={{ paddingHorizontal: theme.spacing.lg, gap: theme.spacing.md }}>
+                {categories.map((cat) => (
+                    <Card key={cat} padding={0}>
+                        <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: c.border }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                                 {t(`notifications.category.${cat}`)}
                             </Text>
                         </View>
-                        
-                        {channels.map(channel => {
+
+                        {channels.map((channel, ci) => {
                             const pref = preferences.find(p => p.category === cat && p.channel === channel);
                             const isEnabled = pref ? pref.enabled : true;
-                            
+
                             return (
-                                <View key={channel} style={tw`flex-row items-center justify-between p-4 ${channel === 'PUSH' ? 'border-b border-slate-100' : ''}`}>
-                                    <View style={tw`flex-1 mr-4`}>
-                                        <Text style={tw`text-base font-semibold text-slate-900 mb-1`}>
+                                <View
+                                    key={channel}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                        padding: 14,
+                                        borderBottomWidth: ci < channels.length - 1 ? 1 : 0,
+                                        borderBottomColor: c.border,
+                                    }}
+                                >
+                                    <View style={{ flex: 1, marginRight: 16 }}>
+                                        <Text style={{ fontSize: 15, fontWeight: '600', color: c.text, marginBottom: 2 }}>
                                             {t(`notifications.channel.${channel}`)}
                                         </Text>
-                                        <Text style={tw`text-xs text-slate-500 leading-tight`}>
+                                        <Text style={{ fontSize: 12, color: c.textSecondary, lineHeight: 17 }}>
                                             {channel === 'PUSH' ? t('notifications.pushDesc') : t('notifications.emailDesc')}
                                         </Text>
                                     </View>
                                     <Switch
-                                        trackColor={{ false: '#cbd5e1', true: tw.color('primary') as string }}
-                                        thumbColor="#ffffff"
-                                        ios_backgroundColor="#cbd5e1"
+                                        trackColor={{ false: c.borderStrong, true: c.primary }}
+                                        thumbColor={c.surface}
+                                        ios_backgroundColor={c.borderStrong}
                                         onValueChange={() => togglePreference(cat, channel)}
                                         value={isEnabled}
                                     />
                                 </View>
                             );
                         })}
-                    </View>
+                    </Card>
                 ))}
 
-                <TouchableOpacity
-                    style={tw`w-full bg-primary flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isSaving ? 'opacity-50' : ''}`}
+                <Button
+                    title={isSaving ? t('notifications.saving') : t('notifications.saveChanges')}
+                    loading={isSaving}
                     onPress={handleSave}
-                    disabled={isSaving}
-                >
-                    <Text style={tw`text-white font-bold text-base`}>{isSaving ? t('notifications.saving') : t('notifications.saveChanges')}</Text>
-                    {isSaving ? <ActivityIndicator size="small" color="white" /> : <Ionicons name="checkmark" size={20} color="white" />}
-                </TouchableOpacity>
-            </ScrollView>
-        </View>
+                    icon={!isSaving ? 'checkmark' : undefined}
+                    style={{ marginTop: 4 }}
+                />
+            </View>
+        </Screen>
     );
 };

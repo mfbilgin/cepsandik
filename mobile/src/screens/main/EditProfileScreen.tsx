@@ -1,38 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView, Platform, Keyboard } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { View, Text, Keyboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Screen, AppHeader, Card, Input, Button } from '../../components/ui';
 
 export const EditProfileScreen = () => {
     const { user, updateUser } = useAuth();
     const navigation = useNavigation<any>();
+    const { t } = useI18n();
+    const c = theme.colors;
 
     const [firstName, setFirstName] = useState(user?.firstName || '');
     const [lastName, setLastName] = useState(user?.lastName || '');
     const [isLoading, setIsLoading] = useState(false);
-    const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-    const { t } = useI18n();
-
-    useEffect(() => {
-        const keyboardDidShowListener = Keyboard.addListener(
-            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-            () => setKeyboardVisible(true)
-        );
-        const keyboardDidHideListener = Keyboard.addListener(
-            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-            () => setKeyboardVisible(false)
-        );
-
-        return () => {
-            keyboardDidShowListener.remove();
-            keyboardDidHideListener.remove();
-        };
-    }, []);
 
     const handleUpdate = async () => {
         if (!firstName.trim() || !lastName.trim()) {
@@ -66,68 +50,58 @@ export const EditProfileScreen = () => {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={tw`flex-1 bg-background`}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-            <View style={tw`bg-surface border-b border-slate-200 pt-14 pb-3 px-5 shadow-sm z-30 flex-row items-center`}>
-                <TouchableOpacity style={tw`w-10 h-10 items-center justify-center rounded-full bg-slate-50`} onPress={() => navigation.goBack()}>
-                    <Ionicons name="chevron-back" size={24} color="#64748b" />
-                </TouchableOpacity>
-                <Text style={tw`text-xl font-bold tracking-tight text-slate-900 ml-4`}>{t('editProfile.title')}</Text>
+        <Screen keyboardAvoiding scroll padded={false}>
+            <View style={{ paddingHorizontal: theme.spacing.md }}>
+                <AppHeader title={t('editProfile.title')} onBack={() => navigation.goBack()} />
             </View>
 
-            <ScrollView contentContainerStyle={tw`flex-grow p-6 ${isKeyboardVisible ? 'pb-120' : 'pb-40'} flex-col gap-6`} keyboardShouldPersistTaps="handled">
-                <View style={tw`items-center justify-center py-4`}>
-                    <View style={tw`w-24 h-24 rounded-full bg-primary items-center justify-center shadow-md mb-4`}>
-                        <Text style={tw`text-5xl font-bold text-white`}>{firstName?.[0] || user?.firstName?.[0]}</Text>
+            <View style={{ paddingHorizontal: theme.spacing.lg, gap: theme.spacing.lg }}>
+                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md }}>
+                    <View
+                        style={{
+                            width: 96, height: 96, borderRadius: 48, backgroundColor: c.primary,
+                            alignItems: 'center', justifyContent: 'center', ...theme.shadows.card,
+                        }}
+                    >
+                        <Text style={{ fontSize: 40, fontWeight: '700', color: c.onPrimary }}>
+                            {(firstName?.[0] || user?.firstName?.[0] || '').toUpperCase()}
+                        </Text>
                     </View>
                 </View>
 
-                <View style={tw`flex-col gap-5 bg-surface p-6 rounded-2xl shadow-sm border border-slate-100`}>
-                    <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.name')}</Text>
-                        <TextInput
-                            style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 text-base`}
-                            placeholder={t('editProfile.namePlaceholder')}
-                            placeholderTextColor="#94a3b8"
-                            value={firstName}
-                            onChangeText={setFirstName}
-                        />
-                    </View>
-
-                    <View style={tw`flex-col gap-2`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.surname')}</Text>
-                        <TextInput
-                            style={tw`w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3.5 text-base`}
-                            placeholder={t('editProfile.surnamePlaceholder')}
-                            placeholderTextColor="#94a3b8"
-                            value={lastName}
-                            onChangeText={setLastName}
-                        />
-                    </View>
-
-                    <View style={tw`flex-col gap-2 opacity-50`}>
-                        <Text style={tw`text-sm font-semibold text-slate-700 ml-1`}>{t('editProfile.email')}</Text>
-                        <TextInput
-                            style={tw`w-full rounded-xl border border-slate-200 bg-slate-100 text-slate-500 px-4 py-3.5 text-base`}
+                <Card padding={theme.spacing.lg}>
+                    <Input
+                        label={t('editProfile.name')}
+                        placeholder={t('editProfile.namePlaceholder')}
+                        value={firstName}
+                        onChangeText={setFirstName}
+                    />
+                    <Input
+                        label={t('editProfile.surname')}
+                        placeholder={t('editProfile.surnamePlaceholder')}
+                        value={lastName}
+                        onChangeText={setLastName}
+                    />
+                    <View style={{ opacity: 0.6 }}>
+                        <Input
+                            label={t('editProfile.email')}
                             value={user?.email}
                             editable={false}
                         />
-                        <Text style={tw`text-xs text-slate-400 ml-1`}>{t('editProfile.emailLocked')}</Text>
+                        <Text style={{ fontSize: 12, color: c.textTertiary, marginTop: -8, marginBottom: 4 }}>
+                            {t('editProfile.emailLocked')}
+                        </Text>
                     </View>
 
-                    <TouchableOpacity
-                        style={tw`mt-4 w-full bg-primary flex-row items-center justify-center gap-2 py-4 rounded-xl shadow-sm ${isLoading ? 'opacity-50' : ''}`}
+                    <Button
+                        title={isLoading ? t('notifications.saving') : t('notifications.saveChanges')}
+                        loading={isLoading}
                         onPress={handleUpdate}
-                        disabled={isLoading}
-                    >
-                        <Text style={tw`text-white font-bold text-base`}>{isLoading ? t('notifications.saving') : t('notifications.saveChanges')}</Text>
-                        {!isLoading && <Ionicons name="checkmark" size={20} color="white" />}
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                        icon={!isLoading ? 'checkmark' : undefined}
+                        style={{ marginTop: 8 }}
+                    />
+                </Card>
+            </View>
+        </Screen>
     );
 };

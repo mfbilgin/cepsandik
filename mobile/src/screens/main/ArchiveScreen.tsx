@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useLayoutEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Card, Badge, EmptyState } from '../../components/ui';
 
 export const ArchiveScreen = () => {
     const [archived, setArchived] = useState<any[]>([]);
@@ -15,6 +17,7 @@ export const ArchiveScreen = () => {
     const [sortAsc, setSortAsc] = useState(false); // false = newest first, true = oldest first
     const navigation = useNavigation<any>();
     const { t, language } = useI18n();
+    const c = theme.colors;
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -68,35 +71,47 @@ export const ArchiveScreen = () => {
     }, [searchQuery, sortAsc, archived]);
 
     return (
-        <View style={tw`flex-1 bg-background`}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
             {/* Header / Navigation */}
-            <View style={tw`bg-surface border-b border-slate-200 px-5 pt-14 pb-4 shadow-sm z-30`}>
-                <View style={tw`flex-row items-center justify-between mb-4`}>
-                    <Text style={tw`text-3xl font-bold tracking-tight text-slate-900`}>{t('archive.title')}</Text>
+            <View
+                style={{
+                    backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border,
+                    paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.md,
+                    ...theme.shadows.card,
+                }}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
+                    <Text style={{ fontSize: 28, fontWeight: '700', color: c.text }}>{t('archive.title')}</Text>
                     <TouchableOpacity
-                        style={tw`p-2 rounded-full ${sortAsc ? 'bg-primary/10' : 'bg-slate-50'}`}
+                        style={{
+                            padding: 8, borderRadius: theme.borderRadius.round,
+                            backgroundColor: sortAsc ? c.primaryTint : c.surfaceAlt,
+                        }}
                         onPress={() => setSortAsc(!sortAsc)}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name={sortAsc ? "arrow-up" : "arrow-down"} size={22} color={sortAsc ? "#41431B" : "#475569"} />
+                        <Ionicons name={sortAsc ? 'arrow-up' : 'arrow-down'} size={22} color={sortAsc ? c.primary : c.textSecondary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Search Bar */}
-                <View style={tw`relative flex-row items-center`}>
-                    <View style={tw`absolute left-3 z-10`}>
-                        <Ionicons name="search" size={20} color="#94a3b8" />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ position: 'absolute', left: 12, zIndex: 10 }}>
+                        <Ionicons name="search" size={20} color={c.textTertiary} />
                     </View>
                     <TextInput
-                        style={tw`flex-1 pl-10 pr-10 py-3 rounded-xl bg-slate-100 text-slate-900 border-none items-center shadow-sm`}
+                        style={{
+                            flex: 1, paddingLeft: 40, paddingRight: 40, paddingVertical: 12,
+                            borderRadius: theme.borderRadius.md, backgroundColor: c.surfaceAlt, color: c.text,
+                        }}
                         placeholder={t('archive.searchPlaceholder')}
-                        placeholderTextColor="#64748b"
+                        placeholderTextColor={c.textTertiary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity style={tw`absolute right-3 z-10`} onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#cbd5e1" />
+                        <TouchableOpacity style={{ position: 'absolute', right: 12, zIndex: 10 }} onPress={() => setSearchQuery('')}>
+                            <Ionicons name="close-circle" size={20} color={c.textTertiary} />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -104,71 +119,71 @@ export const ArchiveScreen = () => {
 
             {/* Main Content: Election List */}
             <ScrollView
-                style={tw`flex-1`}
-                contentContainerStyle={tw`px-5 pt-6 pb-24 flex-col gap-4`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#41431B']} />}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, paddingBottom: 96, gap: theme.spacing.md }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
             >
                 {isLoading ? (
-                    <ActivityIndicator size="large" color={tw.color('primary')} style={tw`mt-10`} />
+                    <ActivityIndicator size="large" color={c.primary} style={{ marginTop: 40 }} />
                 ) : filteredArchived.length === 0 ? (
-                    <View style={tw`flex-col items-center justify-center pt-20 pb-8`}>
-                        <View style={tw`w-20 h-20 bg-surface rounded-full items-center justify-center mb-4 shadow-sm border border-slate-100`}>
-                            <Ionicons name="documents-outline" size={36} color="#94a3b8" />
-                        </View>
-                        <Text style={tw`text-base text-slate-500 font-medium`}>
-                            {searchQuery ? t('archive.searchEmpty') : t('archive.empty')}
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="documents-outline"
+                        title={searchQuery ? t('archive.searchEmpty') : t('archive.empty')}
+                    />
                 ) : (
                     filteredArchived.map((item: any, index: number) => (
-                        <TouchableOpacity
+                        <Card
                             key={index}
-                            style={tw`bg-surface rounded-2xl shadow-sm border border-slate-100 overflow-hidden`}
+                            padding={0}
                             onPress={() => navigation.navigate('ElectionDetail', { electionId: item.electionId })}
-                            activeOpacity={0.8}
                         >
-                            <View style={tw`p-5 flex-row gap-4`}>
-                                <View style={tw`w-12 h-12 rounded-full bg-primary/10 items-center justify-center`}>
-                                    <Ionicons name="archive" size={24} color={tw.color('primary')} />
+                            <View style={{ padding: theme.spacing.lg, flexDirection: 'row', gap: theme.spacing.md }}>
+                                <View
+                                    style={{
+                                        width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceAlt,
+                                        alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="archive-outline" size={22} color={c.textSecondary} />
                                 </View>
-                                <View style={tw`flex-1`}>
-                                    <View style={tw`flex-row justify-between items-start`}>
-                                        <Text style={tw`text-base font-bold text-slate-900 flex-1 pr-2 leading-tight`} numberOfLines={2}>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, flex: 1, paddingRight: 8, lineHeight: 20 }} numberOfLines={2}>
                                             {item.electionTitle}
                                         </Text>
-                                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                                        <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
                                     </View>
-                                    <View style={tw`flex-row items-center mt-1 mb-3`}>
-                                        <Ionicons name="time-outline" size={14} color="#64748b" style={tw`mr-1`} />
-                                        <Text style={tw`text-xs font-medium text-slate-500`}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 10 }}>
+                                        <Ionicons name="time-outline" size={14} color={c.textSecondary} style={{ marginRight: 4 }} />
+                                        <Text style={{ fontSize: 12, fontWeight: '500', color: c.textSecondary }}>
                                             {t('archive.endDate', { date: new Date(item.endTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR') })}
                                         </Text>
                                     </View>
-                                    <View style={tw`flex-row items-center gap-2`}>
-                                        <View style={tw`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200`}>
-                                            <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
-                                            <Text style={tw`text-xs font-bold text-green-700`}>{t('archive.voted')}</Text>
-                                        </View>
-                                        <View style={tw`flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200`}>
-                                            <Ionicons name="shield-checkmark" size={12} color={tw.color('primary')} />
-                                            <Text style={tw`text-[10px] font-bold text-primary uppercase tracking-wide`}>{t('archive.verified')}</Text>
-                                        </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Badge label={t('archive.voted')} tone="success" dot />
+                                        <Badge label={t('archive.verified')} tone="primary" dot />
                                     </View>
                                 </View>
                             </View>
-                        </TouchableOpacity>
+                        </Card>
                     ))
                 )}
 
                 {!isLoading && filteredArchived.length > 0 && (
-                    <View style={tw`py-8 flex-col items-center justify-center opacity-60`}>
-                        <View style={tw`w-12 h-12 bg-slate-200 rounded-full flex-row items-center justify-center mb-3`}>
-                            <Ionicons name="checkmark-done" size={24} color="#64748b" />
+                    <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                        <View
+                            style={{
+                                width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceAlt,
+                                alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+                            }}
+                        >
+                            <Ionicons name="checkmark-done" size={24} color={c.textSecondary} />
                         </View>
-                        <Text style={tw`text-sm font-medium text-slate-500`}>{t('archive.allLoaded')}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '500', color: c.textSecondary }}>{t('archive.allLoaded')}</Text>
                     </View>
                 )}
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
