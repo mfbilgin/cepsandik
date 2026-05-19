@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useLayoutEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, ImageBackground, TextInput, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../services/api';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
+import { theme } from '../../utils/theme';
+import { Card, EmptyState } from '../../components/ui';
 
 export const CommunitiesScreen = () => {
     const [communities, setCommunities] = useState<any[]>([]);
@@ -16,6 +18,7 @@ export const CommunitiesScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
     const { t } = useI18n();
+    const c = theme.colors;
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -23,7 +26,6 @@ export const CommunitiesScreen = () => {
 
     const fetchCommunities = async () => {
         try {
-            // we will fetch all communities for now
             const res = await api.get('/communities');
             const data = res.data?.data?.content || res.data?.data || [];
             setCommunities(data);
@@ -47,134 +49,164 @@ export const CommunitiesScreen = () => {
         setRefreshing(false);
     }, []);
 
-    useEffect(() => {
-        initialFetch();
-    }, []);
+    useEffect(() => { initialFetch(); }, []);
 
     useEffect(() => {
         if (!searchQuery) {
             setFilteredCommunities(communities);
         } else {
-            const lowerQuery = searchQuery.toLowerCase();
-            const filtered = communities.filter(c =>
-                c.name?.toLowerCase().includes(lowerQuery) ||
-                c.description?.toLowerCase().includes(lowerQuery)
+            const q = searchQuery.toLowerCase();
+            setFilteredCommunities(
+                communities.filter((x) =>
+                    x.name?.toLowerCase().includes(q) || x.description?.toLowerCase().includes(q)),
             );
-            setFilteredCommunities(filtered);
         }
     }, [searchQuery, communities]);
 
+    const IconBtn = ({ name, onPress }: { name: any; onPress: () => void }) => (
+        <TouchableOpacity
+            onPress={onPress}
+            style={{
+                width: 38, height: 38, borderRadius: theme.borderRadius.md,
+                backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+                alignItems: 'center', justifyContent: 'center',
+            }}
+        >
+            <Ionicons name={name} size={20} color={c.text} />
+        </TouchableOpacity>
+    );
+
+    const Tab = ({ id, label }: { id: 'memberships' | 'managed'; label: string }) => {
+        const active = activeTab === id;
+        return (
+            <TouchableOpacity
+                style={{
+                    flex: 1, paddingVertical: 8, borderRadius: theme.borderRadius.sm,
+                    backgroundColor: active ? c.surface : 'transparent',
+                    ...(active ? theme.shadows.card : {}),
+                }}
+                onPress={() => setActiveTab(id)}
+                activeOpacity={0.8}
+            >
+                <Text style={{ textAlign: 'center', fontSize: 14, fontWeight: active ? '700' : '600', color: active ? c.text : c.textSecondary }}>
+                    {label}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
+
     return (
-        <View style={tw`flex-1 bg-background relative`}>
-            {/* Header Section */}
-            <View style={tw`bg-surface border-b border-background pt-14 pb-3 px-5 shadow-sm z-30`}>
-                <View style={tw`flex-row items-center justify-between mb-3`}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            {/* Başlık */}
+            <View style={{ paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.sm }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, minHeight: 38 }}>
                     {!isSearchOpen ? (
                         <>
-                            <Text style={tw`text-2xl font-bold tracking-tight text-primary`}>{t('communities.title')}</Text>
-                            <View style={tw`flex-row items-center gap-2`}>
-                                <TouchableOpacity style={tw`p-2 rounded-full bg-secondary/20`} onPress={() => setIsSearchOpen(true)}>
-                                    <Ionicons name="search" size={22} color={tw.color('primary') as string} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={tw`p-2 rounded-full bg-secondary/20`} onPress={() => navigation.navigate('NotificationInbox')}>
-                                    <Ionicons name="notifications-outline" size={22} color={tw.color('primary') as string} />
-                                </TouchableOpacity>
+                            <Text style={{ fontSize: 24, fontWeight: '700', color: c.text }}>{t('communities.title')}</Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <IconBtn name="search" onPress={() => setIsSearchOpen(true)} />
+                                <IconBtn name="notifications-outline" onPress={() => navigation.navigate('NotificationInbox')} />
                             </View>
                         </>
                     ) : (
-                        <View style={tw`flex-row items-center flex-1 bg-background rounded-full px-4 py-2 mt-1 mb-1 border border-primary/10`}>
-                            <Ionicons name="search" size={20} color={tw.color('secondary') as string} />
+                        <View
+                            style={{
+                                flexDirection: 'row', alignItems: 'center', flex: 1,
+                                backgroundColor: c.surface, borderRadius: theme.borderRadius.md,
+                                paddingHorizontal: 12, borderWidth: 1, borderColor: c.borderStrong, height: 44,
+                            }}
+                        >
+                            <Ionicons name="search" size={18} color={c.textTertiary} />
                             <TextInput
-                                style={tw`flex-1 h-10 px-3 text-primary text-base`}
+                                style={{ flex: 1, paddingHorizontal: 10, color: c.text, fontSize: 15 }}
                                 placeholder={t('communities.searchPlaceholder')}
-                                placeholderTextColor={tw.color('secondary') as string}
+                                placeholderTextColor={c.textTertiary}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                                 autoFocus
                             />
-                            <TouchableOpacity onPress={() => { setIsSearchOpen(false); setSearchQuery(''); }} style={tw`p-1`}>
-                                <Ionicons name="close-circle" size={20} color={tw.color('secondary') as string} />
+                            <TouchableOpacity onPress={() => { setIsSearchOpen(false); setSearchQuery(''); }} hitSlop={8}>
+                                <Ionicons name="close-circle" size={20} color={c.textTertiary} />
                             </TouchableOpacity>
                         </View>
                     )}
                 </View>
 
-                {/* Segmented Control Tabs */}
-                <View style={tw`flex-row p-1 bg-background rounded-lg mt-1 border border-primary/10`}>
-                    <TouchableOpacity
-                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'memberships' ? 'bg-surface shadow-sm' : 'bg-transparent'}`}
-                        onPress={() => setActiveTab('memberships')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={tw`text-center text-sm ${activeTab === 'memberships' ? 'font-bold text-primary' : 'font-semibold text-textSecondary'}`}>
-                            {t('communities.tab.memberships')}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={tw`flex-1 py-2 px-3 rounded ${activeTab === 'managed' ? 'bg-surface shadow-sm' : 'bg-transparent'}`}
-                        onPress={() => setActiveTab('managed')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={tw`text-center text-sm ${activeTab === 'managed' ? 'font-bold text-primary' : 'font-semibold text-textSecondary'}`}>
-                            {t('communities.tab.managed')}
-                        </Text>
-                    </TouchableOpacity>
+                <View
+                    style={{
+                        flexDirection: 'row', padding: 3, backgroundColor: c.surfaceAlt,
+                        borderRadius: theme.borderRadius.md, borderWidth: 1, borderColor: c.border,
+                    }}
+                >
+                    <Tab id="memberships" label={t('communities.tab.memberships')} />
+                    <Tab id="managed" label={t('communities.tab.managed')} />
                 </View>
             </View>
 
-            {/* Main Content: Community List */}
             <ScrollView
-                style={tw`flex-1`}
-                contentContainerStyle={tw`p-5 pb-24 flex-col gap-5`}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[tw.color('primary') as string]} />
-                }
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: 90, gap: 14 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
             >
                 {isLoading ? (
-                    <ActivityIndicator size="large" color={tw.color('primary')} style={tw`mt-10`} />
+                    <ActivityIndicator size="large" color={c.primary} style={{ marginTop: 40 }} />
                 ) : filteredCommunities.length === 0 ? (
-                    <View style={tw`flex-col items-center justify-center p-8 mt-10 bg-surface rounded-2xl border border-primary/10 shadow-sm`}>
-                        <Ionicons name="people-outline" size={64} color={tw.color('secondary') as string} />
-                        <Text style={tw`text-textSecondary font-medium mt-4 text-center`}>
-                            {searchQuery ? t('communities.searchEmpty') : t('communities.empty')}
-                        </Text>
-                    </View>
+                    <Card>
+                        <EmptyState
+                            icon="people-outline"
+                            title={searchQuery ? t('communities.searchEmpty') : t('communities.empty')}
+                        />
+                    </Card>
                 ) : (
                     filteredCommunities.map((comm) => (
-                        <TouchableOpacity key={comm.id} style={tw`flex-col overflow-hidden bg-surface rounded-2xl shadow-sm border border-primary/10`} activeOpacity={0.8} onPress={() => navigation.navigate('CommunityDetail', { id: comm.id })}>
-                            {/* Banner Image */}
+                        <TouchableOpacity
+                            key={comm.id}
+                            activeOpacity={0.85}
+                            onPress={() => navigation.navigate('CommunityDetail', { id: comm.id })}
+                            style={{
+                                backgroundColor: c.surface, borderRadius: theme.borderRadius.lg,
+                                borderWidth: 1, borderColor: c.border, overflow: 'hidden', ...theme.shadows.card,
+                            }}
+                        >
+                            {/* Yumuşak marka banner'ı (eski ağır düz mavi yerine primaryTint) */}
                             {comm.coverImageUrl ? (
-                                <ImageBackground source={{ uri: comm.coverImageUrl }} style={tw`h-24 w-full bg-primary`}>
-                                    <View style={tw`absolute inset-0 bg-primary/20`} />
-                                </ImageBackground>
+                                <ImageBackground source={{ uri: comm.coverImageUrl }} style={{ height: 80, width: '100%' }} />
                             ) : (
-                                <View style={tw`h-24 w-full bg-primary`} />
+                                <View style={{ height: 80, width: '100%', backgroundColor: c.primaryTint }} />
                             )}
 
-                            <View style={tw`flex-col p-5 pt-0`}>
-                                <View style={tw`flex-row justify-between items-start`}>
-                                    <View style={tw`-mt-8 mb-3`}>
-                                        <View style={tw`h-16 w-16 rounded-2xl border-4 border-surface bg-background overflow-hidden shadow-sm items-center justify-center`}>
-                                            <Text style={tw`text-3xl font-black text-primary`}>{comm.name?.[0]}</Text>
-                                        </View>
-                                    </View>
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                                <View
+                                    style={{
+                                        height: 56, width: 56, borderRadius: theme.borderRadius.lg,
+                                        borderWidth: 3, borderColor: c.surface, backgroundColor: c.primaryTint,
+                                        alignItems: 'center', justifyContent: 'center', marginTop: -28, marginBottom: 10,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 24, fontWeight: '800', color: c.primary }}>
+                                        {comm.name?.[0]}
+                                    </Text>
                                 </View>
 
-                                <Text style={tw`text-xl font-bold text-primary leading-tight`}>{comm.name}</Text>
-                                <Text style={tw`text-sm text-textSecondary mt-1.5 leading-relaxed`} numberOfLines={2}>
+                                <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{comm.name}</Text>
+                                <Text style={{ fontSize: 13, color: c.textSecondary, marginTop: 4, lineHeight: 19 }} numberOfLines={2}>
                                     {comm.description || t('communities.noDescription')}
                                 </Text>
 
-                                <View style={tw`mt-4 flex-row items-center justify-between border-t border-primary/10 pt-4`}>
-                                    <View style={tw`flex-row items-center gap-2`}>
-                                        <View style={tw`bg-primary/10 p-1.5 rounded-lg`}>
-                                            <Ionicons name="people" size={16} color={tw.color('primary') as string} />
-                                        </View>
-                                        <Text style={tw`text-sm font-semibold text-textSecondary`}>{t('communities.member')}</Text>
+                                <View
+                                    style={{
+                                        marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border,
+                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Ionicons name="people-outline" size={16} color={c.textSecondary} />
+                                        <Text style={{ fontSize: 13, fontWeight: '600', color: c.textSecondary }}>
+                                            {t('communities.member')}
+                                        </Text>
                                     </View>
-                                    <View style={tw`w-8 h-8 rounded-full bg-secondary/20 items-center justify-center`}>
-                                        <Ionicons name="chevron-forward" size={18} color={tw.color('primary') as string} />
-                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -183,12 +215,16 @@ export const CommunitiesScreen = () => {
             </ScrollView>
 
             <TouchableOpacity
-                style={tw`absolute bottom-6 right-5 h-14 w-14 bg-primary rounded-full shadow-lg items-center justify-center z-40 border-2 border-surface`}
+                style={{
+                    position: 'absolute', bottom: 24, right: theme.spacing.md,
+                    height: 56, width: 56, borderRadius: 28, backgroundColor: c.primary,
+                    alignItems: 'center', justifyContent: 'center', ...theme.shadows.elevated,
+                }}
                 onPress={() => navigation.navigate('CreateCommunity')}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
             >
-                <Ionicons name="add" size={28} color="white" />
+                <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
-        </View >
+        </SafeAreaView>
     );
 };

@@ -1,42 +1,28 @@
-import React, { useLayoutEffect, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Keyboard } from 'react-native';
+import React, { useLayoutEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
 import { registerForPushNotificationsAsync } from '../../utils/notificationHandler';
 import { api } from '../../services/api';
-import { Switch } from 'react-native';
+import { theme } from '../../utils/theme';
+import { Card, ListItem } from '../../components/ui';
 
 export const ProfileScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const { user, signOut, refreshUser } = useAuth();
-    const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-
     const navigation = useNavigation<any>();
     const { t, language, setLanguage } = useI18n();
     const { showDialog } = useUI();
+    const c = theme.colors;
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
     }, [navigation]);
-
-    useEffect(() => {
-        const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
-            setKeyboardVisible(true);
-        });
-        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-            setKeyboardVisible(false);
-        });
-
-        return () => {
-            showSubscription.remove();
-            hideSubscription.remove();
-        };
-    }, []);
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
@@ -50,16 +36,7 @@ export const ProfileScreen = () => {
             message: t('profile.logoutBody'),
             type: 'confirm',
             confirmText: t('profile.logout'),
-            onConfirm: signOut
-        });
-    };
-
-    const handleNotImplemented = () => {
-        Toast.show({
-            type: 'info',
-            text1: t('profile.comingSoonTitle'),
-            text2: t('profile.comingSoonBody'),
-            visibilityTime: 2000,
+            onConfirm: signOut,
         });
     };
 
@@ -72,30 +49,18 @@ export const ProfileScreen = () => {
                 aspect: [1, 1],
                 quality: 0.5,
             });
-
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const asset = result.assets[0];
                 const formData = new FormData();
-
-                // Formulate the file to upload
                 const localUri = asset.uri;
                 const filename = localUri.split('/').pop();
                 const match = /\.(\w+)$/.exec(filename || '');
                 const type = match ? `image/${match[1]}` : `image`;
-
-                formData.append('file', {
-                    uri: localUri,
-                    name: filename,
-                    type,
-                } as any);
-
+                formData.append('file', { uri: localUri, name: filename, type } as any);
                 Toast.show({ type: 'info', text1: t('profile.uploadingTitle'), text2: t('profile.uploadingBody') });
-
-                const { api } = require('../../services/api');
                 await api.post('/users/me/profile-image', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' },
                 });
-
                 await refreshUser();
                 Toast.show({ type: 'success', text1: t('profile.uploadSuccessTitle'), text2: t('profile.uploadSuccessBody') });
             }
@@ -107,18 +72,12 @@ export const ProfileScreen = () => {
 
     const toggleGuardianRole = async () => {
         if (!user) return;
-        
         const currentEligible = (user as any).isGuardianEligible;
-        
         if (!currentEligible) {
-            // Aday olmak istiyor -> İzin al
             const token = await registerForPushNotificationsAsync();
             if (token) {
                 try {
-                    await api.put('/users/me/push-token', {
-                        pushToken: token,
-                        guardianEligible: true
-                    });
+                    await api.put('/users/me/push-token', { pushToken: token, guardianEligible: true });
                     await refreshUser();
                     Toast.show({ type: 'success', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleSuccess') });
                 } catch (error) {
@@ -128,12 +87,8 @@ export const ProfileScreen = () => {
                 Toast.show({ type: 'error', text1: t('profile.notificationPermissionRequired'), text2: t('profile.notificationSettings') });
             }
         } else {
-            // Adaylıktan çıkmak istiyor
             try {
-                await api.put('/users/me/push-token', {
-                    pushToken: (user as any).pushToken,
-                    guardianEligible: false
-                });
+                await api.put('/users/me/push-token', { pushToken: (user as any).pushToken, guardianEligible: false });
                 await refreshUser();
                 Toast.show({ type: 'info', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleDisabled') });
             } catch (error) {
@@ -142,194 +97,186 @@ export const ProfileScreen = () => {
         }
     };
 
-    const is2FA = (user as any)?.isMfaEnabled || (user as any)?.mfaEnabled;
+    const LangBtn = ({ code, label }: { code: 'tr' | 'en'; label: string }) => {
+        const active = language === code;
+        return (
+            <TouchableOpacity
+                onPress={() => setLanguage(code)}
+                activeOpacity={0.8}
+                style={{
+                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: theme.borderRadius.md,
+                    backgroundColor: active ? c.primary : 'transparent',
+                }}
+            >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? c.onPrimary : c.textSecondary }}>
+                    {label}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
 
     return (
-        <View style={tw`flex-1 bg-background`}>
-            {/* Header */}
-            <View style={tw`items-center justify-center p-4 pt-14 pb-4 bg-surface border-b border-background z-10 shadow-sm`}>
-                <Text style={tw`text-xl font-bold leading-tight tracking-tight text-center text-primary`}>
-                    {t('profile.title')}
-                </Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            <View style={{ paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surface }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{t('profile.title')}</Text>
             </View>
 
-            {/* Scrollable Content */}
             <ScrollView
-                style={tw`flex-1`}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[tw.color('primary') as string]} />}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: 32 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />}
             >
-                {/* User Profile Card */}
-                <View style={tw`p-6 flex-col items-center`}>
-                    <View style={tw`relative mb-4`}>
-                        <View style={tw`w-28 h-28 rounded-full bg-primary border-4 border-white shadow-lg items-center justify-center overflow-hidden`}>
+                {/* Profil kartı */}
+                <View style={{ alignItems: 'center', paddingVertical: theme.spacing.lg }}>
+                    <View style={{ marginBottom: 14 }}>
+                        <View
+                            style={{
+                                width: 104, height: 104, borderRadius: 52, overflow: 'hidden',
+                                backgroundColor: c.primary, borderWidth: 4, borderColor: c.surface,
+                                alignItems: 'center', justifyContent: 'center', ...theme.shadows.card,
+                            }}
+                        >
                             {user?.profileImage ? (
-                                <React.Fragment>
-                                    {/* <Text style={tw`text-xs text-white`}>Resim Yüklendi</Text> */}
-                                    {<Image source={{ uri: user.profileImage }} style={tw`w-full h-full`} />}
-                                </React.Fragment>
+                                <Image source={{ uri: user.profileImage }} style={{ width: '100%', height: '100%' }} />
                             ) : (
-                                <Text style={tw`text-5xl font-bold text-white`}>{user?.firstName?.[0]}{user?.lastName?.[0]}</Text>
+                                <Text style={{ fontSize: 40, fontWeight: '700', color: c.onPrimary }}>
+                                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                                </Text>
                             )}
                         </View>
                         <TouchableOpacity
-                            style={tw`absolute bottom-0 right-0 bg-primary rounded-full p-2.5 border-2 border-white`}
                             onPress={handleImagePick}
                             activeOpacity={0.8}
+                            style={{
+                                position: 'absolute', bottom: 0, right: 0,
+                                backgroundColor: c.primary, borderRadius: 18, padding: 9,
+                                borderWidth: 2, borderColor: c.surface,
+                            }}
                         >
-                            <Ionicons name="camera" size={18} color="white" />
+                            <Ionicons name="camera" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
-                    <Text style={tw`text-2xl font-bold text-primary mb-1`}>{user?.firstName} {user?.lastName}</Text>
-                    <Text style={tw`text-textSecondary text-sm font-medium`}>{user?.email || t('profile.defaultEmail')}</Text>
-                    <View style={tw`mt-4 px-3.5 py-1.5 bg-success/10 items-center justify-center flex-row gap-1.5 rounded-full border border-success/20`}>
-                        <Ionicons name="shield-checkmark" size={16} color={tw.color('success') as string} />
-                        <Text style={tw`text-success text-xs font-bold uppercase tracking-wide`}>{t('profile.verifiedVoter')}</Text>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>
+                        {user?.firstName} {user?.lastName}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: c.textSecondary, marginTop: 2 }}>
+                        {user?.email || t('profile.defaultEmail')}
+                    </Text>
+                    <View
+                        style={{
+                            marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 6,
+                            paddingHorizontal: 14, paddingVertical: 6,
+                            backgroundColor: c.successTint, borderRadius: theme.borderRadius.round,
+                        }}
+                    >
+                        <Ionicons name="shield-checkmark" size={15} color={c.success} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: c.success }}>
+                            {t('profile.verifiedVoter')}
+                        </Text>
                     </View>
                 </View>
 
-                {/* Settings Groups */}
-                <View style={tw`px-5 pb-8 flex-col gap-6 mt-2`}>
-                    {/* Account Settings Group */}
-                    <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-textSecondary uppercase tracking-wider`}>{t('profile.section.account')}</Text>
-                        <View style={tw`bg-surface rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
-                            {/* Edit Profile */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('EditProfile')} activeOpacity={0.7}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/10 items-center justify-center`}>
-                                        <Ionicons name="person-outline" size={20} color={tw.color('primary') as string} />
-                                    </View>
-                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.editProfile')}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
-                            </TouchableOpacity>
-
-                            {/* Security */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('SecuritySettings')} activeOpacity={0.7}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-secondary/20 items-center justify-center`}>
-                                        <Ionicons name="lock-closed-outline" size={20} color={tw.color('primary') as string} />
-                                    </View>
-                                    <View style={tw`flex-col`}>
-                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.securityPassword')}</Text>
-
-                                    </View>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
-                            </TouchableOpacity>
-
-                            {/* Notifications */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('NotificationSettings')} activeOpacity={0.7}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/20 items-center justify-center`}>
-                                        <Ionicons name="notifications-outline" size={20} color={tw.color('primary') as string} />
-                                    </View>
-                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.notificationSettings')}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
-                            </TouchableOpacity>
-
-                            {/* Guardian Role Toggle */}
-                            <View style={tw`flex-row items-center justify-between p-4 bg-surface`}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-success/10 items-center justify-center`}>
-                                        <Ionicons name="shield-outline" size={20} color={tw.color('success') as string} />
-                                    </View>
-                                    <View style={tw`flex-1 mr-4`}>
-                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.guardianRole')}</Text>
-                                        <Text style={tw`text-xs text-textSecondary`}>{t('profile.guardianRoleDesc')}</Text>
-                                    </View>
-                                </View>
+                {/* Hesap */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: c.textSecondary, marginBottom: 8, marginLeft: 4, letterSpacing: 0.5 }}>
+                    {t('profile.section.account')}
+                </Text>
+                <Card padding={0} style={{ overflow: 'hidden' }}>
+                    <View style={{ paddingHorizontal: theme.spacing.md }}>
+                        <ListItem
+                            icon="person-outline"
+                            title={t('profile.editProfile')}
+                            onPress={() => navigation.navigate('EditProfile')}
+                        />
+                        <Divider />
+                        <ListItem
+                            icon="lock-closed-outline"
+                            title={t('profile.securityPassword')}
+                            onPress={() => navigation.navigate('SecuritySettings')}
+                        />
+                        <Divider />
+                        <ListItem
+                            icon="notifications-outline"
+                            title={t('profile.notificationSettings')}
+                            onPress={() => navigation.navigate('NotificationSettings')}
+                        />
+                        <Divider />
+                        <ListItem
+                            icon="shield-outline"
+                            iconTone="success"
+                            title={t('profile.guardianRole')}
+                            subtitle={t('profile.guardianRoleDesc')}
+                            right={
                                 <Switch
                                     value={(user as any)?.isGuardianEligible || false}
                                     onValueChange={toggleGuardianRole}
-                                    trackColor={{ false: '#cbd5e1', true: tw.color('success') as string }}
-                                    thumbColor="white"
+                                    trackColor={{ false: c.borderStrong, true: c.success }}
+                                    thumbColor="#fff"
                                 />
-                            </View>
-
-                            <View style={tw`p-4 bg-surface border-t border-slate-100`}>
-                                <View style={tw`flex-row items-center justify-between`}>
-                                    <View style={tw`flex-row items-center gap-4`}>
-                                        <View style={tw`w-10 h-10 rounded-xl bg-secondary/20 items-center justify-center`}>
-                                            <Ionicons name="language-outline" size={20} color={tw.color('primary') as string} />
-                                        </View>
-                                        <Text style={tw`text-base font-semibold text-primary`}>{t('profile.language')}</Text>
-                                    </View>
-                                    <View style={tw`flex-row rounded-xl bg-background p-1 border border-primary/10`}>
-                                        <TouchableOpacity
-                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'tr' ? 'bg-primary' : '')}
-                                            onPress={() => setLanguage('tr')}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={tw.style(`text-xs font-bold`, language === 'tr' ? 'text-surface' : 'text-textSecondary')}>
-                                                {t('profile.languageTurkish')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={tw.style(`px-3 py-1.5 rounded-lg`, language === 'en' ? 'bg-primary' : '')}
-                                            onPress={() => setLanguage('en')}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={tw.style(`text-xs font-bold`, language === 'en' ? 'text-surface' : 'text-textSecondary')}>
-                                                {t('profile.languageEnglish')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
+                            }
+                        />
+                        <Divider />
+                        <ListItem
+                            icon="language-outline"
+                            title={t('profile.language')}
+                            right={
+                                <View
+                                    style={{
+                                        flexDirection: 'row', backgroundColor: c.surfaceAlt,
+                                        borderRadius: theme.borderRadius.md, padding: 3,
+                                        borderWidth: 1, borderColor: c.border,
+                                    }}
+                                >
+                                    <LangBtn code="tr" label={t('profile.languageTurkish')} />
+                                    <LangBtn code="en" label={t('profile.languageEnglish')} />
                                 </View>
-                            </View>
-                        </View>
+                            }
+                        />
                     </View>
+                </Card>
 
-                    {/* Support Group */}
-                    <View>
-                        <Text style={tw`px-2 mb-2 text-xs font-bold text-textSecondary uppercase tracking-wider`}>{t('profile.section.support')}</Text>
-                        <View style={tw`bg-surface rounded-2xl overflow-hidden shadow-sm border border-slate-100`}>
-                            {/* About */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface border-b border-slate-100`} onPress={() => navigation.navigate('About')} activeOpacity={0.7}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-primary/10 items-center justify-center`}>
-                                        <Ionicons name="information-circle-outline" size={22} color={tw.color('primary') as string} />
-                                    </View>
-                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.about')}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
-                            </TouchableOpacity>
-
-                            {/* Help */}
-                            <TouchableOpacity style={tw`flex-row items-center justify-between p-4 bg-surface`} onPress={() => navigation.navigate('Help')} activeOpacity={0.7}>
-                                <View style={tw`flex-row items-center gap-4`}>
-                                    <View style={tw`w-10 h-10 rounded-xl bg-secondary/10 items-center justify-center`}>
-                                        <Ionicons name="help-buoy-outline" size={22} color={tw.color('primary') as string} />
-                                    </View>
-                                    <Text style={tw`text-base font-semibold text-primary`}>{t('profile.helpCenter')}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={20} color={tw.color('secondary') as string} />
-                            </TouchableOpacity>
-                        </View>
+                {/* Destek */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: c.textSecondary, marginBottom: 8, marginTop: theme.spacing.lg, marginLeft: 4, letterSpacing: 0.5 }}>
+                    {t('profile.section.support')}
+                </Text>
+                <Card padding={0} style={{ overflow: 'hidden' }}>
+                    <View style={{ paddingHorizontal: theme.spacing.md }}>
+                        <ListItem
+                            icon="information-circle-outline"
+                            title={t('profile.about')}
+                            onPress={() => navigation.navigate('About')}
+                        />
+                        <Divider />
+                        <ListItem
+                            icon="help-buoy-outline"
+                            title={t('profile.helpCenter')}
+                            onPress={() => navigation.navigate('Help')}
+                        />
                     </View>
-                    {/* Security Badge */}
-                    <View style={tw`px-5`}>
-                        <View style={tw`flex-column items-center gap-2 bg-primary/10 py-1.5 rounded-full  border border-primary/20`}>
-                            <Text style={tw`text-xs font-semibold tracking-wide uppercase text-primary`}>
-                                {t('home.securedBy')}
-                            </Text>
-                        </View>
-                    </View>
-                    {/* Logout Button */}
-                    <TouchableOpacity
-                        style={tw`w-full flex-row items-center justify-center gap-2 p-4 rounded-2xl bg-danger/10 mt-2 border border-danger/20`}
-                        onPress={handleLogout}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="log-out-outline" size={24} color={tw.color('danger') as string} />
-                        <Text style={tw`text-danger font-bold text-base`}>{t('profile.logout')}</Text>
-                    </TouchableOpacity>
+                </Card>
 
+                {/* Çıkış */}
+                <TouchableOpacity
+                    onPress={handleLogout}
+                    activeOpacity={0.8}
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        padding: 16, borderRadius: theme.borderRadius.lg,
+                        backgroundColor: c.dangerTint, marginTop: theme.spacing.lg,
+                    }}
+                >
+                    <Ionicons name="log-out-outline" size={22} color={c.danger} />
+                    <Text style={{ color: c.danger, fontWeight: '700', fontSize: 15 }}>{t('profile.logout')}</Text>
+                </TouchableOpacity>
 
-                    <Text style={tw`text-center text-xs text-textSecondary mt-2 font-medium`}>{t('profile.version')}</Text>
-                </View>
+                <Text style={{ textAlign: 'center', fontSize: 12, color: c.textTertiary, marginTop: 14 }}>
+                    {t('profile.version')}
+                </Text>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
+
+const Divider = () => (
+    <View style={{ height: 1, backgroundColor: theme.colors.border }} />
+);
