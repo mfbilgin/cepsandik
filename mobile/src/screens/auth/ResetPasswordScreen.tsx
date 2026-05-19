@@ -7,6 +7,7 @@ import Toast from 'react-native-toast-message';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { Screen, AppHeader, Input, Button } from '../../components/ui';
+import { validatePasswordStrengthSync } from '../../utils/passwordStrength';
 
 export const ResetPasswordScreen = () => {
     const route = useRoute<any>();
@@ -21,15 +22,8 @@ export const ResetPasswordScreen = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const confirmPasswordRef = useRef<TextInput>(null);
 
-    const getPasswordStrength = () => {
-        let score = 0;
-        if (password.length > 5) score += 1;
-        if (password.length > 8) score += 1;
-        if (/[A-Z]/.test(password)) score += 1;
-        if (/[0-9]/.test(password)) score += 1;
-        return score;
-    };
-    const strengthScore = getPasswordStrength();
+    const strengthResult = password.length > 0 ? validatePasswordStrengthSync(password) : null;
+    const strengthScore = strengthResult?.score ?? 0;
     const strengthColors = ['transparent', c.danger, c.warning, '#65A30D', c.success];
     const strengthLabels = [
         t('auth.reset.passwordStrength.0'),
@@ -50,6 +44,15 @@ export const ResetPasswordScreen = () => {
         }
         if (!token) {
             Toast.show({ type: 'error', text1: t('auth.reset.errorTitle'), text2: t('auth.reset.invalidToken') });
+            return;
+        }
+        const policy = validatePasswordStrengthSync(password);
+        if (policy.score < 3) {
+            Toast.show({
+                type: 'error',
+                text1: t('auth.reset.errorTitle'),
+                text2: policy.feedback[0] || (t('password.tooWeak') || 'Parola çok zayıf'),
+            });
             return;
         }
         setIsLoading(true);
@@ -114,6 +117,15 @@ export const ResetPasswordScreen = () => {
                             {password.length > 0 ? strengthLabels[strengthScore] : ''}
                         </Text>
                     </View>
+                    {strengthResult && strengthResult.feedback.length > 0 && strengthScore < 3 && (
+                        <View style={{ marginTop: -4, marginBottom: 12, gap: 4 }}>
+                            {strengthResult.feedback.slice(0, 3).map((msg, idx) => (
+                                <Text key={idx} style={{ fontSize: 12, color: c.danger, lineHeight: 17 }}>
+                                    • {msg}
+                                </Text>
+                            ))}
+                        </View>
+                    )}
 
                     <Input
                         ref={confirmPasswordRef}

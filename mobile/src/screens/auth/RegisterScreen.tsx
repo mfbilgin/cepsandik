@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Keyboard } from 'react-native';
 import { theme } from '../../utils/theme';
 import { Screen, AppHeader, Input, Button } from '../../components/ui';
+import { validatePasswordStrengthSync, validatePasswordStrength } from '../../utils/passwordStrength';
 
 export const RegisterScreen = () => {
     const [firstName, setFirstName] = useState('');
@@ -17,6 +18,8 @@ export const RegisterScreen = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [kvkkAccepted, setKvkkAccepted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [passwordStrengthResult, setPasswordStrengthResult] = useState<any>(null);
+    const [isCheckingBreach, setIsCheckingBreach] = useState(false);
 
     const lastNameRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
@@ -27,22 +30,40 @@ export const RegisterScreen = () => {
     const { t } = useI18n();
     const c = theme.colors;
 
-    const getPasswordStrength = () => {
-        let score = 0;
-        if (password.length > 5) score += 1;
-        if (password.length > 8) score += 1;
-        if (/[A-Z]/.test(password)) score += 1;
-        if (/[0-9]/.test(password)) score += 1;
-        return score;
+    // Real-time password strength validation (synchronous for immediate UI feedback)
+    const handlePasswordChange = (newPassword: string) => {
+        setPassword(newPassword);
+        const result = validatePasswordStrengthSync(newPassword);
+        setPasswordStrengthResult(result);
     };
-    const strengthScore = getPasswordStrength();
-    const strengthColors = ['transparent', c.danger, c.warning, '#65A30D', c.success];
+
+    // Async breach check when user is done typing (debounced)
+    useEffect(() => {
+        if (!password || password.length < 8) {
+            return; // Don't check very short passwords
+        }
+
+        const timer = setTimeout(async () => {
+            setIsCheckingBreach(true);
+            try {
+                const result = await validatePasswordStrength(password, true);
+                setPasswordStrengthResult(result);
+            } finally {
+                setIsCheckingBreach(false);
+            }
+        }, 1500); // Wait 1.5s after user stops typing
+
+        return () => clearTimeout(timer);
+    }, [password]);
+
+    const strengthScore = passwordStrengthResult?.score || 0;
+    const strengthColor = [c.danger, c.danger, c.warning, '#65A30D', c.success][strengthScore];
     const strengthLabels = [
-        t('auth.register.passwordStrength.0'),
-        t('auth.register.passwordStrength.1'),
-        t('auth.register.passwordStrength.2'),
-        t('auth.register.passwordStrength.3'),
-        t('auth.register.passwordStrength.4'),
+        t('auth.register.passwordStrength.0') || 'Çok Zayıf',
+        t('auth.register.passwordStrength.1') || 'Zayıf',
+        t('auth.register.passwordStrength.2') || 'Orta',
+        t('auth.register.passwordStrength.3') || 'İyi',
+        t('auth.register.passwordStrength.4') || 'Çok Güçlü',
     ];
 
     const handleRegister = async () => {
@@ -58,6 +79,27 @@ export const RegisterScreen = () => {
             Toast.show({ type: 'error', text1: t('auth.register.errorTitle'), text2: t('auth.register.kvkkRequired') });
             return;
         }
+
+        // Backend policy: entropy ≥ 50 bits, 12+ char, 3+ char classes — ≈ score ≥ 3
+        if (!passwordStrengthResult || passwordStrengthResult.score < 3) {
+            Toast.show({
+                type: 'error',
+                text1: 'Zayıf Şifre',
+                text2: 'Lütfen daha güçlü bir şifre seçin. Gereksinimleri karşılaştığınızdan emin olun.',
+            });
+            return;
+        }
+
+        // Check if password is breached
+        if (passwordStrengthResult.isBreached) {
+            Toast.show({
+                type: 'error',
+                text1: 'Güvenlik Uyarısı',
+                text2: 'Bu şifre geçmişte veri ihlallerinde tespit edilmiştir. Lütfen farklı bir şifre seçin.',
+            });
+            return;
+        }
+
         setIsLoading(true);
         Keyboard.dismiss();
         try {
@@ -142,28 +184,67 @@ export const RegisterScreen = () => {
                     placeholder="••••••••"
                     password
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={handlePasswordChange}
                     returnKeyType="next"
                     onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                     blurOnSubmit={false}
                 />
-                {/* Parola gücü */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -8, marginBottom: 12 }}>
+                {/* Enhanced password strength indicator */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -8, marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row', flex: 1, height: 6, gap: 4, borderRadius: 3, overflow: 'hidden', backgroundColor: c.surfaceAlt }}>
                         {[1, 2, 3, 4].map((i) => (
                             <View
                                 key={i}
                                 style={{
-                                    flex: 1, borderRadius: 3,
-                                    backgroundColor: strengthScore >= i ? strengthColors[strengthScore] : 'transparent',
+                                    flex: 1,
+                                    borderRadius: 3,
+                                    backgroundColor: password.length > 0 && strengthScore >= i ? strengthColor : 'transparent',
                                 }}
                             />
                         ))}
                     </View>
-                    <Text style={{ fontSize: 12, color: c.textSecondary, width: 64, textAlign: 'right' }}>
-                        {password.length > 0 ? strengthLabels[strengthScore] : ''}
-                    </Text>
+                    <View style={{ width: 80, alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 12, color: strengthColor, fontWeight: '600' }}>
+                            {password.length > 0 ? strengthLabels[strengthScore] : ''}
+                        </Text>
+                        {isCheckingBreach && password.length > 8 && (
+                            <Text style={{ fontSize: 10, color: c.textSecondary, marginTop: 2 }}>
+                                Kontrol ediliyor...
+                            </Text>
+                        )}
+                    </View>
                 </View>
+
+                {/* Password strength feedback */}
+                {password.length > 0 && passwordStrengthResult && (
+                    <View style={{ marginBottom: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: c.surfaceAlt, borderRadius: 8 }}>
+                        {passwordStrengthResult.feedback.map((msg: string, idx: number) => (
+                            <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: idx < passwordStrengthResult.feedback.length - 1 ? 6 : 0 }}>
+                                <Ionicons
+                                    name={
+                                        msg.includes('✓')
+                                            ? 'checkmark-circle'
+                                            : msg.includes('İhlal') || msg.includes('geçmişte')
+                                              ? 'alert-circle'
+                                              : 'information-circle'
+                                    }
+                                    size={14}
+                                    color={
+                                        msg.includes('✓')
+                                            ? c.success
+                                            : msg.includes('İhlal') || msg.includes('geçmişte')
+                                              ? c.danger
+                                              : c.warning
+                                    }
+                                    style={{ marginTop: 2 }}
+                                />
+                                <Text style={{ flex: 1, fontSize: 12, color: c.textSecondary, lineHeight: 16 }}>
+                                    {msg}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
 
                 <Input
                     ref={confirmPasswordRef}

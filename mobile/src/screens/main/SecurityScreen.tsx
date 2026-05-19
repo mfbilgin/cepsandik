@@ -8,6 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { Screen, AppHeader, Card, Input, Button, Badge } from '../../components/ui';
+import { validatePasswordStrengthSync } from '../../utils/passwordStrength';
 
 export const SecurityScreen = () => {
     const navigation = useNavigation<any>();
@@ -39,16 +40,8 @@ export const SecurityScreen = () => {
         }, [])
     );
 
-    const calculateStrength = (pass: string) => {
-        let score = 0;
-        if (pass.length > 7) score += 1;
-        if (/[A-Z]/.test(pass)) score += 1;
-        if (/[0-9]/.test(pass)) score += 1;
-        if (/[^A-Za-z0-9]/.test(pass)) score += 1;
-        return score; // 0-4
-    };
-
-    const strength = calculateStrength(newPassword);
+    const strengthResult = newPassword.length > 0 ? validatePasswordStrengthSync(newPassword) : null;
+    const strength = strengthResult?.score ?? 0;
     const strengthLevels = [
         t('auth.reset.passwordStrength.0'),
         t('auth.reset.passwordStrength.1'),
@@ -66,6 +59,15 @@ export const SecurityScreen = () => {
 
         if (newPassword !== confirmPassword) {
             Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: t('security.passwordMismatch') });
+            return;
+        }
+        const policy = validatePasswordStrengthSync(newPassword);
+        if (policy.score < 3) {
+            Toast.show({
+                type: 'error',
+                text1: t('auth.twoFactor.errorTitle'),
+                text2: policy.feedback[0] || (t('password.tooWeak') || 'Parola çok zayıf'),
+            });
             return;
         }
 
@@ -148,6 +150,15 @@ export const SecurityScreen = () => {
                             <Text style={{ fontSize: 12, textAlign: 'right', color: strengthColors[strength], fontWeight: '500' }}>
                                 {strengthLevels[strength]}
                             </Text>
+                            {strengthResult && strengthResult.feedback.length > 0 && strength < 3 && (
+                                <View style={{ gap: 4, marginTop: 4 }}>
+                                    {strengthResult.feedback.slice(0, 3).map((msg, idx) => (
+                                        <Text key={idx} style={{ fontSize: 12, color: c.danger, lineHeight: 17 }}>
+                                            • {msg}
+                                        </Text>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     )}
 
