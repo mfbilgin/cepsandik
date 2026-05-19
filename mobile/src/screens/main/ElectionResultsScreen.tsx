@@ -4,6 +4,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import { tw } from '../../utils/tailwind';
+import { theme } from '../../utils/theme';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
@@ -251,7 +252,7 @@ export const ElectionResultsScreen = () => {
                     {/* ── Results List ── */}
                     <View style={tw`mx-4 mt-3 rounded-2xl bg-surface shadow-sm border border-slate-100`}>
                         <View style={tw`p-5 pb-3 flex-row items-center gap-2`}>
-                            <Ionicons name="podium-outline" size={20} color={tw.color('primary')} />
+                            <Ionicons name="podium-outline" size={20} color={theme.colors.textSecondary} />
                             <Text style={tw`text-base font-bold text-slate-900`}>{t('results.candidateResults')}</Text>
                         </View>
 
@@ -278,7 +279,7 @@ export const ElectionResultsScreen = () => {
                                                 {t('results.votes', { count: candidate.voteCount })}
                                             </Text>
                                             <Text style={tw`text-xs text-slate-400`}>•</Text>
-                                            <Text style={tw`text-xs font-semibold text-primary`}>{t('home.percentValue', { value: candidate.percentage?.toFixed(1) })}</Text>
+                                            <Text style={tw`text-xs font-semibold text-textSecondary`}>{t('home.percentValue', { value: candidate.percentage?.toFixed(1) })}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -290,7 +291,7 @@ export const ElectionResultsScreen = () => {
                                             tw`h-full rounded-full`,
                                             {
                                                 width: `${Math.max((candidate.voteCount / maxVotes) * 100, 2)}%` as any,
-                                                backgroundColor: candidate.isWinner ? '#22c55e' : tw.color('primary'),
+                                                backgroundColor: candidate.isWinner ? theme.colors.success : theme.colors.borderStrong,
                                             }
                                         ]}
                                     />
@@ -302,14 +303,14 @@ export const ElectionResultsScreen = () => {
                     </View>
 
                     {/* ── Independent Audit Info ── */}
-                    <View style={tw`mx-4 mt-3 rounded-2xl bg-primary/5 p-5 border border-primary/20`}>
+                    <View style={[tw`mx-4 mt-3 rounded-2xl p-5`, { backgroundColor: theme.colors.successTint, borderWidth: 1, borderColor: theme.colors.success + '33' }]}>
                         <View style={tw`flex-row items-center gap-3 mb-3`}>
-                            <View style={tw`w-10 h-10 rounded-full bg-primary/10 items-center justify-center`}>
-                                <Ionicons name="shield-checkmark" size={22} color={tw.color('primary')} />
+                            <View style={[tw`w-10 h-10 rounded-full items-center justify-center`, { backgroundColor: theme.colors.success + '22' }]}>
+                                <Ionicons name="shield-checkmark" size={22} color={theme.colors.success} />
                             </View>
                             <View style={tw`flex-1`}>
                                 <Text style={tw`text-base font-bold text-slate-900`}>{t('results.auditInfoTitle')}</Text>
-                                <Text style={tw`text-xs font-bold text-primary`}>{t('results.auditVerified')}</Text>
+                                <Text style={[tw`text-xs font-bold`, { color: theme.colors.success }]}>{t('results.auditVerified')}</Text>
                             </View>
                         </View>
                         
@@ -431,7 +432,7 @@ const formatDate = (iso: string, lang: string) => {
 
 const StatItem = ({ value, label }: { value: string; label: string }) => (
     <View style={tw`items-center`}>
-        <Text style={tw`text-2xl font-bold text-primary`}>{value}</Text>
+        <Text style={tw`text-2xl font-bold text-textDefault`}>{value}</Text>
         <Text style={tw`text-xs text-slate-500 mt-1`}>{label}</Text>
     </View>
 );

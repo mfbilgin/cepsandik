@@ -325,32 +325,54 @@ export const ElectionDetailScreen = () => {
                 </View>
             </ScrollView>
 
-            {/* Sticky Footer */}
-            <View style={tw`absolute bottom-0 w-full bg-surface/95 p-4 border-t border-slate-200 shadow-md`}>
-                {election.status === 'DRAFT' && String(election.createdBy) === String(user?.id) ? (
-                    <TouchableOpacity
-                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm`}
-                        onPress={handlePublish}
-                        disabled={isPublishing}
-                    >
-                        <Ionicons name="send" size={20} color="#fff" />
-                        <Text style={tw`text-base font-bold text-white tracking-wide`}>
-                            {isPublishing ? t('notifications.saving') : t('electionDetail.publish')}
-                        </Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity
-                        style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm ${election.status !== 'ACTIVE' ? 'opacity-50' : ''}`}
-                        onPress={handleProceed}
-                        disabled={election.status !== 'ACTIVE' || isVerifying}
-                    >
-                        <Ionicons name="checkbox-outline" size={20} color="#fff" />
-                        <Text style={tw`text-base font-bold text-white tracking-wide`}>
-                            {isVerifying ? t('electionDetail.verify') : t('electionDetail.voteNow')}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+            {/* Sticky Footer — bağlamsal: ölü/pasif "Vote Now" yerine duruma
+                göre eylem. SCHEDULED/CANCELLED'da footer hiç gösterilmez. */}
+            {(() => {
+                const isDraftOwner = election.status === 'DRAFT'
+                    && String(election.createdBy) === String(user?.id);
+                const isActive = election.status === 'ACTIVE';
+                const isClosedLike = election.status === 'CLOSED' || election.status === 'ARCHIVED';
+
+                if (!isDraftOwner && !isActive && !isClosedLike) return null;
+
+                return (
+                    <View style={tw`absolute bottom-0 w-full bg-surface/95 p-4 border-t border-slate-200 shadow-md`}>
+                        {isDraftOwner ? (
+                            <TouchableOpacity
+                                style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm`}
+                                onPress={handlePublish}
+                                disabled={isPublishing}
+                            >
+                                <Ionicons name="send" size={20} color="#fff" />
+                                <Text style={tw`text-base font-bold text-white tracking-wide`}>
+                                    {isPublishing ? t('notifications.saving') : t('electionDetail.publish')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : isActive ? (
+                            <TouchableOpacity
+                                style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm ${isVerifying ? 'opacity-50' : ''}`}
+                                onPress={handleProceed}
+                                disabled={isVerifying}
+                            >
+                                <Ionicons name="checkbox-outline" size={20} color="#fff" />
+                                <Text style={tw`text-base font-bold text-white tracking-wide`}>
+                                    {isVerifying ? t('electionDetail.verify') : t('electionDetail.voteNow')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 shadow-sm`}
+                                onPress={() => navigation.navigate('ElectionResults', { electionId })}
+                            >
+                                <Ionicons name="bar-chart-outline" size={20} color="#fff" />
+                                <Text style={tw`text-base font-bold text-white tracking-wide`}>
+                                    {t('electionDetail.viewResults')}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                );
+            })()}
 
             {/* Edit Dates Modal */}
             <Modal visible={isEditModalVisible} transparent animationType="slide">
