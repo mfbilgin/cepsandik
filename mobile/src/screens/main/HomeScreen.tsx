@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -8,6 +8,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { Card, Badge, Button, EmptyState, SectionHeader } from '../../components/ui';
+import { AccessCodeInput } from '../../components/AccessCodeInput';
+import { NewElectionSheet } from '../../components/NewElectionSheet';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export const HomeScreen = () => {
     const { user } = useAuth();
@@ -17,6 +20,8 @@ export const HomeScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [recentResults, setRecentResults] = useState([]);
+    const [showAccessCodeModal, setShowAccessCodeModal] = useState(false);
+    const [showNewElectionSheet, setShowNewElectionSheet] = useState(false);
 
     const fetchDashboardData = async () => {
         try {
@@ -51,6 +56,12 @@ export const HomeScreen = () => {
         await fetchDashboardData();
         setRefreshing(false);
     }, []);
+
+    const handleAccessCodeSuccess = useCallback((electionData: any) => {
+        setShowAccessCodeModal(false);
+        // Navigate to voting ballot with the election data
+        navigation.navigate('VotingBallot', { electionId: electionData.id });
+    }, [navigation]);
 
     useEffect(() => { initialFetch(); }, []);
 
@@ -121,6 +132,53 @@ export const HomeScreen = () => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
                 }
             >
+                {/* Hızlı Erişim — kod ile katıl + yeni seçim oluştur */}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: theme.spacing.md }}>
+                    <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setShowAccessCodeModal(true)}
+                        style={{
+                            flex: 1, padding: 14, borderRadius: theme.borderRadius.lg,
+                            backgroundColor: theme.colors.primaryTint, borderWidth: 1, borderColor: theme.colors.border,
+                            gap: 10, minHeight: 110, justifyContent: 'space-between',
+                        }}
+                    >
+                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="key" size={18} color={theme.colors.onPrimary} />
+                        </View>
+                        <View>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
+                                {t('home.joinWithCode') || 'Kod ile Oy Ver'}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, lineHeight: 15 }} numberOfLines={2}>
+                                {t('home.joinWithCodeHelp') || '6 haneli kodu gir, seçim ekranına git'}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => setShowNewElectionSheet(true)}
+                        style={{
+                            flex: 1, padding: 14, borderRadius: theme.borderRadius.lg,
+                            backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border,
+                            gap: 10, minHeight: 110, justifyContent: 'space-between',
+                        }}
+                    >
+                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                            <MaterialIcons name="how-to-vote" size={20} color={theme.colors.primary} />
+                        </View>
+                        <View>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
+                                {t('home.newElection') || 'Yeni Seçim Oluştur'}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, lineHeight: 15 }} numberOfLines={2}>
+                                {t('home.newElectionShort') || 'Topluluğun için veya bağımsız'}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Aktif seçimler */}
                 <SectionHeader
                     title={t('home.activeElections')}
@@ -203,6 +261,52 @@ export const HomeScreen = () => {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Yeni seçim oluşturma alt sayfası */}
+            <NewElectionSheet
+                visible={showNewElectionSheet}
+                onClose={() => setShowNewElectionSheet(false)}
+            />
+
+            {/* Access Code Modal */}
+            <Modal
+                visible={showAccessCodeModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowAccessCodeModal(false)}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                    <TouchableOpacity
+                        style={{ flex: 1 }}
+                        activeOpacity={1}
+                        onPress={() => setShowAccessCodeModal(false)}
+                    />
+                    <View style={{
+                        backgroundColor: theme.colors.background,
+                        borderTopLeftRadius: theme.borderRadius.lg,
+                        borderTopRightRadius: theme.borderRadius.lg,
+                        paddingVertical: theme.spacing.lg,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingBottom: theme.spacing.lg + 24,
+                    }}>
+                        {/* Handle bar */}
+                        <View style={{
+                            width: 40,
+                            height: 4,
+                            backgroundColor: theme.colors.border,
+                            borderRadius: 2,
+                            alignSelf: 'center',
+                            marginBottom: theme.spacing.md,
+                        }} />
+
+                        {/* Content */}
+                        <AccessCodeInput
+                            onSuccess={handleAccessCodeSuccess}
+                            onCancel={() => setShowAccessCodeModal(false)}
+                        />
+                    </View>
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 };
