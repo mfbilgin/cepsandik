@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
-import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
 import { randomHex, sha256Hex } from '../../utils/ballotEncrypt';
 import { encryptBallotClientSide, spoilBallotClientSide, EncryptionParams } from '../../utils/electionGuardClient';
+import { theme } from '../../utils/theme';
+import { Button } from '../../components/ui';
 
 export const VotingBallotScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
-    const { electionId, accessCode } = route.params;
+    const { electionId } = route.params;
 
     const [options, setOptions] = useState<any[]>([]);
     const [election, setElection] = useState<any>(null);
@@ -26,9 +28,7 @@ export const VotingBallotScreen = () => {
         navigation.setOptions({ headerShown: false });
     }, [navigation]);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    useEffect(() => { fetchData(); }, []);
 
     const fetchData = async () => {
         try {
@@ -40,11 +40,7 @@ export const VotingBallotScreen = () => {
             setElection(electRes.data?.data || null);
         } catch (e) {
             console.error(e);
-            showDialog({
-                title: t('voting.loadErrorTitle'),
-                message: t('voting.loadErrorBody'),
-                type: 'error'
-            });
+            showDialog({ title: t('voting.loadErrorTitle'), message: t('voting.loadErrorBody'), type: 'error' });
         } finally {
             setIsLoading(false);
         }
@@ -52,15 +48,10 @@ export const VotingBallotScreen = () => {
 
     const confirmVote = () => {
         if (!selectedOptionId) {
-            showDialog({
-                title: t('voting.selectRequiredTitle'),
-                message: t('voting.selectRequiredBody'),
-                type: 'warning'
-            });
+            showDialog({ title: t('voting.selectRequiredTitle'), message: t('voting.selectRequiredBody'), type: 'warning' });
             return;
         }
         const option = options.find((o) => o.id === selectedOptionId);
-
         showDialog({
             title: t('voting.confirmTitle'),
             message: t('voting.confirmBody', { option: option?.name || option?.text || '' }),
@@ -75,14 +66,12 @@ export const VotingBallotScreen = () => {
         setIsCasting(true);
         try {
             // E2E-V: önce client-side ElGamal şifreleme için kriptografik parametreleri çek.
-            // Bu endpoint cache'li ve immutable; manifest/context/jointPublicKey içerir.
             const paramsRes = await api.get(`/elections/${electionId}/encryption-params`);
             const encryptionParams: EncryptionParams = paramsRes.data?.data;
             if (!encryptionParams?.jointPublicKey) {
                 throw new Error(t('voting.encryptionRequired') || 'E2E-V parametreleri alınamadı.');
             }
 
-            // Voter eligibility credential — ballot'ta saklanmaz.
             const tokenRes = await api.post(`/elections/${electionId}/votes/token`);
             const credential = tokenRes.data?.data?.token || tokenRes.data?.token;
             const selectedOption = selectedOptionId!;
@@ -90,20 +79,9 @@ export const VotingBallotScreen = () => {
             const nullifierHash = sha256Hex(`${credential}:${electionId}:nullifier`);
 
             const encrypted = await encryptBallotClientSide({
-                encryptionParams,
-                ballotId,
-                options,
-                selectedOptionId: selectedOption,
+                encryptionParams, ballotId, options, selectedOptionId: selectedOption,
             });
-            const castBody: {
-                ballotId: string;
-                credential: string;
-                credentialSignature: string;
-                nullifierHash: string;
-                encryptedBallot: string;
-                zkpProof: string;
-                trackingCode: string;
-            } = {
+            const castBody = {
                 ballotId,
                 credential,
                 credentialSignature: sha256Hex(`${credential}:${electionId}:signature`),
@@ -114,13 +92,10 @@ export const VotingBallotScreen = () => {
             };
 
             const voteRes = await api.post(`/elections/${electionId}/votes`, castBody);
-
             const payload = voteRes.data?.data;
             const alreadyVoted = payload?.alreadyVoted === true;
             const trackingCode: string | undefined = payload?.trackingCode;
-            const trackingLabel = trackingCode?.trim()
-                ? trackingCode
-                : t('voting.trackingNone');
+            const trackingLabel = trackingCode?.trim() ? trackingCode : t('voting.trackingNone');
 
             showDialog({
                 title: alreadyVoted ? t('voting.castIdempotentTitle') : t('voting.castSuccessTitle'),
@@ -136,26 +111,16 @@ export const VotingBallotScreen = () => {
                 error.response?.data?.message ||
                 (typeof error?.message === 'string' ? error.message : null) ||
                 t('voting.castErrorBody');
-            showDialog({
-                title: t('voting.castErrorTitle'),
-                message: msg,
-                type: 'error'
-            });
+            showDialog({ title: t('voting.castErrorTitle'), message: msg, type: 'error' });
         } finally {
             setIsCasting(false);
         }
     };
 
-    // Faz 1.4 — Benaloh challenge: ballot'u spoil et (cast etme). Cihaz primary
-    // nonce'ı açar, sunucu DecryptWithNonce ile BAĞIMSIZ çözer. Çözülen seçim
-    // seçmenin seçtiğiyle eşleşiyorsa cihaz dürüst şifrelemiş → cast-as-intended.
+    // Faz 1.4 — Benaloh challenge: ballot'u spoil et (cast etme).
     const handleSpoilBallot = async () => {
         if (!selectedOptionId) {
-            showDialog({
-                title: t('voting.selectRequiredTitle'),
-                message: t('voting.selectRequiredBody'),
-                type: 'warning',
-            });
+            showDialog({ title: t('voting.selectRequiredTitle'), message: t('voting.selectRequiredBody'), type: 'warning' });
             return;
         }
         setIsCasting(true);
@@ -167,10 +132,7 @@ export const VotingBallotScreen = () => {
             }
             const ballotId = `spoil_${randomHex(16)}`;
             const spoiled = await spoilBallotClientSide({
-                encryptionParams,
-                ballotId,
-                options,
-                selectedOptionId: selectedOptionId!,
+                encryptionParams, ballotId, options, selectedOptionId: selectedOptionId!,
             });
             const res = await api.post(`/elections/${electionId}/votes/spoil`, {
                 ballotId,
@@ -180,34 +142,25 @@ export const VotingBallotScreen = () => {
                 trackingCode: spoiled.trackingCode,
             });
             const data = res.data?.data;
-            const sels: Array<{ selectionId: string; vote: number }> =
-                data?.decryptedSelections || [];
+            const sels: Array<{ selectionId: string; vote: number }> = data?.decryptedSelections || [];
             const chosen = sels.find((s) => Number(s.vote) === 1);
-            const chosenId = chosen
-                ? Number(String(chosen.selectionId).replace('candidate_', ''))
-                : null;
+            const chosenId = chosen ? Number(String(chosen.selectionId).replace('candidate_', '')) : null;
             const chosenOpt = options.find((o) => o.id === chosenId);
             const expectedOpt = options.find((o) => o.id === selectedOptionId);
-            const honest =
-                data?.verified === true &&
-                chosenId === selectedOptionId;
+            const honest = data?.verified === true && chosenId === selectedOptionId;
 
             showDialog({
                 title: honest
                     ? (t('voting.spoilHonestTitle') || 'Şifreleme Dürüst ✓')
                     : (t('voting.spoilFailTitle') || 'Uyarı: Şifreleme Doğrulanamadı'),
                 message: honest
-                    ? (t('voting.spoilHonestBody', {
-                          option: chosenOpt?.name || chosenOpt?.text || '',
-                      }) ||
+                    ? (t('voting.spoilHonestBody', { option: chosenOpt?.name || chosenOpt?.text || '' }) ||
                       `Sunucu bu cihazın şifrelediği oyu nonce ile bağımsız çözdü: ` +
-                          `"${chosenOpt?.name || chosenOpt?.text || ''}". Tam olarak ` +
-                          `seçtiğiniz seçenek. Cihaz dürüst şifreliyor. Bu test oyu ` +
-                          `SAYILMAYACAK — gerçek oyunuzu vermek için "Oyu Onayla"ya basın.`)
+                          `"${chosenOpt?.name || chosenOpt?.text || ''}". Tam olarak seçtiğiniz seçenek. ` +
+                          `Cihaz dürüst şifreliyor. Bu test oyu SAYILMAYACAK — gerçek oyunuzu vermek için "Oyu Onayla"ya basın.`)
                     : (t('voting.spoilFailBody') ||
-                      `Sunucunun bağımsız çözdüğü seçim ("${chosenOpt?.name || '?'}") ` +
-                          `beklenenle ("${expectedOpt?.name || '?'}") eşleşmedi veya ` +
-                          `doğrulanamadı. Bu cihazla oy vermeyin, yetkiliye bildirin.`),
+                      `Sunucunun bağımsız çözdüğü seçim ("${chosenOpt?.name || '?'}") beklenenle ` +
+                          `("${expectedOpt?.name || '?'}") eşleşmedi veya doğrulanamadı. Bu cihazla oy vermeyin, yetkiliye bildirin.`),
                 type: honest ? 'success' : 'error',
             });
         } catch (error: any) {
@@ -223,148 +176,191 @@ export const VotingBallotScreen = () => {
 
     if (isLoading || !election) {
         return (
-            <View style={tw`flex-1 items-center justify-center bg-background`}>
-                <ActivityIndicator size="large" color={tw.color('primary')} />
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
 
+    const c = theme.colors;
+
     return (
-        <View style={tw`flex-1 bg-background flex-col h-full`}>
-            {/* Top Status Bar & Navigation */}
-            <View style={tw`bg-surface shadow-sm z-20 pt-10 pb-2`}>
-                <View style={tw`h-14 flex-row items-center justify-between px-4`}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={tw`p-2 -ml-2 rounded-full`}>
-                        <Ionicons name="close" size={24} color="#64748b" />
-                    </TouchableOpacity>
-                    <Text style={tw`text-base font-bold tracking-tight text-slate-900`}>{t('voting.title')}</Text>
-                    <TouchableOpacity style={tw`w-10 h-10 items-center justify-center`}>
-                        <Ionicons name="information-circle-outline" size={24} color="#64748b" />
-                    </TouchableOpacity>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            {/* Üst bar — başlık KOYU, kapat/info nötr */}
+            <View
+                style={{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    height: 52, paddingHorizontal: theme.spacing.md,
+                    borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surface,
+                }}
+            >
+                <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10} style={{ width: 36 }}>
+                    <Ionicons name="close" size={24} color={c.textSecondary} />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('voting.title')}</Text>
+                <View style={{ width: 36, alignItems: 'flex-end' }}>
+                    <Ionicons name="information-circle-outline" size={22} color={c.textSecondary} />
                 </View>
             </View>
 
-            {/* Main Content Area */}
-            <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-32`}>
-                <View style={tw`px-5 pt-6 pb-2`}>
-                    <View style={tw`flex-row items-start gap-3 mb-2`}>
-                        <Ionicons name="checkbox-outline" size={32} color={tw.color('primary')} />
-                        <View style={tw`flex-1`}>
-                            <Text style={tw`text-2xl font-bold leading-tight text-slate-900`}>{election?.title}</Text>
-                            {election?.description && (
-                                <Text style={tw`text-base text-slate-600 mt-2 leading-relaxed`}>{election?.description}</Text>
-                            )}
-                            <Text style={tw`text-sm text-slate-500 mt-2`}>{t('voting.community')}: {election?.communityId}</Text>
-                        </View>
-                    </View>
-                    <View style={tw`mt-4 p-4 bg-primary/5 rounded-lg border border-primary/10 flex-row gap-3 items-start`}>
-                        <Ionicons name="lock-closed" size={20} color={tw.color('primary')} style={tw`mt-0.5`} />
-                        <Text style={tw`text-sm text-slate-700 leading-relaxed pr-6`}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 170 }} showsVerticalScrollIndicator={false}>
+                {/* Seçim başlığı */}
+                <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.lg }}>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: c.text, lineHeight: 28 }}>
+                        {election?.title}
+                    </Text>
+                    {election?.description && (
+                        <Text style={{ fontSize: 15, color: c.textSecondary, marginTop: 8, lineHeight: 21 }}>
+                            {election?.description}
+                        </Text>
+                    )}
+                    <Text style={{ fontSize: 13, color: c.textTertiary, marginTop: 8 }}>
+                        {t('voting.community')}: {election?.communityId}
+                    </Text>
+
+                    {/* Gizlilik/E2E-V bilgi kutusu — primaryTint zemin (tek vurgu) */}
+                    <View
+                        style={{
+                            marginTop: 16, padding: 14, borderRadius: theme.borderRadius.md,
+                            backgroundColor: c.primaryTint, flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+                        }}
+                    >
+                        <Ionicons name="lock-closed" size={18} color={c.primary} style={{ marginTop: 1 }} />
+                        <Text style={{ flex: 1, fontSize: 13, color: c.text, lineHeight: 19 }}>
                             {t('voting.instructions')}
                         </Text>
                     </View>
                 </View>
 
-                {/* Candidate List */}
-                <View style={tw`flex-col gap-4 p-5`}>
+                {/* Aday listesi — seçili kart mavi (doğru: aktif seçim) */}
+                <View style={{ gap: 12, padding: theme.spacing.md }}>
                     {options.map((option) => {
                         const isSelected = selectedOptionId === option.id;
                         return (
                             <TouchableOpacity
                                 key={option.id}
+                                activeOpacity={0.8}
                                 onPress={() => setSelectedOptionId(option.id)}
-                                style={tw`flex-row items-center gap-4 rounded-xl border ${isSelected ? 'border-primary bg-primary/5' : 'border-slate-200 bg-surface'} p-4 shadow-sm`}
+                                style={{
+                                    flexDirection: 'row', alignItems: 'center', gap: 14,
+                                    borderRadius: theme.borderRadius.lg,
+                                    borderWidth: 1.5,
+                                    borderColor: isSelected ? c.primary : c.border,
+                                    backgroundColor: isSelected ? c.primaryTint : c.surface,
+                                    padding: 16,
+                                    ...(isSelected ? {} : theme.shadows.card),
+                                }}
                             >
-                                {/* Candidate content based on candidateType */}
                                 {election?.candidateType === 'PERSON' ? (
                                     <>
-                                        {/* Avatar placeholder */}
-                                        <View style={tw`h-14 w-14 rounded-full border border-slate-100 bg-slate-100 items-center justify-center`}>
-                                            <Text style={tw`text-lg font-bold text-slate-500`}>{option.name ? option.name[0] : option.text?.[0]}</Text>
+                                        <View
+                                            style={{
+                                                height: 52, width: 52, borderRadius: 26,
+                                                backgroundColor: c.surfaceAlt,
+                                                alignItems: 'center', justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 18, fontWeight: '700', color: c.textSecondary }}>
+                                                {option.name ? option.name[0] : option.text?.[0]}
+                                            </Text>
                                         </View>
-                                        <View style={tw`flex-1 justify-center`}>
-                                            <Text style={tw`text-base font-bold text-slate-900`}>{option.name || option.text}</Text>
-                                            <Text style={tw`text-sm font-medium text-slate-500`}>{t('voting.candidate')}</Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>
+                                                {option.name || option.text}
+                                            </Text>
+                                            <Text style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
+                                                {t('voting.candidate')}
+                                            </Text>
                                         </View>
                                     </>
                                 ) : election?.candidateType === 'IMAGE_OPTION' ? (
                                     <>
-                                        <View style={tw`h-14 w-14 rounded-lg bg-slate-100 overflow-hidden`}>
+                                        <View style={{ height: 52, width: 52, borderRadius: theme.borderRadius.md, backgroundColor: c.surfaceAlt, overflow: 'hidden' }}>
                                             {option.imageUrl ? (
-                                                <Image source={{ uri: option.imageUrl }} style={tw`w-full h-full`} resizeMode="cover" />
+                                                <Image source={{ uri: option.imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                                             ) : (
-                                                <View style={tw`w-full h-full items-center justify-center`}>
-                                                    <Ionicons name="image-outline" size={24} color="#94a3b8" />
+                                                <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name="image-outline" size={24} color={c.textTertiary} />
                                                 </View>
                                             )}
                                         </View>
-                                        <View style={tw`flex-1 justify-center`}>
-                                            <Text style={tw`text-base font-bold text-slate-900`}>{option.name || option.text}</Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>
+                                                {option.name || option.text}
+                                            </Text>
                                         </View>
                                     </>
                                 ) : (
-                                    <View style={tw`flex-1 justify-center py-2`}>
-                                        <Text style={tw`text-base font-bold text-slate-900`}>{option.name || option.text}</Text>
+                                    <View style={{ flex: 1, paddingVertical: 4 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>
+                                            {option.name || option.text}
+                                        </Text>
                                     </View>
                                 )}
 
-                                {/* Radio Outline */}
-                                <View style={tw`relative h-6 w-6 rounded-full border-2 ${isSelected ? 'border-primary bg-primary' : 'border-slate-300 bg-transparent'} items-center justify-center`}>
-                                    {isSelected && <View style={tw`w-2 h-2 bg-surface rounded-full`} />}
+                                {/* Radyo */}
+                                <View
+                                    style={{
+                                        height: 24, width: 24, borderRadius: 12, borderWidth: 2,
+                                        borderColor: isSelected ? c.primary : c.borderStrong,
+                                        backgroundColor: isSelected ? c.primary : 'transparent',
+                                        alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >
+                                    {isSelected && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />}
                                 </View>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
 
-                {/* Security Badge */}
-                <View style={tw`flex-row items-center justify-center gap-1.5 opacity-60 pb-8 mt-2`}>
-                    <Ionicons name="shield-checkmark" size={14} color="#64748b" />
-                    <Text style={tw`text-xs font-medium text-slate-500`}>{t('home.securedBy')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 24, marginTop: 4 }}>
+                    <Ionicons name="shield-checkmark" size={14} color={c.textTertiary} />
+                    <Text style={{ fontSize: 12, color: c.textTertiary, fontWeight: '500' }}>{t('home.securedBy')}</Text>
                 </View>
             </ScrollView>
 
-            {/* Sticky Footer */}
-            <View style={tw`absolute bottom-0 left-0 right-0 z-30 p-4 pb-8 bg-surface/95 border-t border-slate-200`}>
-                <TouchableOpacity
-                    style={tw`w-full flex-row items-center justify-center gap-2 rounded-xl bg-primary py-3.5 shadow-md ${!selectedOptionId || isCasting ? 'opacity-50' : ''}`}
+            {/* Sabit alt aksiyon */}
+            <View
+                style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    padding: theme.spacing.md, paddingBottom: 28,
+                    backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border,
+                }}
+            >
+                <Button
+                    title={isCasting ? t('voting.encrypting') : t('voting.confirmSelection')}
+                    icon="arrow-forward"
+                    iconPosition="right"
+                    loading={isCasting}
+                    disabled={!selectedOptionId || isCasting}
                     onPress={confirmVote}
+                />
+                <Button
+                    title={t('voting.spoilButton') || 'Şifrelemeyi Doğrula (test — sayılmaz)'}
+                    icon="shield-checkmark-outline"
+                    variant="outline"
+                    size="sm"
                     disabled={!selectedOptionId || isCasting}
-                >
-                    <Text style={tw`text-base font-bold text-white tracking-wide`}>
-                        {isCasting ? t('voting.encrypting') : t('voting.confirmSelection')}
-                    </Text>
-                    {!isCasting && <Ionicons name="arrow-forward" size={20} color="#fff" />}
-                </TouchableOpacity>
-
-                {/* Faz 1.4 — Benaloh challenge: cihazın dürüst şifrelediğini test et.
-                    Bu ballot sayılmaz; doğrulama sonrası gerçek oy verilir. */}
-                <TouchableOpacity
-                    style={tw`w-full flex-row items-center justify-center gap-2 rounded-xl border border-primary py-3 mt-2 ${!selectedOptionId || isCasting ? 'opacity-50' : ''}`}
                     onPress={handleSpoilBallot}
-                    disabled={!selectedOptionId || isCasting}
-                >
-                    <Ionicons name="shield-checkmark-outline" size={18} color={tw.color('primary')} />
-                    <Text style={tw`text-sm font-semibold text-primary tracking-wide`}>
-                        {t('voting.spoilButton') || 'Şifrelemeyi Doğrula (test — sayılmaz)'}
-                    </Text>
-                </TouchableOpacity>
+                    style={{ marginTop: 10 }}
+                />
             </View>
 
-            {/* Encryption Overlay */}
-            <Modal transparent={true} visible={isCasting} animationType="fade">
-                <View style={tw`flex-1 items-center justify-center bg-black/60`}>
-                    <View style={tw`bg-surface p-8 rounded-2xl items-center w-4/5 shadow-2xl`}>
-                        <ActivityIndicator size="large" color={tw.color('primary')} style={tw`mb-4 scale-150`} />
-                        <Text style={tw`text-lg font-bold text-slate-900 mb-2 text-center`}>
+            {/* Şifreleme overlay */}
+            <Modal transparent visible={isCasting} animationType="fade">
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.6)' }}>
+                    <View style={{ backgroundColor: c.surface, padding: 32, borderRadius: theme.borderRadius.xl, alignItems: 'center', width: '80%', ...theme.shadows.elevated }}>
+                        <ActivityIndicator size="large" color={c.primary} style={{ marginBottom: 16 }} />
+                        <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, marginBottom: 6, textAlign: 'center' }}>
                             {t('voting.encrypting') || 'Oyunuz Şifreleniyor...'}
                         </Text>
-                        <Text style={tw`text-sm text-slate-500 text-center leading-relaxed mt-2`}>
+                        <Text style={{ fontSize: 13, color: c.textSecondary, textAlign: 'center', lineHeight: 19 }}>
                             Matematiksel kanıtlar cihazınızda üretiliyor. Lütfen bekleyin.
                         </Text>
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 };
