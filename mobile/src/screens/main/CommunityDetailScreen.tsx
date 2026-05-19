@@ -382,7 +382,7 @@ export const CommunityDetailScreen = () => {
                             <View style={tw`bg-surface rounded-xl p-5 shadow-sm border border-borderDefault`}>
                                 <View style={tw`flex-row items-center justify-between mb-4`}>
                                     <Text style={tw`text-sm font-bold text-textDefault uppercase tracking-wider`}>{t('communityDetail.membersHeader') || 'Üyeler'}</Text>
-                                    <TouchableOpacity onPress={() => navigation.navigate('CommunityMembers', { communityId: id, communityName: community.name })}>
+                                    <TouchableOpacity onPress={() => navigation.navigate('CommunityMembers', { communityId: id, communityName: community.name, userRole: community.userRole })}>
                                         <Text style={tw`text-xs font-bold text-primary`}>{t('common.seeAll') || 'Tümünü Gör'}</Text>
                                     </TouchableOpacity>
                                 </View>
