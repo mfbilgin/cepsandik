@@ -1,23 +1,32 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
+import { useUI } from '../../context/UIContext';
 import { theme } from '../../utils/theme';
 import { AppHeader, Badge, EmptyState } from '../../components/ui';
 
 export const CommunityMembersScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
-    const { communityId, communityName } = route.params || {};
+    const { communityId, communityName, userRole } = route.params || {};
     const { t } = useI18n();
+    const { showDialog } = useUI();
     const c = theme.colors;
 
     const [members, setMembers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [actionMember, setActionMember] = useState<any | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    // İzleyici OWNER/ADMIN ise rol yönetimi yapabilir.
+    const canManage = userRole === 'OWNER' || userRole === 'ADMIN';
+    const isOwnerViewer = userRole === 'OWNER';
 
     const fetchMembers = useCallback(async () => {
         setIsLoading(true);
@@ -44,10 +53,72 @@ export const CommunityMembersScreen = () => {
 
     const roleLabel = (role: string) => {
         switch (role) {
-            case 'OWNER': return t('roles.owner') || 'Sahip';
-            case 'ADMIN': return t('roles.admin') || 'Yönetici';
-            default: return t('roles.member') || 'Üye';
+            case 'OWNER': return t('communityDetail.role.owner') || 'Sahip';
+            case 'ADMIN': return t('communityDetail.role.admin') || 'Yönetici';
+            default: return t('communityDetail.role.member') || 'Üye';
         }
+    };
+
+    const memberName = (m: any) =>
+        m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (m.displayName || `#${String(m.userId).slice(-8).toUpperCase()}`);
+
+    const runAction = async (fn: () => Promise<any>, successMsg: string) => {
+        setBusy(true);
+        try {
+            await fn();
+            Toast.show({ type: 'success', text1: t('common.success') || 'Başarılı', text2: successMsg });
+            setActionMember(null);
+            await fetchMembers();
+        } catch (e: any) {
+            Toast.show({
+                type: 'error',
+                text1: t('common.error') || 'Hata',
+                text2: e?.response?.data?.message || (t('communityMembers.actionError') || 'İşlem başarısız'),
+            });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const changeRole = (m: any, role: 'ADMIN' | 'MEMBER') =>
+        runAction(
+            () => api.put(`/communities/${communityId}/members/${m.id}/role`, { role }),
+            role === 'ADMIN'
+                ? (t('communityMembers.promoteSuccess') || 'Üye yönetici yapıldı')
+                : (t('communityMembers.demoteSuccess') || 'Yöneticilik kaldırıldı'),
+        );
+
+    const removeMember = (m: any) => {
+        showDialog({
+            title: t('communityMembers.confirmRemoveTitle') || 'Üyeyi Çıkar',
+            message: (t('communityMembers.confirmRemoveBody') || '{name} topluluktan çıkarılsın mı?').replace('{name}', memberName(m)),
+            type: 'confirm',
+            confirmText: t('communityMembers.removeMember') || 'Çıkar',
+            cancelText: t('common.cancel') || 'İptal',
+            onConfirm: () =>
+                runAction(
+                    () => api.delete(`/communities/${communityId}/members/${m.id}`),
+                    t('communityMembers.removeSuccess') || 'Üye topluluktan çıkarıldı',
+                ),
+        });
+    };
+
+    // Hedef üye için izleyicinin yapabileceği eylemler (backend kuralları ile uyumlu).
+    const actionsFor = (m: any) => {
+        const acts: { label: string; icon: any; danger?: boolean; onPress: () => void }[] = [];
+        if (!m || m.role === 'OWNER') return acts;
+        if (m.role === 'MEMBER') {
+            acts.push({ label: t('communityMembers.makeAdmin') || 'Yönetici Yap', icon: 'shield-checkmark', onPress: () => changeRole(m, 'ADMIN') });
+        }
+        // ADMIN'i geri alma yalnızca OWNER (backend: admin admini düşüremez)
+        if (m.role === 'ADMIN' && isOwnerViewer) {
+            acts.push({ label: t('communityMembers.removeAdmin') || 'Yöneticiliği Al', icon: 'shield-outline', onPress: () => changeRole(m, 'MEMBER') });
+        }
+        // ADMIN sadece normal üyeyi çıkarabilir; ADMIN'i yalnız OWNER çıkarır
+        if (m.role === 'MEMBER' || isOwnerViewer) {
+            acts.push({ label: t('communityMembers.removeMember') || 'Topluluktan Çıkar', icon: 'exit-outline', danger: true, onPress: () => removeMember(m) });
+        }
+        return acts;
     };
 
     return (
@@ -97,8 +168,14 @@ export const CommunityMembersScreen = () => {
                     ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: c.border, marginVertical: 12 }} />}
                     renderItem={({ item }) => {
                         const privileged = item.role === 'OWNER' || item.role === 'ADMIN';
+                        const manageable = canManage && item.role !== 'OWNER' && actionsFor(item).length > 0;
                         return (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <TouchableOpacity
+                                activeOpacity={manageable ? 0.6 : 1}
+                                disabled={!manageable}
+                                onPress={() => manageable && setActionMember(item)}
+                                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                            >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                     {item.profileImage ? (
                                         <Image source={{ uri: item.profileImage }} style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border }} />
@@ -109,15 +186,18 @@ export const CommunityMembersScreen = () => {
                                     )}
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
-                                            {item.firstName ? `${item.firstName} ${item.lastName}` : (item.displayName || `#${String(item.userId).slice(-8).toUpperCase()}`)}
+                                            {memberName(item)}
                                         </Text>
                                         <Text style={{ fontSize: 12, color: c.textSecondary, fontWeight: '500', marginTop: 2 }}>
                                             {roleLabel(item.role)}
                                         </Text>
                                     </View>
                                 </View>
-                                {privileged && <Badge label={roleLabel(item.role)} tone="primary" />}
-                            </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    {privileged && <Badge label={roleLabel(item.role)} tone="primary" />}
+                                    {manageable && <Ionicons name="ellipsis-vertical" size={18} color={c.textTertiary} />}
+                                </View>
+                            </TouchableOpacity>
                         );
                     }}
                     ListEmptyComponent={
@@ -125,6 +205,70 @@ export const CommunityMembersScreen = () => {
                     }
                 />
             )}
+
+            {/* Üye eylem sayfası (alt sheet) */}
+            <Modal
+                visible={!!actionMember}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setActionMember(null)}
+            >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => !busy && setActionMember(null)}
+                    style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{
+                            backgroundColor: c.surface, borderTopLeftRadius: theme.borderRadius.xl,
+                            borderTopRightRadius: theme.borderRadius.xl, padding: theme.spacing.lg, paddingBottom: theme.spacing.xl,
+                        }}
+                    >
+                        <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
+                            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: c.borderStrong, marginBottom: theme.spacing.md }} />
+                            <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>
+                                {actionMember ? memberName(actionMember) : ''}
+                            </Text>
+                            <Text style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
+                                {actionMember ? roleLabel(actionMember.role) : ''}
+                            </Text>
+                        </View>
+
+                        {busy ? (
+                            <ActivityIndicator size="large" color={c.primary} style={{ marginVertical: 24 }} />
+                        ) : (
+                            (actionMember ? actionsFor(actionMember) : []).map((a, i) => (
+                                <TouchableOpacity
+                                    key={i}
+                                    onPress={a.onPress}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16,
+                                        borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.border,
+                                    }}
+                                >
+                                    <Ionicons name={a.icon} size={22} color={a.danger ? c.danger : c.primary} />
+                                    <Text style={{ fontSize: 15, fontWeight: '600', color: a.danger ? c.danger : c.text }}>
+                                        {a.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))
+                        )}
+
+                        <TouchableOpacity
+                            onPress={() => !busy && setActionMember(null)}
+                            style={{
+                                marginTop: theme.spacing.md, paddingVertical: 14, borderRadius: theme.borderRadius.lg,
+                                backgroundColor: c.surfaceAlt, alignItems: 'center',
+                            }}
+                        >
+                            <Text style={{ fontSize: 15, fontWeight: '600', color: c.textSecondary }}>
+                                {t('common.cancel') || 'İptal'}
+                            </Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 };
