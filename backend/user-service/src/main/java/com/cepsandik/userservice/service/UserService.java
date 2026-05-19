@@ -44,7 +44,7 @@ public class UserService {
         userRepo.save(user);
     }
 
-    public java.util.List<com.cepsandik.userservice.models.NotificationPreference> getNotificationPreferences(String email) {
+    public java.util.List<com.cepsandik.userservice.dtos.responses.NotificationPreferenceResponse> getNotificationPreferences(String email) {
         var user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
         
@@ -65,7 +65,9 @@ public class UserService {
                 }
             }
         }
-        return preferences;
+        return preferences.stream()
+                .map(com.cepsandik.userservice.dtos.responses.NotificationPreferenceResponse::from)
+                .toList();
     }
 
     @LogAudit(action = "NOTIFICATION PREFERENCE UPDATE")
@@ -107,6 +109,8 @@ public class UserService {
 
     @LogAudit(action = "PASSWORD CHANGE")
     public void changePassword(String email, PasswordChangeRequest req) {
+        PasswordPolicyService.validateAcceptable(req.newPassword());
+
         var user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
         if (Objects.equals(req.oldPassword(), req.newPassword()))
