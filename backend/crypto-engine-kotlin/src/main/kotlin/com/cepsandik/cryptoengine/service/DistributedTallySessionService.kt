@@ -228,19 +228,35 @@ class DistributedTallySessionService {
             return ack(false, session.state.name, "partials decode hataları: $errs")
         }
 
-        // Decryptor zaten başladıysa: bu guardian seçilen Q'dan biriyse proxy'sine
-        // ilet; değilse quorum doldu, partial gerekmiyor (geç gelen — zararsız).
+        // Decryptor zaten başladıysa:
         if (session.decryptorStarted.get()) {
             val proxy = session.proxies[request.guardianId]
             if (proxy != null) {
-                proxy.submitPartialDecryption(partials)
-                log.info("partial (seçili Q) iletildi: session={}, guardian={}, count={}",
-                    request.sessionId, request.guardianId, partials.size)
-            } else {
-                log.info("partial geç geldi, quorum zaten doldu: session={}, guardian={}",
+                // KRİTİK (4.15c chaos bulgusu): seçili guardian decryptor
+                // başladıktan SONRA tekrar partial gönderiyor. Bu yalnızca
+                // guardian "temiz re-run" yaptığında olur (app-kill veya önceki
+                // turda Q dolmadan çıkıp tekrar tap) → TAZE nonce'lu yeni
+                // DecryptingTrustee instance. Decryptor ESKİ partial'ı zaten
+                // tüketti; bu taze partial'ı eski proxy'ye beslersek, guardian
+                // sonra TAZE nonce ile challenge response üretecek ve kilitli
+                // ESKİ partial ile eşleşmeyecek (ai≠ai' → checkIndividualResponses
+                // FAIL → tüm tally çöker). KMP randomConstantNonce persist
+                // edilemez → eski partial kurtarılamaz. Tek doğru yol: stale
+                // partial'ı besleME, election-service'e REBUILD sinyali ver →
+                // yeni session + SADECE complete (partial+challenge) çift replay
+                // + bu guardian taze tam re-run.
+                log.warn("REBUILD gerek: seçili guardian decryptor başladıktan " +
+                    "sonra taze partial gönderdi (stale-lock) session={}, guardian={}",
                     request.sessionId, request.guardianId)
+                return ack(false, "REBUILD_REQUIRED",
+                    "guardian seçili + decryptor başlamış, taze-nonce partial geldi " +
+                        "→ session rebuild gerek (stale partial/challenge nonce uyumsuzluğu)")
+            } else {
+                log.info("partial geç geldi, quorum zaten doldu (seçilmeyen guardian, " +
+                    "zararsız): session={}, guardian={}",
+                    request.sessionId, request.guardianId)
+                return ack(true, session.state.name, "")
             }
-            return ack(true, session.state.name, "")
         }
 
         // Henüz Q'ya ulaşılmadı: topla. Aynı guardian tekrar gönderirse replace.

@@ -75,6 +75,19 @@ public class DistributedTallyService {
     }
 
     /**
+     * Faz 4.15c — crypto-engine "stale-lock" sinyali: seçili guardian decryptor
+     * başladıktan SONRA taze-nonce partial gönderdi (app-kill / Q dolmadan çıkıp
+     * tekrar tap sonrası temiz re-run). Kilitli eski partial ile gelecek taze
+     * challenge uyumsuz olur → restartAndReplay (yalnız complete çift) gerek.
+     */
+    private boolean isRebuildRequired(SessionAckResponse ack) {
+        if (ack == null || ack.getAccepted()) return false;
+        String st = ack.getState() == null ? "" : ack.getState();
+        String e = ack.getError() == null ? "" : ack.getError().toLowerCase();
+        return "REBUILD_REQUIRED".equals(st) || e.contains("rebuild gerek");
+    }
+
+    /**
      * crypto-engine session'ı kaybolduysa: YENİ session aç + persisted
      * partial/challenge-response'ları SIRAYLA replay et. Q-of-N seçimi
      * crypto-engine'de deterministik (guardianId sıralı ilk Q) olduğundan
@@ -100,41 +113,65 @@ public class DistributedTallyService {
         List<TallySubmission> responses = tallySubmissionRepository
                 .findByElectionIdAndRoundOrderByIdAsc(eid, TallySubmission.ROUND_CHALLENGE_RESPONSE);
 
-        // Faz 2.7 — "tamamlanmış guardian" tercihi: app'i ölen guardian sadece
-        // partial gönderip challenge-response göndermediyse, restart sonrası o
-        // guardian quorum slotunu işgal edip tally'i kilitlememeli. Hem PARTIAL
-        // hem CHALLENGE_RESPONSE'u olan guardian'lar "complete". Eğer >= quorum
-        // complete guardian varsa SADECE onları replay et (crypto-engine
-        // deterministik ilk-Q sıralı seçtiğinden hepsi complete → kilit yok).
+        // Faz 4.15c — KRİTİK doğruluk fix'i: SADECE "complete" (hem PARTIAL hem
+        // CHALLENGE_RESPONSE persist) guardian'ları replay et. Bir partial
+        // ancak AYNI nonce'tan üretilen challenge-response'u da varsa
+        // anlamlıdır (KMP randomConstantNonce persist EDİLEMEZ). Partial-only
+        // bir submission'ın nonce'u kurtarılamaz: rebuilt decryptor'a beslenip
+        // sonradan TAZE nonce'lu challenge gelirse ai≠ai' → checkIndividual
+        // Responses FAIL → tüm tally sessizce çöker (4.15c chaos bulgusu, eski
+        // kod `else partials` ile tam bunu yapıyordu). Complete çift ise nonce
+        // tutarlı + Fiat-Shamir deterministik → replay geçerli. Complete pair
+        // yoksa o guardian'lar TAZE tam re-run yapmalı (tek kesintisiz
+        // runDistributedTally çağrısında partial+challenge aynı nonce).
         java.util.Set<String> respGuardians = responses.stream()
                 .map(TallySubmission::getGuardianId)
                 .collect(java.util.stream.Collectors.toSet());
-        int quorum = election.getMinGuardiansThreshold() != null
-                ? election.getMinGuardiansThreshold() : 2;
+        java.util.Set<String> partialGuardians = partials.stream()
+                .map(TallySubmission::getGuardianId)
+                .collect(java.util.stream.Collectors.toSet());
+
         List<TallySubmission> completePartials = partials.stream()
                 .filter(p -> respGuardians.contains(p.getGuardianId()))
                 .toList();
-        List<TallySubmission> partialsToReplay =
-                completePartials.size() >= quorum ? completePartials : partials;
-        log.info("Durable replay: complete guardian={}, quorum={}, replay seti={} partial",
-                completePartials.size(), quorum, partialsToReplay.size());
+        List<TallySubmission> completeResponses = responses.stream()
+                .filter(r -> partialGuardians.contains(r.getGuardianId()))
+                .toList();
 
-        for (TallySubmission p : partialsToReplay) {
+        // Stale (eşi olmayan) submission'ları SİL — bir sonraki restart'ı da
+        // zehirlemesin ve guardian'ın taze re-run'ı temiz toplansın.
+        List<TallySubmission> stale = new java.util.ArrayList<>();
+        partials.stream().filter(p -> !respGuardians.contains(p.getGuardianId()))
+                .forEach(stale::add);
+        responses.stream().filter(r -> !partialGuardians.contains(r.getGuardianId()))
+                .forEach(stale::add);
+        if (!stale.isEmpty()) {
+            tallySubmissionRepository.deleteAll(stale);
+            log.warn("Durable replay: {} stale partial-only/orphan submission "
+                    + "SİLİNDİ (nonce kurtarılamaz, taze re-run gerekecek): electionId={}",
+                    stale.size(), eid);
+        }
+
+        log.info("Durable replay: SADECE complete çift replay — completePartials={}, "
+                + "completeResponses={}, electionId={}",
+                completePartials.size(), completeResponses.size(), eid);
+
+        for (TallySubmission p : completePartials) {
             try {
                 cryptoEngineClient.submitPartialDecryption(sid, p.getGuardianId(), p.getPayloadJson());
             } catch (Exception ex) {
                 log.warn("replay partial FAIL guardian={}, hata={}", p.getGuardianId(), ex.getMessage());
             }
         }
-        for (TallySubmission r : responses) {
+        for (TallySubmission r : completeResponses) {
             try {
                 cryptoEngineClient.submitChallengeResponse(sid, r.getGuardianId(), r.getPayloadJson());
             } catch (Exception ex) {
                 log.warn("replay challenge-response FAIL guardian={}, hata={}", r.getGuardianId(), ex.getMessage());
             }
         }
-        log.info("Durable replay tamam: electionId={}, sessionId={}, partials={}, responses={}",
-                eid, sid, partials.size(), responses.size());
+        log.info("Durable replay tamam: electionId={}, sessionId={}, complete pair={}, "
+                + "stale silindi={}", eid, sid, completePartials.size(), stale.size());
     }
 
     // ============ Server-driven (lifecycle hook) ============
@@ -261,9 +298,13 @@ public class DistributedTallyService {
         SessionAckResponse ack = cryptoEngineClient.submitPartialDecryption(
                 election.getTallySessionId(), effectiveGuardianId, partialsJson);
 
-        // Faz 2.6 — crypto-engine restart/crash → session kayıp. Yeni session
-        // aç, persisted partial/response'ları replay et, mevcut submit'i tekrarla.
-        if (isSessionLost(ack)) {
+        // Faz 2.6/4.15c — crypto-engine restart/crash → session kayıp VEYA
+        // stale-lock (seçili guardian decryptor başladıktan sonra taze partial).
+        // İkisinde de: yeni session aç + SADECE complete çift replay + mevcut
+        // (taze) partial'ı yeni session'a tekrar gönder.
+        if (isSessionLost(ack) || isRebuildRequired(ack)) {
+            log.warn("Tally session yenileniyor (sessionLost={}, rebuild={}): electionId={}, guardian={}",
+                    isSessionLost(ack), isRebuildRequired(ack), electionId, effectiveGuardianId);
             restartAndReplay(election);
             Election fresh = electionRepository.findById(electionId).orElseThrow();
             ack = cryptoEngineClient.submitPartialDecryption(
@@ -271,6 +312,17 @@ public class DistributedTallyService {
         }
 
         if (ack.getAccepted()) {
+            // Faz 4.15c — Bu TAZE partial geldiğine göre guardian'ın varsa eski
+            // CHALLENGE_RESPONSE'u artık stale (farklı nonce) — sil ki restart
+            // replay'inde taze partial ile eşleştirilip ai≠ai' üretmesin.
+            tallySubmissionRepository
+                    .findByElectionIdAndGuardianIdAndRound(electionId, effectiveGuardianId,
+                            TallySubmission.ROUND_CHALLENGE_RESPONSE)
+                    .ifPresent(stale -> {
+                        tallySubmissionRepository.delete(stale);
+                        log.warn("Taze partial → stale challenge-response silindi: "
+                                + "electionId={}, guardian={}", electionId, effectiveGuardianId);
+                    });
             // Durable: bu partial'ı kalıcılaştır (restart sonrası replay için)
             persistSubmission(electionId, effectiveGuardianId,
                     TallySubmission.ROUND_PARTIAL, partialsJson);
