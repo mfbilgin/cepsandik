@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { tw } from '../../utils/tailwind';
-import { theme } from '../../utils/theme';
+import { View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import { runKeyCeremony, declineCeremony, runDistributedTally } from '../../utils/distributedKeyCeremony';
+import { useUI } from '../../context/UIContext';
+import { theme } from '../../utils/theme';
+import { Card, Button, Badge, EmptyState } from '../../components/ui';
 
 type GuardianStatus =
     | 'PENDING' | 'KEY_UPLOADED' | 'KEYS_EXCHANGED' | 'READY'
@@ -18,20 +20,22 @@ type GuardianDuty = {
     electionStatus: 'SCHEDULED' | 'ACTIVE' | 'CLOSED' | 'CLOSED_WAITING_DECRYPTION' | 'ARCHIVED' | 'CANCELLED';
 };
 
-const STATUS_LABEL: Record<GuardianStatus, { text: string; color: string }> = {
-    PENDING:        { text: 'ANAHTAR BEKLENİYOR', color: 'text-orange-500' },
-    KEY_UPLOADED:   { text: 'ANAHTAR YÜKLENDİ (devam)', color: 'text-amber-500' },
-    KEYS_EXCHANGED: { text: 'PAYLAR DEĞİŞTİRİLDİ (devam)', color: 'text-amber-500' },
-    READY:          { text: 'HAZIR ✓', color: 'text-green-600' },
-    DECLINED:       { text: 'KATILMADINIZ', color: 'text-slate-400' },
-    TIMEOUT:        { text: 'SÜRE DOLDU', color: 'text-red-500' },
-    SHARE_UPLOADED: { text: 'TALLY PAYI GÖNDERİLDİ', color: 'text-green-600' },
+type Tone = 'neutral' | 'primary' | 'success' | 'danger' | 'warning' | 'info';
+const STATUS_LABEL: Record<GuardianStatus, { text: string; tone: Tone }> = {
+    PENDING:        { text: 'ANAHTAR BEKLENİYOR', tone: 'warning' },
+    KEY_UPLOADED:   { text: 'ANAHTAR YÜKLENDİ (devam)', tone: 'warning' },
+    KEYS_EXCHANGED: { text: 'PAYLAR DEĞİŞTİRİLDİ (devam)', tone: 'warning' },
+    READY:          { text: 'HAZIR ✓', tone: 'success' },
+    DECLINED:       { text: 'KATILMADINIZ', tone: 'neutral' },
+    TIMEOUT:        { text: 'SÜRE DOLDU', tone: 'danger' },
+    SHARE_UPLOADED: { text: 'TALLY PAYI GÖNDERİLDİ', tone: 'success' },
 };
 
 export const GuardianScreen = () => {
     const [duties, setDuties] = useState<GuardianDuty[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<number | null>(null);
+    const { showDialog } = useUI();
 
     const fetchDuties = useCallback(async () => {
         try {
@@ -40,256 +44,265 @@ export const GuardianScreen = () => {
             setDuties(response.data);
         } catch (error: any) {
             console.error('Görevler yüklenemedi:', error);
-            Alert.alert('Hata', 'Emanetçi görevleriniz yüklenemedi.');
+            showDialog({ title: 'Hata', message: 'Emanetçi görevleriniz yüklenemedi.', type: 'error' });
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [showDialog]);
 
     useEffect(() => { fetchDuties(); }, [fetchDuties]);
 
     // ---- Eylem 1: Anahtar Yükle (3 round tek tıkla, idempotent) ----
     const handleKeyCeremony = (duty: GuardianDuty) => {
-        Alert.alert(
-            'Anahtar Üretimi',
-            'Cihazınızda kriptografik anahtarınız üretilecek ve diğer emanetçilerle ' +
-            'şifreli pay değişimi yapılacak. Gizli anahtarınız cihazınızdan ÇIKMAZ. ' +
-            'Tüm emanetçiler hazır olunca seçim aktifleşir. Devam edilsin mi?',
-            [
-                { text: 'Vazgeç', style: 'cancel' },
-                {
-                    text: 'Üret ve Yükle',
-                    onPress: async () => {
-                        setBusyId(duty.electionId);
-                        try {
-                            const r = await runKeyCeremony(duty.electionId);
-                            if (r.completed) {
-                                Alert.alert(
-                                    'Hazır ✓',
-                                    r.jointKeyGenerated
-                                        ? 'Tüm emanetçiler tamamlandı, ortak anahtar üretildi ve seçim hazır.'
-                                        : 'Anahtar göreviniz tamamlandı. Diğer emanetçiler bekleniyor.',
-                                );
-                            } else {
-                                Alert.alert(
-                                    'Devam ediliyor',
-                                    'Bu adım tamamlandı ama diğer emanetçiler henüz hazır değil. ' +
-                                    'Lütfen bir süre sonra tekrar "Anahtar Yükle" deyin (kaldığınız yerden devam eder).',
-                                );
-                            }
-                            fetchDuties();
-                        } catch (err: any) {
-                            Alert.alert('Hata', 'Anahtar adımı başarısız: ' +
-                                (err.response?.data?.message || err.message));
-                        } finally {
-                            setBusyId(null);
-                        }
-                    },
-                },
-            ],
-        );
+        showDialog({
+            title: 'Anahtar Üretimi',
+            message: 'Cihazınızda kriptografik anahtarınız üretilecek ve diğer emanetçilerle '
+                + 'şifreli pay değişimi yapılacak. Gizli anahtarınız cihazınızdan ÇIKMAZ. '
+                + 'Tüm emanetçiler hazır olunca seçim aktifleşir. Devam edilsin mi?',
+            type: 'confirm',
+            confirmText: 'Üret ve Yükle',
+            cancelText: 'Vazgeç',
+            onConfirm: async () => {
+                setBusyId(duty.electionId);
+                try {
+                    const r = await runKeyCeremony(duty.electionId);
+                    if (r.completed) {
+                        showDialog({
+                            title: 'Hazır ✓',
+                            message: r.jointKeyGenerated
+                                ? 'Tüm emanetçiler tamamlandı, ortak anahtar üretildi ve seçim hazır.'
+                                : 'Anahtar göreviniz tamamlandı. Diğer emanetçiler bekleniyor.',
+                            type: 'success',
+                        });
+                    } else {
+                        showDialog({
+                            title: 'Devam ediliyor',
+                            message: 'Bu adım tamamlandı ama diğer emanetçiler henüz hazır değil. '
+                                + 'Lütfen bir süre sonra tekrar "Anahtar Yükle" deyin (kaldığınız yerden devam eder).',
+                            type: 'info',
+                        });
+                    }
+                    fetchDuties();
+                } catch (err: any) {
+                    showDialog({
+                        title: 'Hata',
+                        message: 'Anahtar adımı başarısız: ' + (err.response?.data?.message || err.message),
+                        type: 'error',
+                    });
+                } finally {
+                    setBusyId(null);
+                }
+            },
+        });
     };
 
     // ---- Eylem 2: Bu seçime katılmıyorum (cezasız, STATE_RESET) ----
     const handleDecline = (duty: GuardianDuty) => {
-        Alert.alert(
-            'Bu seçime katılmıyorum',
-            'Göreviniz yedek emanetçiye aktarılacak. Bu CEZASIZDIR — dürüst ' +
-            'iletişim ödüllendirilir. Ceremony yeniden başlar (diğer emanetçiler ' +
-            'anahtarlarını tekrar üretir). Onaylıyor musunuz?',
-            [
-                { text: 'Vazgeç', style: 'cancel' },
-                {
-                    text: 'Katılmıyorum',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setBusyId(duty.electionId);
-                        try {
-                            const r = await declineCeremony(duty.electionId);
-                            if (r.cancelled) {
-                                Alert.alert('Seçim İptal Edildi',
-                                    'Maksimum yedek değişim sayısına ulaşıldı, seçim iptal edildi.');
-                            } else if (r.backupAvailable === false) {
-                                Alert.alert('Yedek Yok',
-                                    r.message || 'Yedek havuzu tükendi, yönetici müdahalesi gerekli.');
-                            } else {
-                                Alert.alert('Tamam', 'Göreviniz yedeğe aktarıldı. Teşekkürler.');
-                            }
-                            fetchDuties();
-                        } catch (err: any) {
-                            Alert.alert('Hata', 'İşlem başarısız: ' +
-                                (err.response?.data?.message || err.message));
-                        } finally {
-                            setBusyId(null);
-                        }
-                    },
-                },
-            ],
-        );
+        showDialog({
+            title: 'Bu seçime katılmıyorum',
+            message: 'Göreviniz yedek emanetçiye aktarılacak. Bu CEZASIZDIR — dürüst '
+                + 'iletişim ödüllendirilir. Ceremony yeniden başlar (diğer emanetçiler '
+                + 'anahtarlarını tekrar üretir). Onaylıyor musunuz?',
+            type: 'confirm',
+            confirmText: 'Katılmıyorum',
+            cancelText: 'Vazgeç',
+            onConfirm: async () => {
+                setBusyId(duty.electionId);
+                try {
+                    const r = await declineCeremony(duty.electionId);
+                    if (r.cancelled) {
+                        showDialog({ title: 'Seçim İptal Edildi', message: 'Maksimum yedek değişim sayısına ulaşıldı, seçim iptal edildi.', type: 'warning' });
+                    } else if (r.backupAvailable === false) {
+                        showDialog({ title: 'Yedek Yok', message: r.message || 'Yedek havuzu tükendi, yönetici müdahalesi gerekli.', type: 'warning' });
+                    } else {
+                        showDialog({ title: 'Tamam', message: 'Göreviniz yedeğe aktarıldı. Teşekkürler.', type: 'success' });
+                    }
+                    fetchDuties();
+                } catch (err: any) {
+                    showDialog({ title: 'Hata', message: 'İşlem başarısız: ' + (err.response?.data?.message || err.message), type: 'error' });
+                } finally {
+                    setBusyId(null);
+                }
+            },
+        });
     };
 
     // ---- Tally: distributed pay hesaplama (CLOSED) ----
     const handleTally = (duty: GuardianDuty) => {
-        Alert.alert(
-            'Hesaplamaya Katıl',
-            'Cihazınızdaki gizli anahtar payınızla şifreli toplam üzerinde kısmi ' +
-            'çözme yapılacak. Anahtarınız cihazdan ÇIKMAZ — sunucu sadece ' +
-            'payları birleştirir (Q-of-N). Devam?',
-            [
-                { text: 'Vazgeç', style: 'cancel' },
-                {
-                    text: 'Hesapla',
-                    onPress: async () => {
-                        setBusyId(duty.electionId);
-                        try {
-                            const r = await runDistributedTally(duty.electionId);
-                            if (r.finalized) {
-                                Alert.alert('Sonuç Açıklandı ✓',
-                                    'Yeterli pay toplandı, seçim sonucu hesaplandı.');
-                            } else if (r.submitted) {
-                                Alert.alert('Pay Gönderildi',
-                                    'Hesaplama payınız gönderildi. Diğer emanetçiler ' +
-                                    'bekleniyor — yeterli sayıya ulaşınca sonuç açılır.');
-                            }
-                            fetchDuties();
-                        } catch (err: any) {
-                            Alert.alert('Hata', 'Tally adımı başarısız: ' +
-                                (err.response?.data?.message || err.message));
-                        } finally {
-                            setBusyId(null);
-                        }
-                    },
-                },
-            ],
-        );
+        showDialog({
+            title: 'Hesaplamaya Katıl',
+            message: 'Cihazınızdaki gizli anahtar payınızla şifreli toplam üzerinde kısmi '
+                + 'çözme yapılacak. Anahtarınız cihazdan ÇIKMAZ — sunucu sadece '
+                + 'payları birleştirir (Q-of-N). Devam?',
+            type: 'confirm',
+            confirmText: 'Hesapla',
+            cancelText: 'Vazgeç',
+            onConfirm: async () => {
+                setBusyId(duty.electionId);
+                try {
+                    const r = await runDistributedTally(duty.electionId);
+                    if (r.finalized) {
+                        showDialog({ title: 'Sonuç Açıklandı ✓', message: 'Yeterli pay toplandı, seçim sonucu hesaplandı.', type: 'success' });
+                    } else if (r.submitted) {
+                        showDialog({
+                            title: 'Pay Gönderildi',
+                            message: 'Hesaplama payınız gönderildi. Diğer emanetçiler bekleniyor — '
+                                + 'yeterli sayıya ulaşınca sonuç açılır.',
+                            type: 'info',
+                        });
+                    }
+                    fetchDuties();
+                } catch (err: any) {
+                    showDialog({ title: 'Hata', message: 'Tally adımı başarısız: ' + (err.response?.data?.message || err.message), type: 'error' });
+                } finally {
+                    setBusyId(null);
+                }
+            },
+        });
     };
 
-    // ---- Eylem 3: Daha Sonra Hatırlat ----
     const handleRemindLater = () => {
-        Alert.alert('Tamam', 'Görevi daha sonra tamamlayabilirsiniz. Süre dolmadan ' +
-            'anahtarınızı yükleyin — aksi halde görev yedeğe geçer.');
+        showDialog({
+            title: 'Tamam',
+            message: 'Görevi daha sonra tamamlayabilirsiniz. Süre dolmadan anahtarınızı '
+                + 'yükleyin — aksi halde görev yedeğe geçer.',
+            type: 'info',
+        });
     };
 
     const isCeremonyPhase = (d: GuardianDuty) =>
         d.electionStatus === 'SCHEDULED' &&
         (d.status === 'PENDING' || d.status === 'KEY_UPLOADED' || d.status === 'KEYS_EXCHANGED');
 
+    const c = theme.colors;
+
     const renderDuty = ({ item }: { item: GuardianDuty }) => {
-        const label = STATUS_LABEL[item.status] ?? { text: item.status, color: 'text-secondary' };
+        const label = STATUS_LABEL[item.status] ?? { text: item.status, tone: 'neutral' as Tone };
         const busy = busyId === item.electionId;
+        const isClosed = item.electionStatus === 'CLOSED' || item.electionStatus === 'CLOSED_WAITING_DECRYPTION';
         return (
-            <View style={tw`bg-surface p-4 rounded-xl mb-4 border border-slate-100 shadow-sm`}>
-                <View style={tw`flex-row justify-between items-start`}>
-                    <View style={tw`flex-1`}>
-                        <Text style={tw`text-primary font-bold text-lg`}>{item.electionTitle}</Text>
-                        {item.communityName && (
-                            <Text style={tw`text-secondary text-sm`}>{item.communityName}</Text>
+            <Card style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }} numberOfLines={2}>
+                            {item.electionTitle}
+                        </Text>
+                        {item.communityName != null && String(item.communityName).trim() !== '' && (
+                            <Text style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
+                                Topluluk: {item.communityName}
+                            </Text>
                         )}
                     </View>
-                    <View style={tw`bg-primary/10 px-2 py-1 rounded`}>
-                        <Text style={tw`text-primary text-[10px] font-bold`}>EMANETÇİ (SİZ)</Text>
-                    </View>
+                    <Badge label="EMANETÇİ (SİZ)" tone="primary" />
                 </View>
 
-                <View style={tw`mt-3`}>
-                    <Text style={tw`text-xs text-secondary mb-1`}>Durum:</Text>
-                    <Text style={tw`text-sm font-semibold ${label.color}`}>{label.text}</Text>
+                <View style={{ marginTop: 12 }}>
+                    <Text style={{ fontSize: 12, color: c.textSecondary, marginBottom: 4 }}>Durum:</Text>
+                    <Badge label={label.text} tone={label.tone} dot />
                 </View>
 
                 {busy && (
-                    <View style={tw`mt-3 flex-row items-center`}>
-                        <ActivityIndicator color={theme.colors.primary} size="small" />
-                        <Text style={tw`text-secondary text-xs ml-2`}>İşleniyor — kapatmayın…</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 8 }}>
+                        <ActivityIndicator color={c.primary} size="small" />
+                        <Text style={{ fontSize: 12, color: c.textSecondary }}>İşleniyor — kapatmayın…</Text>
                     </View>
                 )}
 
                 {!busy && isCeremonyPhase(item) && (
-                    <View style={tw`mt-4`}>
-                        <TouchableOpacity
+                    <View style={{ marginTop: 16 }}>
+                        <Button
+                            title={item.status === 'PENDING' ? 'Anahtar Yükle' : 'Devam Et'}
+                            icon="key-outline"
                             onPress={() => handleKeyCeremony(item)}
-                            style={tw`bg-primary px-4 py-3 rounded-lg mb-2`}
-                        >
-                            <Text style={tw`text-white font-bold text-center`}>
-                                {item.status === 'PENDING' ? 'Anahtar Yükle' : 'Devam Et'}
-                            </Text>
-                        </TouchableOpacity>
-                        <View style={tw`flex-row`}>
-                            <TouchableOpacity
-                                onPress={() => handleRemindLater()}
-                                style={tw`flex-1 bg-slate-100 px-3 py-2 rounded-lg mr-2`}
-                            >
-                                <Text style={tw`text-secondary font-semibold text-center text-xs`}>
-                                    Daha Sonra Hatırlat
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => handleDecline(item)}
-                                style={tw`flex-1 bg-red-50 px-3 py-2 rounded-lg`}
-                            >
-                                <Text style={tw`text-red-500 font-semibold text-center text-xs`}>
-                                    Katılmıyorum
-                                </Text>
-                            </TouchableOpacity>
+                        />
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                            <View style={{ flex: 1 }}>
+                                <Button
+                                    title="Daha Sonra"
+                                    variant="secondary"
+                                    size="sm"
+                                    onPress={handleRemindLater}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Button
+                                    title="Katılmıyorum"
+                                    variant="danger"
+                                    size="sm"
+                                    onPress={() => handleDecline(item)}
+                                />
+                            </View>
                         </View>
                     </View>
                 )}
 
                 {!busy && item.status === 'READY' && item.electionStatus === 'SCHEDULED' && (
-                    <Text style={tw`mt-3 text-green-600 text-xs`}>
-                        ✓ Göreviniz tamam. Diğer emanetçiler hazır olunca seçim aktifleşir.
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 }}>
+                        <Ionicons name="checkmark-circle" size={16} color={c.success} />
+                        <Text style={{ fontSize: 12, color: c.success, flex: 1 }}>
+                            Göreviniz tamam. Diğer emanetçiler hazır olunca seçim aktifleşir.
+                        </Text>
+                    </View>
                 )}
 
-                {!busy && (item.electionStatus === 'CLOSED'
-                        || item.electionStatus === 'CLOSED_WAITING_DECRYPTION') && (
-                    <View style={tw`mt-4`}>
-                        <Text style={tw`text-xs text-secondary mb-2`}>
+                {!busy && isClosed && (
+                    <View style={{ marginTop: 16 }}>
+                        <Text style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10, lineHeight: 18 }}>
                             Seçim kapandı. Sonucun açılması için pay hesaplamanıza ihtiyaç var.
                             Gizli anahtarınız cihazınızdan ÇIKMAZ.
                         </Text>
-                        <TouchableOpacity
+                        <Button
+                            title="Hesaplamaya Katıl"
+                            icon="calculator-outline"
                             onPress={() => handleTally(item)}
-                            style={tw`bg-accent-blue px-4 py-3 rounded-lg`}
-                        >
-                            <Text style={tw`text-white font-bold text-center`}>Hesaplamaya Katıl</Text>
-                        </TouchableOpacity>
+                        />
                     </View>
                 )}
-            </View>
+            </Card>
         );
     };
 
     return (
-        <View style={tw`flex-1 bg-background p-4 pt-12`}>
-            <View style={tw`flex-row items-center mb-6`}>
-                <View style={tw`bg-primary/20 p-3 rounded-2xl mr-4`}>
-                    <Ionicons name="shield-checkmark" size={32} color={theme.colors.primary} />
-                </View>
-                <View>
-                    <Text style={tw`text-primary text-2xl font-bold`}>Emanetçi Görevleri</Text>
-                    <Text style={tw`text-secondary text-sm`}>Güvenli seçimler için kriptografik onaylarınız</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+            <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.sm }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: theme.spacing.md }}>
+                    <View
+                        style={{
+                            width: 48, height: 48, borderRadius: theme.borderRadius.lg,
+                            backgroundColor: c.primaryTint, alignItems: 'center', justifyContent: 'center',
+                        }}
+                    >
+                        <Ionicons name="shield-checkmark" size={26} color={c.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>Emanetçi Görevleri</Text>
+                        <Text style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
+                            Güvenli seçimler için kriptografik onaylarınız
+                        </Text>
+                    </View>
                 </View>
             </View>
 
             {loading ? (
-                <ActivityIndicator color={theme.colors.primary} style={tw`mt-20`} />
+                <ActivityIndicator color={c.primary} style={{ marginTop: 80 }} />
             ) : duties.length > 0 ? (
                 <FlatList
                     data={duties}
                     keyExtractor={(item) => item.electionId.toString()}
                     renderItem={renderDuty}
-                    contentContainerStyle={tw`pb-20`}
+                    contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: 24 }}
+                    showsVerticalScrollIndicator={false}
                     refreshControl={
-                        <RefreshControl refreshing={loading} onRefresh={fetchDuties}
-                            tintColor={theme.colors.primary} />
+                        <RefreshControl refreshing={loading} onRefresh={fetchDuties} tintColor={c.primary} colors={[c.primary]} />
                     }
                 />
             ) : (
-                <View style={tw`flex-1 justify-center items-center opacity-40`}>
-                    <Ionicons name="documents-outline" size={80} color={theme.colors.secondary} />
-                    <Text style={tw`text-secondary font-medium mt-4`}>Henüz bir görev atanmadı.</Text>
-                </View>
+                <EmptyState
+                    icon="documents-outline"
+                    title="Henüz bir görev atanmadı"
+                    subtitle="Bir seçimde emanetçi seçildiğinizde görev burada görünür."
+                />
             )}
-        </View>
+        </SafeAreaView>
     );
 };
