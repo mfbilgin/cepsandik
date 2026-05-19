@@ -6,6 +6,7 @@ import { api } from '../../services/api';
 import { tw } from '../../utils/tailwind';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
+import { useAuth } from '../../context/AuthContext';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
@@ -45,8 +46,12 @@ export const ElectionResultsScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
     const [isVerifyModalVisible, setIsVerifyModalVisible] = useState(false);
+    // Faz B0.4 — "Sonuçları Hesapla" yalnız seçim sahibine (organizatör).
+    // Sıradan seçmen tetikleyememeli (leader-mode tuzağıyla aynı sınıf).
+    const [isOwner, setIsOwner] = useState(false);
     const { t, language } = useI18n();
     const { showDialog } = useUI();
+    const { user } = useAuth();
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -54,6 +59,13 @@ export const ElectionResultsScreen = () => {
 
     useEffect(() => {
         fetchResults();
+        (async () => {
+            try {
+                const res = await api.get(`/elections/${electionId}`);
+                const e = res.data?.data;
+                setIsOwner(!!e && String(e.createdBy) === String(user?.id));
+            } catch { /* sahiplik tespiti opsiyonel — varsayılan false */ }
+        })();
     }, []);
 
     const fetchResults = async () => {
@@ -177,19 +189,21 @@ export const ElectionResultsScreen = () => {
                     </View>
                     <Text style={tw`text-xl font-bold text-slate-900 text-center mb-2`}>{t('results.notReadyTitle')}</Text>
                     <Text style={tw`text-sm text-slate-500 text-center mb-8 leading-relaxed`}>{t('results.notReadyDesc')}</Text>
-                    <TouchableOpacity
-                        onPress={handleCalculate}
-                        disabled={isCalculating}
-                        style={tw`flex-row items-center gap-2 bg-primary px-8 py-3.5 rounded-xl shadow-sm ${isCalculating ? 'opacity-50' : ''}`}
-                    >
-                        {isCalculating
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Ionicons name="calculator-outline" size={20} color="#fff" />
-                        }
-                        <Text style={tw`text-base font-bold text-white`}>
-                            {isCalculating ? t('results.calculating') : t('results.calculate')}
-                        </Text>
-                    </TouchableOpacity>
+                    {isOwner && (
+                        <TouchableOpacity
+                            onPress={handleCalculate}
+                            disabled={isCalculating}
+                            style={tw`flex-row items-center gap-2 bg-primary px-8 py-3.5 rounded-xl shadow-sm ${isCalculating ? 'opacity-50' : ''}`}
+                        >
+                            {isCalculating
+                                ? <ActivityIndicator size="small" color="#fff" />
+                                : <Ionicons name="calculator-outline" size={20} color="#fff" />
+                            }
+                            <Text style={tw`text-base font-bold text-white`}>
+                                {isCalculating ? t('results.calculating') : t('results.calculate')}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={tw`pb-12`}>
