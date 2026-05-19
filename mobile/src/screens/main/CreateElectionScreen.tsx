@@ -14,7 +14,7 @@ import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 import { useUI } from '../../context/UIContext';
 
-type CandidateType = 'PERSON' | 'TEXT_OPTION' | 'IMAGE_OPTION';
+type CandidateType = 'PERSON' | 'TEXT_OPTION';
 type ElectionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
 
 interface Candidate {
@@ -211,7 +211,6 @@ export const CreateElectionScreen = () => {
     const CANDIDATE_TYPES = [
         { key: 'PERSON', label: t('createElection.candidateType.personLabel'), icon: 'person', desc: t('createElection.candidateType.personDesc') },
         { key: 'TEXT_OPTION', label: t('createElection.candidateType.textLabel'), icon: 'text-fields', desc: t('createElection.candidateType.textDesc') },
-        { key: 'IMAGE_OPTION', label: t('createElection.candidateType.imageLabel'), icon: 'image', desc: t('createElection.candidateType.imageDesc') },
     ] as const;
 
     return (
@@ -411,21 +410,10 @@ export const CreateElectionScreen = () => {
                                         value={candidate.name}
                                         onChangeText={v => updateCandidate(idx, 'name', v)}
                                         style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
-                                        placeholder={candidateType === 'IMAGE_OPTION' ? t('createElection.imageLabelPlaceholder') : t('createElection.optionNamePlaceholder')}
+                                        placeholder={t('createElection.optionNamePlaceholder')}
                                         placeholderTextColor="#94a3b8"
                                         maxLength={200}
                                     />
-                                    {candidateType === 'IMAGE_OPTION' && (
-                                        <TextInput
-                                            value={candidate.imageUrl}
-                                            onChangeText={v => updateCandidate(idx, 'imageUrl', v)}
-                                            style={tw`bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium`}
-                                            placeholder={t('createElection.imageUrlPlaceholder')}
-                                            placeholderTextColor="#94a3b8"
-                                            autoCapitalize="none"
-                                            keyboardType="url"
-                                        />
-                                    )}
                                 </>
                             )}
                         </View>
