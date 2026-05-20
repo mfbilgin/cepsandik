@@ -40,7 +40,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.temporal.ChronoUnit;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,6 +65,7 @@ public class ElectionService {
     private final UserServiceClient userServiceClient;
     private final RabbitTemplate rabbitTemplate;
     private final UtcClock utcClock;
+    private final BulletinOutboxService bulletinOutbox;
 
     @Value("${app.guardian.count:5}")
     private int guardianCount;
@@ -100,6 +105,19 @@ public class ElectionService {
 
         Election saved = electionRepository.save(election);
         log.info("Seçim oluşturuldu: id={}, title={}", saved.getId(), saved.getTitle());
+
+        // Her seçim için otomatik erişim kodu oluştur
+        String code;
+        do {
+            code = accessCodeConfig.generateCode();
+        } while (accessCodeRepository.existsByCode(code));
+        accessCodeRepository.save(AccessCode.builder()
+                .election(saved)
+                .code(code)
+                .createdBy(userId)
+                .build());
+        log.info("Seçim için erişim kodu oluşturuldu: electionId={}, code={}", saved.getId(), code);
+
         return electionMapper.toDetailedResponse(saved);
     }
 
@@ -169,7 +187,19 @@ public class ElectionService {
         }
 
         // === Dağıtık Emanetçi Seçimi ===
-        selectGuardians(election);
+        List<ElectionGuardian> preselectedGuardians = guardianRepository.findAllByElectionId(id);
+        if (preselectedGuardians.isEmpty()) {
+            selectGuardians(election);
+        } else if (preselectedGuardians.size() < guardianQuorum) {
+            throw ApiException.badRequest("Manuel emanetçi listesi quorum için yetersiz. Gerekli: "
+                    + guardianQuorum + ", mevcut: " + preselectedGuardians.size());
+        } else {
+            log.info("Seçim {} için önceden atanmış {} manuel emanetçi korunuyor.",
+                    id, preselectedGuardians.size());
+            notifyGuardianAssignments(election, preselectedGuardians.stream()
+                    .map(guardian -> guardian.getUserId().toString())
+                    .toList());
+        }
 
         election.setStatus(ElectionStatus.SCHEDULED);
         election.setMinGuardiansThreshold(guardianQuorum);
@@ -233,7 +263,10 @@ public class ElectionService {
         
         log.info("Seçim {} için {} adet emanetçi seçildi.", election.getId(), selectedIds.size());
 
-        // === Bildirim Event'i Gönder ===
+        notifyGuardianAssignments(election, selectedIds);
+    }
+
+    private void notifyGuardianAssignments(Election election, List<String> selectedIds) {
         try {
             String communityName = election.getCommunityId() != null 
                     ? communityServiceClient.getCommunityName(election.getCommunityId()) 
@@ -255,6 +288,86 @@ public class ElectionService {
             log.info("Sandık görevlisi atama bildirimi kuyruğa gönderildi. ElectionId={}", election.getId());
         } catch (Exception e) {
             log.error("Bildirim gönderimi sırasında hata: ", e);
+        }
+    }
+
+    @Transactional
+    public ElectionResponse assignManualGuardians(Long electionId, String userId, List<String> guardianUserIds) {
+        Election election = findElectionOrThrow(electionId);
+        checkOwnership(election, userId);
+
+        if (!election.isDraft()) {
+            throw ApiException.badRequest("Emanetçiler sadece DRAFT durumundaki seçimlerde manuel atanabilir");
+        }
+        if (guardianUserIds == null || guardianUserIds.isEmpty()) {
+            throw ApiException.badRequest("guardianUserIds zorunludur");
+        }
+
+        List<String> selectedIds = guardianUserIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
+        if (selectedIds.size() < guardianQuorum) {
+            throw ApiException.badRequest("Manuel emanetçi sayısı quorum için yetersiz. Gerekli: "
+                    + guardianQuorum + ", mevcut: " + selectedIds.size());
+        }
+
+        for (String id : selectedIds) {
+            try {
+                UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                throw ApiException.badRequest("Geçersiz kullanıcı UUID: " + id);
+            }
+        }
+
+        List<ElectionGuardian> existing = guardianRepository.findAllByElectionId(electionId);
+        if (!existing.isEmpty()) {
+            guardianRepository.deleteAll(existing);
+        }
+
+        int xCoord = 1;
+        for (String gUserId : selectedIds) {
+            ElectionGuardian guardian = ElectionGuardian.builder()
+                    .election(election)
+                    .userId(UUID.fromString(gUserId))
+                    .xCoordinate(xCoord++)
+                    .status(ElectionGuardian.GuardianStatus.PENDING)
+                    .build();
+            guardianRepository.save(guardian);
+        }
+
+        log.info("Seçim {} için manuel emanetçiler atandı: {}", electionId, selectedIds);
+        enqueueManualGuardianSelectionProof(election, userId, selectedIds);
+        return electionMapper.toDetailedResponse(election);
+    }
+
+    private void enqueueManualGuardianSelectionProof(Election election, String assignedByUserId, List<String> selectedIds) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("guardianSelectionMethod", "MANUAL");
+        payload.put("electionId", election.getId());
+        payload.put("electionTitle", election.getTitle());
+        payload.put("assignedByUserId", assignedByUserId);
+        payload.put("guardianCount", selectedIds.size());
+        payload.put("guardianQuorum", guardianQuorum);
+        payload.put("guardianUserIds", selectedIds);
+        payload.put("recordedAt", Instant.now().toString());
+
+        bulletinOutbox.enqueue(
+                String.valueOf(election.getId()),
+                "GUARDIANS_SELECTED_MANUAL",
+                "",
+                "",
+                toJson(payload),
+                true);
+    }
+
+    private String toJson(Map<String, Object> payload) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new IllegalStateException("Bulletin payload serialize hatası", e);
         }
     }
 
@@ -726,6 +839,74 @@ public class ElectionService {
                 .totalPages(page.getTotalPages())
                 .first(page.isFirst())
                 .last(page.isLast())
+                .build();
+    }
+
+    // ==================== GLOBAL BY-CODE VERIFY ====================
+
+    /**
+     * Erişim kodunu electionId olmadan doğrular. Seçim bir topluluğa aitse
+     * ve kullanıcı üye değilse requiresMembership=true döner; aksi hâlde
+     * normal seçim verisi döner.
+     */
+    @Transactional
+    public AccessVerificationResponse verifyByCode(String code, String userId) {
+        AccessCode accessCode = accessCodeRepository.findByCodeAndIsActiveTrue(code.toUpperCase())
+                .orElseThrow(() -> ApiException.notFound("Geçersiz veya süresi dolmuş erişim kodu"));
+
+        Election election = accessCode.getElection();
+        if (!election.isActive()) {
+            throw ApiException.badRequest("Bu seçim şu an aktif değil");
+        }
+
+        Instant now = utcClock.instant();
+        if (!accessCode.isValid(now)) {
+            throw ApiException.badRequest("Bu erişim kodu aktif değil, süresi dolmuş veya kullanım limiti dolmuş");
+        }
+
+        // Topluluk seçimine erişim: üyelik kontrolü
+        if (election.getCommunityId() != null) {
+            List<String> memberIds = communityServiceClient.getMemberUserIds(election.getCommunityId());
+            if (!memberIds.contains(userId)) {
+                String communityName = communityServiceClient.getCommunityName(election.getCommunityId());
+                return AccessVerificationResponse.builder()
+                        .requiresMembership(true)
+                        .communityId(election.getCommunityId())
+                        .communityName(communityName != null ? communityName : "Topluluk #" + election.getCommunityId())
+                        .build();
+            }
+        }
+
+        accessCode.incrementUsage();
+        accessCodeRepository.save(accessCode);
+
+        List<CandidateResponse> candidates = candidateRepository
+                .findByElectionIdAndIsDeletedFalseOrderByDisplayOrderAsc(election.getId())
+                .stream()
+                .map(c -> CandidateResponse.builder()
+                        .id(c.getId())
+                        .name(c.getName())
+                        .description(c.getDescription())
+                        .imageUrl(c.getImageUrl())
+                        .displayOrder(c.getDisplayOrder())
+                        .candidateType(c.getCandidateType())
+                        .memberUserId(c.getMemberUserId())
+                        .createdAt(c.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        return AccessVerificationResponse.builder()
+                .requiresMembership(false)
+                .electionId(election.getId())
+                .electionTitle(election.getTitle())
+                .electionDescription(election.getDescription())
+                .status(election.getStatus())
+                .type(election.getType())
+                .maxSelections(election.getMaxSelections())
+                .startTime(election.getStartTime())
+                .endTime(election.getEndTime())
+                .candidateCount(candidates.size())
+                .candidates(candidates)
                 .build();
     }
 }

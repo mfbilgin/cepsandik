@@ -103,15 +103,22 @@ export const AccessCodeInput: React.FC<AccessCodeInputProps> = ({ onSuccess, onC
 
             const electionData = verifyResponse.data.data;
 
-            // Show success toast
-            Toast.show({
-                type: 'success',
-                text1: t('accessCode.success') || 'Seçim bulundu!',
-                text2: electionData.title,
-                visibilityTime: 2000,
-            });
+            if (electionData.requiresMembership) {
+                Toast.show({
+                    type: 'info',
+                    text1: t('accessCode.membershipRequired') || 'Üyelik Gerekli',
+                    text2: t('accessCode.redirectingToCommunity') || 'Bu seçim bir topluluğa ait. Önce topluluğa katılmalısınız.',
+                    visibilityTime: 3000,
+                });
+            } else {
+                Toast.show({
+                    type: 'success',
+                    text1: t('accessCode.success') || 'Seçim bulundu!',
+                    text2: electionData.electionTitle,
+                    visibilityTime: 2000,
+                });
+            }
 
-            // Call success callback
             onSuccess(electionData);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message 

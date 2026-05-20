@@ -59,8 +59,11 @@ export const HomeScreen = () => {
 
     const handleAccessCodeSuccess = useCallback((electionData: any) => {
         setShowAccessCodeModal(false);
-        // Navigate to voting ballot with the election data
-        navigation.navigate('VotingBallot', { electionId: electionData.id });
+        if (electionData.requiresMembership) {
+            navigation.navigate('CommunityDetail', { communityId: electionData.communityId });
+        } else {
+            navigation.navigate('VotingBallot', { electionId: electionData.electionId });
+        }
     }, [navigation]);
 
     useEffect(() => { initialFetch(); }, []);

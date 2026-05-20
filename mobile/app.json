@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "cepsandik",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/new_icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -23,7 +23,7 @@
       "package": "com.cepsandik.mobile",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/new_icon.png",
         "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false,
@@ -46,7 +46,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/new_icon.png"
     },
     "plugins": [
       "expo-secure-store",

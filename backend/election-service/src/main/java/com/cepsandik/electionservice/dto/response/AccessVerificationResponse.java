@@ -16,6 +16,11 @@ import java.util.List;
 @Builder
 public class AccessVerificationResponse {
 
+    @Builder.Default
+    private boolean requiresMembership = false;
+    private Long communityId;
+    private String communityName;
+
     private Long electionId;
     private String electionTitle;
     private String electionDescription;

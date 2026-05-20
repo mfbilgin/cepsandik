@@ -1,6 +1,8 @@
 package com.cepsandik.electionservice.controller;
 
 import com.cepsandik.electionservice.dto.request.CreateAccessCodeRequest;
+import com.cepsandik.electionservice.dto.request.VerifyAccessCodeRequest;
+import com.cepsandik.electionservice.dto.response.AccessVerificationResponse;
 import com.cepsandik.electionservice.dto.request.CreateCandidateRequest;
 import com.cepsandik.electionservice.dto.request.CreateElectionRequest;
 import com.cepsandik.electionservice.dto.request.UpdateElectionRequest;
@@ -75,6 +77,18 @@ public class ElectionController {
 
         ElectionResponse response = electionService.publishElection(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Seçim yayınlandı", response));
+    }
+
+    @Operation(summary = "Demo akışı için seçim emanetçilerini elle atar (DRAFT)")
+    @PostMapping("/{id}/guardians/manual")
+    public ResponseEntity<ApiResponse<ElectionResponse>> assignManualGuardians(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestBody java.util.Map<String, java.util.List<String>> body) {
+
+        java.util.List<String> guardianUserIds = body.get("guardianUserIds");
+        ElectionResponse response = electionService.assignManualGuardians(id, userId, guardianUserIds);
+        return ResponseEntity.ok(ApiResponse.success("Emanetçiler manuel atandı", response));
     }
 
     @Operation(summary = "Seçimi başlatır (SCHEDULED → ACTIVE)")
@@ -249,5 +263,14 @@ public class ElectionController {
         PageResponse<ElectionResponse> response = electionService.getArchivedElections(communityId, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-}
 
+    @Operation(summary = "Erişim kodunu electionId olmadan doğrular; üyelik gerekliyse requiresMembership=true döner")
+    @PostMapping("/by-code/verify")
+    public ResponseEntity<ApiResponse<AccessVerificationResponse>> verifyByCode(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestBody VerifyAccessCodeRequest request) {
+
+        AccessVerificationResponse response = electionService.verifyByCode(request.getCode(), userId);
+        return ResponseEntity.ok(ApiResponse.success("Erişim kodu doğrulandı", response));
+    }
+}
