@@ -1,8 +1,9 @@
-version: "3.8"
-
 services:
   gateway:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-gateway:latest
+    build:
+      context: ./openresty
+      dockerfile: Dockerfile
+    image: cepsandik-gateway:local
     container_name: gateway
     restart: unless-stopped
     ports:
@@ -15,16 +16,31 @@ services:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot:ro
       - ./logs/nginx:/usr/local/openresty/nginx/logs
+      - ./openresty/conf/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./openresty/html:/usr/share/nginx/html:ro
     depends_on:
       - user-service
       - community-service
       - election-service
+      - notification-service
     networks:
       - app-net
     mem_limit: 256m
 
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - app-net
+
   user-service:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-user-service:latest
+    build:
+      context: ../backend/user-service
+      dockerfile: Dockerfile
+    image: cepsandik-user-service:local
     container_name: user-service
     restart: unless-stopped
     mem_limit: 450m
@@ -76,7 +92,10 @@ services:
       - app-net
 
   community-service:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-community-service:latest
+    build:
+      context: ../backend/community-service
+      dockerfile: Dockerfile
+    image: cepsandik-community-service:local
     container_name: community-service
     restart: unless-stopped
     mem_limit: 400m
@@ -109,7 +128,10 @@ services:
       - app-net
 
   election-service:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-election-service:latest
+    build:
+      context: ../backend/election-service
+      dockerfile: Dockerfile
+    image: cepsandik-election-service:local
     container_name: election-service
     restart: unless-stopped
     mem_limit: 400m
@@ -131,6 +153,7 @@ services:
 
       # Community Service (internal communication)
       - APP_COMMUNITY_SERVICE_URL=http://community-service:8083
+      - APP_USER_SERVICE_URL=http://user-service:8080
 
       # Crypto-Engine (gRPC — kriptografik işlemler)
       - APP_CRYPTO_ENGINE_HOST=crypto-engine-kotlin
@@ -147,7 +170,10 @@ services:
       - app-net
 
   bulletin-board-service:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-bulletin-board-service:latest
+    build:
+      context: ../backend/bulletin-board-service
+      dockerfile: Dockerfile
+    image: cepsandik-bulletin-board-service:local
     container_name: bulletin-board-service
     restart: unless-stopped
     mem_limit: 300m
@@ -163,7 +189,10 @@ services:
       - app-net
 
   notification-service:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-notification-service:latest
+    build:
+      context: ../backend/notification-service
+      dockerfile: Dockerfile
+    image: cepsandik-notification-service:local
     container_name: notification-service
     restart: unless-stopped
     mem_limit: 400m
@@ -183,7 +212,7 @@ services:
       - SPRING_MAIL_USERNAME=${MAIL_USERNAME}
       - SPRING_MAIL_PASSWORD=${MAIL_PASSWORD}
       - EXPO_PUSH_API_URL=https://exp.host/--/api/v2/push/send
-      - APP_USER_SERVICE_URL=http://user-service:8081
+      - APP_USER_SERVICE_URL=http://user-service:8080
     depends_on:
       - db
       - rabbitmq
@@ -191,7 +220,10 @@ services:
       - app-net
 
   crypto-engine-kotlin:
-    image: ghcr.io/${GITHUB_OWNER}/cepsandik-crypto-engine-kotlin:latest
+    build:
+      context: ../backend/crypto-engine-kotlin
+      dockerfile: Dockerfile
+    image: cepsandik-crypto-engine-kotlin:local
     container_name: crypto-engine-kotlin
     restart: unless-stopped
     mem_limit: 768m
@@ -204,11 +236,13 @@ services:
     restart: unless-stopped
     mem_limit: 256m
     environment:
-      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - app-net
 
@@ -261,7 +295,6 @@ networks:
 
 volumes:
   postgres_data:
-    external: true
     name: cepsandik-postgres-data
   redis_data:
   rabbitmq_data:

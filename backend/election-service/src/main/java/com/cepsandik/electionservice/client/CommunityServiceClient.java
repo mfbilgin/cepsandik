@@ -70,4 +70,5 @@ public class CommunityServiceClient {
             return "Topluluk #" + communityId;
         }
     }
+
 }

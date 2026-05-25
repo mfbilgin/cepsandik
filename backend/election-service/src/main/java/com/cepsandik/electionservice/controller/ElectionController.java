@@ -253,6 +253,15 @@ public class ElectionController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Topluluk bazlı taslak seçimleri listeler (sadece admin/owner)")
+    @GetMapping("/communities/{communityId}/drafts")
+    public ResponseEntity<ApiResponse<List<ElectionResponse>>> getDraftElections(
+            @PathVariable Long communityId,
+            @RequestHeader("X-User-Id") String userId) {
+        List<ElectionResponse> response = electionService.getDraftElectionsByCommunity(communityId, userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "Topluluk bazlı arşivlenmiş seçimleri listeler")
     @GetMapping("/communities/{communityId}/archived")
     public ResponseEntity<ApiResponse<PageResponse<ElectionResponse>>> getArchivedElections(
@@ -262,6 +271,13 @@ public class ElectionController {
 
         PageResponse<ElectionResponse> response = electionService.getArchivedElections(communityId, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Guardian seçimi için tüm aktif kullanıcıları listeler")
+    @GetMapping("/guardian-candidates")
+    public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> getGuardianCandidates(
+            @RequestHeader("X-User-Id") String userId) {
+        return ResponseEntity.ok(ApiResponse.success(electionService.getGuardianCandidates()));
     }
 
     @Operation(summary = "Erişim kodunu electionId olmadan doğrular; üyelik gerekliyse requiresMembership=true döner")

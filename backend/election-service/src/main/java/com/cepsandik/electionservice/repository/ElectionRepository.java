@@ -26,6 +26,9 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
 
        Page<Election> findByCommunityIdAndIsDeletedFalse(Long communityId, Pageable pageable);
 
+       Page<Election> findByCommunityIdAndStatusInAndIsDeletedFalse(
+                     Long communityId, java.util.List<ElectionStatus> statuses, Pageable pageable);
+
        Page<Election> findByCommunityIdAndStatusAndIsDeletedFalse(
                      Long communityId, ElectionStatus status, Pageable pageable);
 

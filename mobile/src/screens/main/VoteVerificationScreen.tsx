@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { AppHeader, Card, Button } from '../../components/ui';
+import { getVoteReceipts, VoteReceipt } from '../../utils/voteReceipts';
 
 /**
  * E2E-V oy doğrulama — KİMLİK KULLANMAZ. Eski sürüm /votes/my-proof
@@ -24,6 +25,7 @@ export const VoteVerificationScreen = () => {
 
     const [election, setElection] = useState<any>(null);
     const [code, setCode] = useState<string>(presetCode || '');
+    const [savedReceipts, setSavedReceipts] = useState<VoteReceipt[]>([]);
     const [checking, setChecking] = useState(false);
     const [result, setResult] = useState<
         | { state: 'found'; record: any; chain: { valid?: boolean; verifiedRecords?: number } }
@@ -42,6 +44,16 @@ export const VoteVerificationScreen = () => {
                 const res = await api.get(`/elections/${electionId}`);
                 setElection(res.data?.data || null);
             } catch { /* election bilgisi opsiyonel */ }
+        })();
+    }, [electionId]);
+
+    useEffect(() => {
+        (async () => {
+            const receipts = await getVoteReceipts(electionId);
+            setSavedReceipts(receipts);
+            if (!presetCode && !code && receipts[0]?.trackingCode) {
+                setCode(receipts[0].trackingCode);
+            }
         })();
     }, [electionId]);
 
@@ -95,6 +107,42 @@ export const VoteVerificationScreen = () => {
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Takip kodu girişi */}
+                {savedReceipts.length > 0 && (
+                    <Card>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <Ionicons name="bookmark-outline" size={20} color={c.primary} />
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>
+                                {t('verification.savedReceiptsTitle')}
+                            </Text>
+                        </View>
+                        <View style={{ gap: 8 }}>
+                            {savedReceipts.map((receipt) => (
+                                <TouchableOpacity
+                                    key={`${receipt.electionId}:${receipt.trackingCode}`}
+                                    onPress={() => setCode(receipt.trackingCode)}
+                                    style={{
+                                        padding: 12,
+                                        borderWidth: 1,
+                                        borderColor: code === receipt.trackingCode ? c.primary : c.border,
+                                        borderRadius: theme.borderRadius.md,
+                                        backgroundColor: code === receipt.trackingCode ? c.primaryTint : c.surfaceAlt,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginBottom: 4 }}>
+                                        {receipt.electionTitle || election?.title || `#${receipt.electionId}`}
+                                    </Text>
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: c.text }}>
+                                        {receipt.trackingCode}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: c.textSecondary, marginTop: 4 }}>
+                                        {new Date(receipt.recordedAt).toLocaleString()}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </Card>
+                )}
+
                 <Card>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <Ionicons name="finger-print-outline" size={20} color={c.primary} />

@@ -41,7 +41,7 @@ public class EmailService {
      * Bu metod EmailConsumer tarafından çağrılır.
      */
     public void sendVerificationEmailDirect(String toEmail, String firstName, String token) {
-        String verificationUrl = frontendUrl + "/auth/verify/" + token;
+        String verificationUrl = frontendUrl + "/verify/" + token;
 
         Context context = new Context();
         context.setVariable("firstName", firstName);

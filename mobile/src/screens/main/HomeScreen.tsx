@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -60,7 +60,7 @@ export const HomeScreen = () => {
     const handleAccessCodeSuccess = useCallback((electionData: any) => {
         setShowAccessCodeModal(false);
         if (electionData.requiresMembership) {
-            navigation.navigate('CommunityDetail', { communityId: electionData.communityId });
+            navigation.navigate('CommunityDetail', { id: electionData.communityId });
         } else {
             navigation.navigate('VotingBallot', { electionId: electionData.electionId });
         }
@@ -278,37 +278,42 @@ export const HomeScreen = () => {
                 animationType="slide"
                 onRequestClose={() => setShowAccessCodeModal(false)}
             >
-                <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
                     <TouchableOpacity
                         style={{ flex: 1 }}
                         activeOpacity={1}
                         onPress={() => setShowAccessCodeModal(false)}
                     />
-                    <View style={{
-                        backgroundColor: theme.colors.background,
-                        borderTopLeftRadius: theme.borderRadius.lg,
-                        borderTopRightRadius: theme.borderRadius.lg,
-                        paddingVertical: theme.spacing.lg,
-                        paddingHorizontal: theme.spacing.md,
-                        paddingBottom: theme.spacing.lg + 24,
-                    }}>
-                        {/* Handle bar */}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                        keyboardVerticalOffset={0}
+                    >
                         <View style={{
-                            width: 40,
-                            height: 4,
-                            backgroundColor: theme.colors.border,
-                            borderRadius: 2,
-                            alignSelf: 'center',
-                            marginBottom: theme.spacing.md,
-                        }} />
+                            backgroundColor: theme.colors.background,
+                            borderTopLeftRadius: theme.borderRadius.lg,
+                            borderTopRightRadius: theme.borderRadius.lg,
+                            paddingVertical: theme.spacing.lg,
+                            paddingHorizontal: theme.spacing.md,
+                            paddingBottom: theme.spacing.lg + 24,
+                        }}>
+                            {/* Handle bar */}
+                            <View style={{
+                                width: 40,
+                                height: 4,
+                                backgroundColor: theme.colors.border,
+                                borderRadius: 2,
+                                alignSelf: 'center',
+                                marginBottom: theme.spacing.md,
+                            }} />
 
-                        {/* Content */}
-                        <AccessCodeInput
-                            onSuccess={handleAccessCodeSuccess}
-                            onCancel={() => setShowAccessCodeModal(false)}
-                        />
-                    </View>
-                </SafeAreaView>
+                            {/* Content */}
+                            <AccessCodeInput
+                                onSuccess={handleAccessCodeSuccess}
+                                onCancel={() => setShowAccessCodeModal(false)}
+                            />
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
             </Modal>
         </SafeAreaView>
     );

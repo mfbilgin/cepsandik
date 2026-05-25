@@ -56,11 +56,12 @@ public class AuthService {
                 .email(req.email())
                 .passwordHash(encoder.encode(req.password()))
                 .isActive(true)
-                .isVerified(true)
-                .verifiedAt(LocalDateTime.now())
+                .isVerified(false)
+                .verificationToken(UUID.randomUUID().toString())
                 .build();
 
         userRepository.save(user);
+        emailProducer.sendVerificationEmail(user.getEmail(), user.getFirstName(), user.getVerificationToken());
 
         MDC.put("event_type", "user_registered");
         log.info("Yeni kullanıcı kaydı: email={}, firstName={}", user.getEmail(), user.getFirstName());

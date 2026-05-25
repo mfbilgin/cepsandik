@@ -5,6 +5,7 @@ import com.cepsandik.communityservice.dto.response.CommunityResponse;
 import com.cepsandik.communityservice.entity.Community;
 import com.cepsandik.communityservice.entity.CommunityMember;
 import com.cepsandik.communityservice.enums.MemberRole;
+import com.cepsandik.communityservice.enums.MemberStatus;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,6 +23,10 @@ public class CommunityMapper {
     }
 
     public CommunityResponse toResponse(Community community, long memberCount, MemberRole userRole) {
+        return toResponse(community, memberCount, userRole, null);
+    }
+
+    public CommunityResponse toResponse(Community community, long memberCount, MemberRole userRole, MemberStatus userStatus) {
         return CommunityResponse.builder()
                 .id(community.getId())
                 .name(community.getName())
@@ -30,6 +35,7 @@ public class CommunityMapper {
                 .ownerId(community.getOwnerId())
                 .memberCount(memberCount)
                 .userRole(userRole)
+                .userStatus(userStatus)
                 .nameChangeCount(community.getNameChangeCount())
                 .createdAt(community.getCreatedAt())
                 .updatedAt(community.getUpdatedAt())
@@ -39,6 +45,7 @@ public class CommunityMapper {
 
     public CommunityResponse toResponse(Community community, long memberCount, CommunityMember member) {
         MemberRole role = member != null ? member.getRole() : null;
-        return toResponse(community, memberCount, role);
+        MemberStatus status = member != null ? member.getStatus() : null;
+        return toResponse(community, memberCount, role, status);
     }
 }

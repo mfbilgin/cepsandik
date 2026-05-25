@@ -24,6 +24,7 @@ export const CommunityDetailScreen = () => {
 
     const [community, setCommunity] = useState<any>(null);
     const [elections, setElections] = useState<any[]>([]);
+    const [draftElections, setDraftElections] = useState<any[]>([]);
     const [archivedElections, setArchivedElections] = useState<any[]>([]);
     const [members, setMembers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +57,13 @@ export const CommunityDetailScreen = () => {
                 setArchivedElections(archRes.data?.data?.content || []);
             } catch {
                 setArchivedElections([]);
+            }
+
+            try {
+                const draftRes = await api.get(`/elections/communities/${id}/drafts`);
+                setDraftElections(draftRes.data?.data || []);
+            } catch {
+                setDraftElections([]);
             }
 
             try {
@@ -142,8 +150,33 @@ export const CommunityDetailScreen = () => {
         }
     };
 
+    const handleLeaveCommunity = () => {
+        showDialog({
+            title: t('communityDetail.leaveTitle') || 'Topluluktan Ayrıl',
+            message: t('communityDetail.leaveBody') || 'Bu topluluktan ayrılmak istediğine emin misin?',
+            type: 'confirm',
+            confirmText: t('communityDetail.leaveConfirm') || 'Ayrıl',
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/communities/${id}/members/leave`);
+                    showDialog({
+                        title: t('common.success') || 'Başarılı',
+                        message: t('communityDetail.leaveSuccess') || 'Topluluktan ayrıldınız.',
+                        type: 'success',
+                    });
+                    fetchData();
+                } catch (error: any) {
+                    const msg = error?.response?.data?.message || 'Ayrılırken hata oluştu';
+                    showDialog({ title: t('common.error') || 'Hata', message: msg, type: 'error' });
+                }
+            },
+        });
+    };
+
     const isOwner = community?.ownerId === user?.id;
     const isAuthorized = isOwner || community?.userRole === 'ADMIN' || community?.userRole === 'OWNER';
+    const isPending = community?.userStatus === 'PENDING';
+    const isApprovedMember = !!community?.userRole && community?.userStatus === 'APPROVED';
 
     const roleLabel = (role: string) => {
         if (role === 'OWNER') return t('communityDetail.role.owner') || 'Owner';
@@ -187,11 +220,11 @@ export const CommunityDetailScreen = () => {
 
     const now = new Date();
     const activeElectionsList = elections.filter((e: any) => {
-        const isBasicActive = e.status === 'ACTIVE' || e.status === 'SCHEDULED' || (isOwner && e.status === 'DRAFT');
-        if (!isBasicActive) return false;
+        if (e.status !== 'ACTIVE') return false;
         if (e.endTime && new Date(e.endTime) <= now) return false;
         return true;
     });
+    const scheduledElectionsList = elections.filter((e: any) => e.status === 'SCHEDULED');
 
     const adminsList = members.filter(m => m.role === 'ADMIN' || m.role === 'OWNER');
     const normalMembers = members.filter(m => m.role !== 'ADMIN' && m.role !== 'OWNER').slice(0, 9);
@@ -275,14 +308,20 @@ export const CommunityDetailScreen = () => {
 
                         {/* Actions Row */}
                         <View style={tw`flex-row gap-2 mt-2 w-full`}>
-                            {community.userRole ? (
+                            {isPending ? (
+                                <View style={tw`flex-1 bg-warningTint border border-borderDefault rounded-lg flex-row items-center justify-center py-2 h-11 gap-2`}>
+                                    <MaterialIcons name="hourglass-top" size={18} color={tw.color('warning') || '#f59e0b'} />
+                                    <Text style={tw`text-textDefault font-bold text-sm`}>{t('communityDetail.requestPending') || 'İstek Beklemede'}</Text>
+                                </View>
+                            ) : isApprovedMember ? (
                                 <View style={tw`flex-1 bg-surface border border-borderDefault shadow-sm rounded-lg flex-row items-center justify-center py-2 h-11 gap-2`}>
                                     <MaterialIcons name="check-circle" size={18} color={tw.color('success') || '#10b981'} />
                                     <Text style={tw`text-textDefault font-bold text-sm`}>{roleLabel(community.userRole)}</Text>
                                 </View>
                             ) : (
                                 <TouchableOpacity onPress={handleJoinCommunity} style={tw`flex-1 bg-primary rounded-lg flex-row items-center justify-center py-2 h-11 shadow-sm gap-2`}>
-                                    <Text style={tw`text-white font-bold text-sm`}>{t('communityDetail.joinCommunity') || 'Join Community'}</Text>
+                                    <MaterialIcons name="group-add" size={18} color="white" />
+                                    <Text style={tw`text-white font-bold text-sm`}>{t('communityDetail.joinCommunity') || 'Katılma İsteği Gönder'}</Text>
                                 </TouchableOpacity>
                             )}
 
@@ -296,6 +335,17 @@ export const CommunityDetailScreen = () => {
                                 </TouchableOpacity>
                             )}
                         </View>
+
+                        {/* Leave button — APPROVED member ve owner değilse */}
+                        {isApprovedMember && !isOwner && (
+                            <TouchableOpacity
+                                onPress={handleLeaveCommunity}
+                                style={tw`flex-row items-center justify-center py-2 h-10 gap-2 rounded-lg border border-dangerTint`}
+                            >
+                                <MaterialIcons name="logout" size={16} color={tw.color('danger') || '#ef4444'} />
+                                <Text style={tw`text-danger font-semibold text-sm`}>{t('communityDetail.leave') || 'Topluluktan Ayrıl'}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
@@ -329,7 +379,7 @@ export const CommunityDetailScreen = () => {
                     {/* Active Polls Section */}
                     <View style={tw`flex-col gap-3`}>
                         <View style={tw`flex-row items-center justify-between`}>
-                            <Text style={tw`text-base font-bold text-textDefault`}>{t('communityDetail.activeHeader') || 'Active Polls'}</Text>
+                            <Text style={tw`text-base font-bold text-textDefault`}>{t('communityDetail.activeHeader') || 'Aktif Seçimler'}</Text>
                             {activeElectionsList.length > 0 && (
                                 <View style={tw`flex-row items-center gap-1 bg-surface px-2 py-0.5 rounded border border-borderDefault`}>
                                     <View style={tw`w-2 h-2 rounded-full bg-danger`} />
@@ -341,7 +391,7 @@ export const CommunityDetailScreen = () => {
                         {activeElectionsList.length === 0 ? (
                             <View style={tw`bg-surface p-6 rounded-xl border border-borderDefault items-center justify-center shadow-sm`}>
                                 <MaterialIcons name="inventory-2" size={36} color={tw.color('textSecondary')} style={tw`opacity-40`} />
-                                <Text style={tw`mt-2 text-textSecondary text-sm font-medium text-center`}>{t('communityDetail.noActive') || 'No active polls at the moment'}</Text>
+                                <Text style={tw`mt-2 text-textSecondary text-sm font-medium text-center`}>{t('communityDetail.noActive') || 'Şu an aktif seçim yok'}</Text>
                             </View>
                         ) : (
                             activeElectionsList.map((election: any) => (
@@ -352,13 +402,14 @@ export const CommunityDetailScreen = () => {
                                     activeOpacity={0.7}
                                 >
                                     <View style={tw`flex-row justify-between items-start mb-3`}>
-                                        <View style={tw`bg-primary/10 px-2 py-1 rounded`}>
-                                            <Text style={tw`text-primary text-[10px] font-bold uppercase`}>{statusLabel(election.status)}</Text>
+                                        <View style={tw`bg-danger/10 px-2 py-1 rounded flex-row items-center gap-1`}>
+                                            <View style={tw`w-1.5 h-1.5 rounded-full bg-danger`} />
+                                            <Text style={tw`text-danger text-[10px] font-bold uppercase`}>CANLI</Text>
                                         </View>
                                         <View style={tw`flex-row items-center gap-1`}>
                                             <MaterialIcons name="timer" size={14} color={tw.color('textSecondary')} />
                                             <Text style={tw`text-textSecondary text-xs font-medium`}>
-                                                {election.endTime ? new Date(election.endTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'short' }) : 'Ongoing'}
+                                                {election.endTime ? new Date(election.endTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'short' }) : 'Süresiz'}
                                             </Text>
                                         </View>
                                     </View>
@@ -366,14 +417,54 @@ export const CommunityDetailScreen = () => {
                                     {election.description ? (
                                         <Text style={tw`text-textSecondary text-xs leading-snug mb-4`} numberOfLines={2}>{election.description}</Text>
                                     ) : <View style={tw`mb-2`} />}
-
                                     <View style={tw`mt-2 bg-primary rounded-lg py-2.5 items-center justify-center`}>
-                                        <Text style={tw`text-white font-bold text-sm`}>{t('communityDetail.card.vote') || 'Vote Now'}</Text>
+                                        <Text style={tw`text-white font-bold text-sm`}>{t('communityDetail.card.vote') || 'Oy Ver'}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))
                         )}
                     </View>
+
+                    {/* Scheduled Polls Section */}
+                    {scheduledElectionsList.length > 0 && (
+                        <View style={tw`flex-col gap-3`}>
+                            <View style={tw`flex-row items-center justify-between`}>
+                                <Text style={tw`text-base font-bold text-textDefault`}>Yaklaşan Seçimler</Text>
+                                <View style={tw`flex-row items-center gap-1 bg-surface px-2 py-0.5 rounded border border-borderDefault`}>
+                                    <Ionicons name="calendar-outline" size={12} color={tw.color('primary')} />
+                                    <Text style={tw`text-primary text-xs font-bold uppercase tracking-tight`}>{scheduledElectionsList.length} PLANLANDI</Text>
+                                </View>
+                            </View>
+                            {scheduledElectionsList.map((election: any) => (
+                                <TouchableOpacity
+                                    key={election.id}
+                                    onPress={() => navigation.navigate('ElectionDetail', { electionId: election.id })}
+                                    style={tw`bg-surface rounded-xl overflow-hidden shadow-sm border border-borderDefault p-5`}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={tw`flex-row justify-between items-start mb-3`}>
+                                        <View style={tw`bg-primary/10 px-2 py-1 rounded flex-row items-center gap-1`}>
+                                            <Ionicons name="calendar-outline" size={11} color={tw.color('primary')} />
+                                            <Text style={tw`text-primary text-[10px] font-bold uppercase`}>PLANLI</Text>
+                                        </View>
+                                        <View style={tw`flex-row items-center gap-1`}>
+                                            <MaterialIcons name="event" size={14} color={tw.color('textSecondary')} />
+                                            <Text style={tw`text-textSecondary text-xs font-medium`}>
+                                                {election.startTime ? new Date(election.startTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: '2-digit', month: 'short' }) : 'Tarih belirsiz'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text style={tw`text-base font-bold text-textDefault mb-1 leading-tight`}>{election.title}</Text>
+                                    {election.description ? (
+                                        <Text style={tw`text-textSecondary text-xs leading-snug mb-4`} numberOfLines={2}>{election.description}</Text>
+                                    ) : <View style={tw`mb-2`} />}
+                                    <View style={tw`mt-2 bg-surface border border-primary rounded-lg py-2.5 items-center justify-center`}>
+                                        <Text style={tw`text-primary font-bold text-sm`}>Detayları Gör</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
 
                     {/* Admins & Past Results Grid Layout */}
                     <View style={tw`gap-6`}>
@@ -405,6 +496,46 @@ export const CommunityDetailScreen = () => {
                                         </View>
                                     ))}
                                 </View>
+                            </View>
+                        )}
+
+                        {/* Draft Elections — sadece admin/owner görür */}
+                        {isAuthorized && (
+                            <View style={tw`bg-surface rounded-xl p-5 shadow-sm border border-borderDefault`}>
+                                <View style={tw`flex-row items-center gap-2 mb-4`}>
+                                    <Ionicons name="document-outline" size={16} color={tw.color('primary')} />
+                                    <Text style={tw`text-sm font-bold text-textDefault uppercase tracking-wider`}>
+                                        Taslak Seçimler
+                                    </Text>
+                                    {draftElections.length > 0 && (
+                                        <View style={tw`ml-auto bg-primary/10 px-2 py-0.5 rounded-full`}>
+                                            <Text style={tw`text-[10px] font-bold text-primary`}>{draftElections.length}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {draftElections.length === 0 ? (
+                                    <Text style={tw`text-textSecondary text-xs font-medium`}>Taslak seçim yok.</Text>
+                                ) : (
+                                    <View style={tw`gap-3`}>
+                                        {draftElections.map((election: any) => (
+                                            <TouchableOpacity
+                                                key={election.id}
+                                                onPress={() => navigation.navigate('ElectionDetail', { electionId: election.id })}
+                                                style={tw`bg-background p-3 rounded-lg border border-borderDefault flex-row items-center justify-between`}
+                                            >
+                                                <View style={tw`flex-1`}>
+                                                    <Text style={tw`text-xs font-bold text-textDefault leading-tight`} numberOfLines={2}>{election.title}</Text>
+                                                    <Text style={tw`text-[10px] text-textSecondary mt-1`}>
+                                                        {election.startTime ? new Date(election.startTime).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR') : 'Tarih belirsiz'}
+                                                    </Text>
+                                                </View>
+                                                <View style={tw`bg-amber-100 px-2 py-0.5 rounded ml-2`}>
+                                                    <Text style={tw`text-[10px] text-amber-700 font-bold uppercase`}>TASLAK</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                         )}
 

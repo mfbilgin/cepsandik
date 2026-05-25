@@ -20,6 +20,11 @@ public class InternalUserController {
 
     private final UserService userService;
 
+    @GetMapping("/all")
+    public ResponseEntity<List<UserResponse>> listAllUsers() {
+        return ResponseEntity.ok(userService.listAllUsers());
+    }
+
     /**
      * Verilen ID listesindeki kullanıcıların bilgilerini döner.
      */

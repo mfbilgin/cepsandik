@@ -19,6 +19,7 @@ export const ProfileScreen = () => {
     const { t, language, setLanguage } = useI18n();
     const { showDialog } = useUI();
     const c = theme.colors;
+    const isDemoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -201,21 +202,25 @@ export const ProfileScreen = () => {
                             onPress={() => navigation.navigate('NotificationSettings')}
                         />
                         <Divider />
-                        <ListItem
-                            icon="shield-outline"
-                            iconTone="success"
-                            title={t('profile.guardianRole')}
-                            subtitle={t('profile.guardianRoleDesc')}
-                            right={
-                                <Switch
-                                    value={(user as any)?.isGuardianEligible || false}
-                                    onValueChange={toggleGuardianRole}
-                                    trackColor={{ false: c.borderStrong, true: c.success }}
-                                    thumbColor="#fff"
+                        {!isDemoMode && (
+                            <>
+                                <ListItem
+                                    icon="shield-outline"
+                                    iconTone="success"
+                                    title={t('profile.guardianRole')}
+                                    subtitle={t('profile.guardianRoleDesc')}
+                                    right={
+                                        <Switch
+                                            value={(user as any)?.isGuardianEligible || false}
+                                            onValueChange={toggleGuardianRole}
+                                            trackColor={{ false: c.borderStrong, true: c.success }}
+                                            thumbColor="#fff"
+                                        />
+                                    }
                                 />
-                            }
-                        />
-                        <Divider />
+                                <Divider />
+                            </>
+                        )}
                         <ListItem
                             icon="language-outline"
                             title={t('profile.language')}

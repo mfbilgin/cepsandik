@@ -5,6 +5,8 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
+    "android:prod": "set EXPO_PUBLIC_API_URL=https://api.cepsandik.com/v1&& expo run:android --variant release",
+    "android:demo": "set EXPO_PUBLIC_API_URL=https://api.cepsandik.com/v1&& set EXPO_PUBLIC_DEMO_MODE=true&& expo run:android --variant release",
     "ios": "expo run:ios",
     "web": "expo start --web"
   },

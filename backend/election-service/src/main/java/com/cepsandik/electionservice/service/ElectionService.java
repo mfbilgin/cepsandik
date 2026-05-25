@@ -106,18 +106,6 @@ public class ElectionService {
         Election saved = electionRepository.save(election);
         log.info("Seçim oluşturuldu: id={}, title={}", saved.getId(), saved.getTitle());
 
-        // Her seçim için otomatik erişim kodu oluştur
-        String code;
-        do {
-            code = accessCodeConfig.generateCode();
-        } while (accessCodeRepository.existsByCode(code));
-        accessCodeRepository.save(AccessCode.builder()
-                .election(saved)
-                .code(code)
-                .createdBy(userId)
-                .build());
-        log.info("Seçim için erişim kodu oluşturuldu: electionId={}, code={}", saved.getId(), code);
-
         return electionMapper.toDetailedResponse(saved);
     }
 
@@ -130,7 +118,8 @@ public class ElectionService {
     @Transactional(readOnly = true)
     public PageResponse<ElectionResponse> getElectionsByCommunity(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Election> electionPage = electionRepository.findByCommunityIdAndIsDeletedFalse(communityId, pageable);
+        java.util.List<ElectionStatus> visible = java.util.List.of(ElectionStatus.ACTIVE, ElectionStatus.SCHEDULED);
+        Page<Election> electionPage = electionRepository.findByCommunityIdAndStatusInAndIsDeletedFalse(communityId, visible, pageable);
         return buildPageResponse(electionPage);
     }
 
@@ -681,6 +670,13 @@ public class ElectionService {
      * Topluluk bazlı arşivlenmiş seçimleri listeler (CLOSED + ARCHIVED).
      */
     @Transactional(readOnly = true)
+    public List<ElectionResponse> getDraftElectionsByCommunity(Long communityId, String userId) {
+        Pageable pageable = PageRequest.of(0, 50, Sort.by("createdAt").descending());
+        Page<Election> page = electionRepository.findByCommunityIdAndStatusAndIsDeletedFalse(
+                communityId, com.cepsandik.electionservice.enums.ElectionStatus.DRAFT, pageable);
+        return page.getContent().stream().map(electionMapper::toDetailedResponse).toList();
+    }
+
     public PageResponse<ElectionResponse> getArchivedElections(Long communityId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("endTime").descending());
         Page<Election> electionPage = electionRepository.findArchivedByCommunityId(communityId, pageable);
@@ -849,6 +845,10 @@ public class ElectionService {
      * ve kullanıcı üye değilse requiresMembership=true döner; aksi hâlde
      * normal seçim verisi döner.
      */
+    public java.util.List<java.util.Map<String, Object>> getGuardianCandidates() {
+        return userServiceClient.listAllUsers();
+    }
+
     @Transactional
     public AccessVerificationResponse verifyByCode(String code, String userId) {
         AccessCode accessCode = accessCodeRepository.findByCodeAndIsActiveTrue(code.toUpperCase())

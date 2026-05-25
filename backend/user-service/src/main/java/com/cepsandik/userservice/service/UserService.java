@@ -256,6 +256,13 @@ public class UserService {
         return UserMapper.toResponse(user);
     }
 
+    public java.util.List<UserResponse> listAllUsers() {
+        return userRepo.findAll().stream()
+                .filter(u -> u.isActive() && u.isVerified())
+                .map(UserMapper::toResponse)
+                .toList();
+    }
+
     /**
      * Verilen ID listesinden kullanıcıları getirir.
      */

@@ -10,6 +10,7 @@ import { randomHex, sha256Hex } from '../../utils/ballotEncrypt';
 import { encryptBallotClientSide, spoilBallotClientSide, EncryptionParams } from '../../utils/electionGuardClient';
 import { theme } from '../../utils/theme';
 import { Button } from '../../components/ui';
+import { saveVoteReceipt } from '../../utils/voteReceipts';
 
 export const VotingBallotScreen = () => {
     const route = useRoute<any>();
@@ -96,15 +97,23 @@ export const VotingBallotScreen = () => {
             const alreadyVoted = payload?.alreadyVoted === true;
             const trackingCode: string | undefined = payload?.trackingCode;
             const trackingLabel = trackingCode?.trim() ? trackingCode : t('voting.trackingNone');
+            if (trackingCode?.trim()) {
+                await saveVoteReceipt({
+                    electionId: String(electionId),
+                    trackingCode,
+                    electionTitle: election?.title,
+                    recordedAt: new Date().toISOString(),
+                });
+            }
 
             showDialog({
                 title: alreadyVoted ? t('voting.castIdempotentTitle') : t('voting.castSuccessTitle'),
                 message: alreadyVoted
                     ? t('voting.castIdempotentBody', { trackingCode: trackingLabel })
-                    : t('voting.castSuccessBody', { trackingCode: trackingLabel }),
+                    : t('voting.receiptSavedBody') || 'Oyunuz kaydedildi. Takip kodunuz cihazınıza kaydedildi ve doğrulama ekranında gösterilecek.',
                 type: 'success',
-                confirmText: t('voting.backHome'),
-                onConfirm: () => navigation.navigate('MainTab')
+                confirmText: t('verification.verifyButton') || 'Doğrula',
+                onConfirm: () => navigation.navigate('VoteVerification', { electionId, trackingCode })
             });
         } catch (error: any) {
             const msg =

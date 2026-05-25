@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { AuthStack } from './AuthStack';
 import { MainStack } from './MainStack';
@@ -31,7 +31,13 @@ export const AppNavigator = () => {
 
     return (
         <NavigationContainer linking={linking}>
-            {user ? <MainStack /> : <AuthStack />}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={0}
+            >
+                {user ? <MainStack /> : <AuthStack />}
+            </KeyboardAvoidingView>
         </NavigationContainer>
     );
 };

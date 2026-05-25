@@ -23,6 +23,8 @@ export const CommunityManagementScreen = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [pendingMembers, setPendingMembers] = useState<any[]>([]);
+    const [processingId, setProcessingId] = useState<number | null>(null);
 
     const fetchCommunity = async () => {
         try {
@@ -38,7 +40,42 @@ export const CommunityManagementScreen = () => {
         }
     };
 
-    useEffect(() => { fetchCommunity(); }, [id]);
+    const fetchPending = async () => {
+        try {
+            const res = await api.get(`/communities/${id}/members/pending?size=50`);
+            setPendingMembers(res.data?.data?.content || []);
+        } catch {
+            setPendingMembers([]);
+        }
+    };
+
+    const handleApprove = async (memberId: number) => {
+        setProcessingId(memberId);
+        try {
+            await api.put(`/communities/${id}/members/${memberId}/approve`);
+            Toast.show({ type: 'success', text1: t('communityManagement.approvedTitle') || 'Onaylandı', text2: t('communityManagement.approvedBody') || 'Üye topluluğa eklendi' });
+            fetchPending();
+        } catch (e: any) {
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || 'İşlem başarısız' });
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleReject = async (memberId: number) => {
+        setProcessingId(memberId);
+        try {
+            await api.put(`/communities/${id}/members/${memberId}/reject`);
+            Toast.show({ type: 'success', text1: t('communityManagement.rejectedTitle') || 'Reddedildi', text2: t('communityManagement.rejectedBody') || 'Katılım isteği reddedildi' });
+            fetchPending();
+        } catch (e: any) {
+            Toast.show({ type: 'error', text1: t('auth.twoFactor.errorTitle'), text2: e.response?.data?.message || 'İşlem başarısız' });
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    useEffect(() => { fetchCommunity(); fetchPending(); }, [id]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -155,6 +192,58 @@ export const CommunityManagementScreen = () => {
                             />
                             <Text style={{ fontSize: 12, color: c.textTertiary, textAlign: 'right', marginTop: 4 }}>{description.length}/2000</Text>
                         </View>
+                    </Card>
+
+                    {/* Pending Join Requests */}
+                    <Card padding={0}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+                            <MaterialIcons name="how-to-reg" size={18} color={c.primary} />
+                            <Text style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>
+                                {t('communityManagement.pendingRequests') || 'Katılım İstekleri'}
+                            </Text>
+                            {pendingMembers.length > 0 && (
+                                <View style={{ marginLeft: 'auto', backgroundColor: c.primaryTint, paddingHorizontal: 8, paddingVertical: 2, borderRadius: theme.borderRadius.round }}>
+                                    <Text style={{ color: c.primary, fontSize: 12, fontWeight: '700' }}>{pendingMembers.length}</Text>
+                                </View>
+                            )}
+                        </View>
+                        {pendingMembers.length === 0 ? (
+                            <Text style={{ color: c.textSecondary, fontSize: 13, paddingHorizontal: 16, paddingBottom: 16 }}>
+                                {t('communityManagement.noPending') || 'Bekleyen katılım isteği yok.'}
+                            </Text>
+                        ) : (
+                            pendingMembers.map((m) => (
+                                <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border }}>
+                                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+                                        <MaterialIcons name="person" size={22} color={c.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
+                                            {m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (m.displayName || `#${String(m.userId).slice(-8).toUpperCase()}`)}
+                                        </Text>
+                                        {m.email ? <Text style={{ color: c.textSecondary, fontSize: 12 }} numberOfLines={1}>{m.email}</Text> : null}
+                                    </View>
+                                    {processingId === m.id ? (
+                                        <ActivityIndicator size="small" color={c.primary} />
+                                    ) : (
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            <TouchableOpacity
+                                                onPress={() => handleApprove(m.id)}
+                                                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.successTint || '#dcfce7', alignItems: 'center', justifyContent: 'center' }}
+                                            >
+                                                <MaterialIcons name="check" size={20} color={c.success || '#16a34a'} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                onPress={() => handleReject(m.id)}
+                                                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.dangerTint, alignItems: 'center', justifyContent: 'center' }}
+                                            >
+                                                <MaterialIcons name="close" size={20} color={c.danger} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            ))
+                        )}
                     </Card>
 
                     {/* Quick Actions */}

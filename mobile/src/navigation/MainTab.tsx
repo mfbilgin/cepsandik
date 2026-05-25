@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../utils/theme';
 import { tw } from '../utils/tailwind';
 
@@ -15,6 +16,7 @@ const Tab = createBottomTabNavigator();
 
 export const MainTab = () => {
     const { t } = useI18n();
+    const { bottom } = useSafeAreaInsets();
 
     return (
         <Tab.Navigator
@@ -22,7 +24,12 @@ export const MainTab = () => {
                 headerShown: false,
                 tabBarActiveTintColor: theme.colors.primary,
                 tabBarInactiveTintColor: theme.colors.secondary,
-                tabBarStyle: tw`bg-surface border-t border-slate-200 h-16 pb-2 pt-2 shadow-sm`,
+                tabBarStyle: {
+                    ...tw`bg-surface border-t border-slate-200 shadow-sm`,
+                    height: 64 + bottom,
+                    paddingBottom: bottom > 0 ? bottom : 8,
+                    paddingTop: 8,
+                },
                 tabBarLabelStyle: tw`text-[10px] font-medium`,
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName: keyof typeof Ionicons.glyphMap = 'home';

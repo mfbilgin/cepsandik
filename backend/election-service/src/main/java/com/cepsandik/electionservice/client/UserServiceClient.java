@@ -11,6 +11,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * User Service ile dahili iletişim istemcisi.
@@ -24,9 +25,22 @@ public class UserServiceClient {
 
     public UserServiceClient(
             RestTemplate restTemplate,
-            @Value("${app.user-service.url:http://user-service:8081}") String userServiceUrl) {
+            @Value("${app.user-service.url:http://user-service:8080}") String userServiceUrl) {
         this.restTemplate = restTemplate;
         this.userServiceUrl = userServiceUrl;
+    }
+
+    public List<Map<String, Object>> listAllUsers() {
+        try {
+            String url = userServiceUrl + "/internal/api/v1/users/all";
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    url, HttpMethod.GET, null,
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            return response.getBody() != null ? response.getBody() : Collections.emptyList();
+        } catch (RestClientException e) {
+            log.error("User service'den kullanıcı listesi alınamadı: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /**

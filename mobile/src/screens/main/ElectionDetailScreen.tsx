@@ -20,6 +20,10 @@ export const ElectionDetailScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isVerifying, setIsVerifying] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [guardianCandidates, setGuardianCandidates] = useState<any[]>([]);
+    const [selectedGuardianIds, setSelectedGuardianIds] = useState<string[]>([]);
+    const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+    const [isAssigningGuardians, setIsAssigningGuardians] = useState(false);
     const { user } = useAuth();
 
     // Edit Dates State
@@ -42,6 +46,25 @@ export const ElectionDetailScreen = () => {
     useEffect(() => {
         fetchDetail();
     }, []);
+
+    const fetchGuardianCandidates = async () => {
+        if (guardianCandidates.length > 0) return;
+        setIsLoadingCandidates(true);
+        try {
+            const res = await api.get('/elections/guardian-candidates');
+            setGuardianCandidates(res.data?.data || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoadingCandidates(false);
+        }
+    };
+
+    const toggleGuardian = (id: string) => {
+        setSelectedGuardianIds(prev =>
+            prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]
+        );
+    };
 
     const fetchDetail = async () => {
         try {
@@ -105,6 +128,34 @@ export const ElectionDetailScreen = () => {
             });
         } finally {
             setIsPublishing(false);
+        }
+    };
+
+    const handleAssignManualGuardians = async () => {
+        if (selectedGuardianIds.length < 2) {
+            showDialog({
+                title: 'Yetersiz seçim',
+                message: 'En az 2 emanetçi seçmen gerekiyor.',
+                type: 'warning'
+            });
+            return;
+        }
+        setIsAssigningGuardians(true);
+        try {
+            await api.post(`/elections/${electionId}/guardians/manual`, { guardianUserIds: selectedGuardianIds });
+            showDialog({
+                title: 'Emanetçiler atandı',
+                message: 'Seçilen kullanıcılar bu seçimin emanetçisi olarak belirlendi.',
+                type: 'success'
+            });
+        } catch (e: any) {
+            showDialog({
+                title: t('auth.twoFactor.errorTitle'),
+                message: e.response?.data?.message || 'Emanetçiler atanamadı.',
+                type: 'error'
+            });
+        } finally {
+            setIsAssigningGuardians(false);
         }
     };
 
@@ -314,6 +365,73 @@ export const ElectionDetailScreen = () => {
 
 
                 {/* Security Badge */}
+                {election.status === 'DRAFT' && String(election.createdBy) === String(user?.id) && (
+                    <View style={tw`mx-4 mb-4 rounded-xl bg-surface p-5 shadow-sm border border-slate-100`}>
+                        <View style={tw`flex-row items-center justify-between mb-1`}>
+                            <View style={tw`flex-row items-center gap-2`}>
+                                <Ionicons name="people-outline" size={20} color={tw.color('primary')} />
+                                <Text style={tw`text-base font-bold text-slate-900`}>Emanetçi Seçimi</Text>
+                            </View>
+                            {guardianCandidates.length === 0 && (
+                                <TouchableOpacity
+                                    onPress={fetchGuardianCandidates}
+                                    style={tw`flex-row items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-full`}
+                                >
+                                    {isLoadingCandidates
+                                        ? <ActivityIndicator size="small" color={tw.color('primary')} />
+                                        : <Ionicons name="refresh-outline" size={14} color={tw.color('primary')} />
+                                    }
+                                    <Text style={tw`text-xs font-bold text-primary`}>Listele</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={tw`text-xs text-slate-400 mb-3`}>
+                            Seçili: {selectedGuardianIds.length} kişi
+                        </Text>
+
+                        {guardianCandidates.length > 0 && (
+                            <View style={tw`gap-2 mb-3`}>
+                                {guardianCandidates.map((u: any) => {
+                                    const selected = selectedGuardianIds.includes(String(u.id));
+                                    return (
+                                        <TouchableOpacity
+                                            key={u.id}
+                                            onPress={() => toggleGuardian(String(u.id))}
+                                            style={tw`flex-row items-center gap-3 px-3 py-2.5 rounded-xl border ${selected ? 'bg-primary/10 border-primary/30' : 'bg-slate-50 border-slate-200'}`}
+                                        >
+                                            <View style={tw`w-8 h-8 rounded-full items-center justify-center ${selected ? 'bg-primary' : 'bg-slate-200'}`}>
+                                                <Text style={tw`text-sm font-bold ${selected ? 'text-white' : 'text-slate-500'}`}>
+                                                    {u.firstName?.[0]}{u.lastName?.[0]}
+                                                </Text>
+                                            </View>
+                                            <View style={tw`flex-1`}>
+                                                <Text style={tw`text-sm font-semibold text-slate-900`}>{u.firstName} {u.lastName}</Text>
+                                                <Text style={tw`text-xs text-slate-400`}>{u.email}</Text>
+                                            </View>
+                                            {selected && <Ionicons name="checkmark-circle" size={20} color={tw.color('primary')} />}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            onPress={handleAssignManualGuardians}
+                            disabled={isAssigningGuardians || selectedGuardianIds.length < 2}
+                            style={tw`flex-row items-center justify-center gap-2 rounded-lg bg-primary/10 py-3 border border-primary/20 ${(isAssigningGuardians || selectedGuardianIds.length < 2) ? 'opacity-50' : ''}`}
+                        >
+                            {isAssigningGuardians ? (
+                                <ActivityIndicator color={tw.color('primary')} />
+                            ) : (
+                                <Ionicons name="checkmark-circle-outline" size={18} color={tw.color('primary')} />
+                            )}
+                            <Text style={tw`text-sm font-bold text-primary`}>
+                                Emanetçileri Ata ({selectedGuardianIds.length})
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <View style={tw`mx-4 mb-6 items-center pt-2 opacity-70`}>
                     <View style={tw`flex-row items-center gap-2`}>
                         <Ionicons name="lock-closed" size={16} color={tw.color('primary')} />

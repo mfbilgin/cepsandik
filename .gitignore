@@ -45,3 +45,4 @@ mobile/ios/build/
 mobile/ios/Pods/
 mobile/modules/*/android/build/
 mobile/modules/*/ios/build/
+mobile/screen_shoots/
