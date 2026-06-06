@@ -165,16 +165,17 @@ Authorization: Bearer <accessToken>
 
 ---
 
-### 6. Topluluk Ara
+### 6. Topluluk Keşfet
 ```
-GET http://localhost/api/v1/communities/search?query=test&page=0&size=20
+GET http://localhost/api/v1/communities/discover?page=0&size=20
 Authorization: Bearer <accessToken>
 ```
+
+Kullanıcının üye olmadığı (APPROVED + PENDING dışındaki) tüm toplulukları döner.
 
 **Query Parametreleri:**
 | Parametre | Zorunlu | Varsayılan | Açıklama |
 |-----------|---------|------------|----------|
-| query | Evet | - | Arama terimi |
 | page | Hayır | 0 | Sayfa numarası |
 | size | Hayır | 20 | Sayfa başına kayıt |
 

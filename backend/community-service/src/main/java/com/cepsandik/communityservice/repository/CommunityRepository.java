@@ -20,11 +20,10 @@ public interface CommunityRepository extends JpaRepository<Community, Long> {
 
     boolean existsByNameAndOwnerIdAndIsDeletedFalse(String name, String ownerId);
 
-    // Arama ve filtreleme
-    @Query("SELECT c FROM Community c WHERE c.isDeleted = false AND " +
-            "(LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-            "LOWER(c.description) LIKE LOWER(CONCAT('%', :query, '%')))")
-    Page<Community> searchCommunities(@Param("query") String query, Pageable pageable);
+    // Keşfet — kullanıcının üye olmadığı tüm topluluklar (PUBLIC + PRIVATE).
+    // excludeIds boşsa servis sentinel olarak [-1L] geçer (JPQL'de boş IN listesi DB-specific).
+    @Query("SELECT c FROM Community c WHERE c.isDeleted = false AND c.id NOT IN :excludeIds")
+    Page<Community> discoverExcluding(@Param("excludeIds") List<Long> excludeIds, Pageable pageable);
 
     // Kullanıcının üye olduğu topluluklar için pagination
     @Query("SELECT c FROM Community c WHERE c.id IN :communityIds AND c.isDeleted = false")

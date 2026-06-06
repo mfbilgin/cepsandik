@@ -69,13 +69,13 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success("Topluluk başarıyla silindi", null));
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<ApiResponse<PageResponse<CommunityResponse>>> searchCommunities(
-            @RequestParam String query,
+    @GetMapping("/discover")
+    public ResponseEntity<ApiResponse<PageResponse<CommunityResponse>>> discoverCommunities(
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageResponse<CommunityResponse> communities = communityService.searchCommunities(query, page, size);
+        PageResponse<CommunityResponse> communities = communityService.discoverCommunities(userId, page, size);
         return ResponseEntity.ok(ApiResponse.success(communities));
     }
 

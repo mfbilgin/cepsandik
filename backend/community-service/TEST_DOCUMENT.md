@@ -16,7 +16,7 @@ Bu doküman, Community Service'in tüm endpoint'lerini ve her endpoint için tes
 | GET /api/v1/communities/{id} | 4 |
 | PUT /api/v1/communities/{id} | 5 |
 | DELETE /api/v1/communities/{id} | 4 |
-| GET /api/v1/communities/search | 3 |
+| GET /api/v1/communities/discover | 2 |
 | POST /api/v1/communities/{id}/invitations | 5 |
 | POST /api/v1/communities/join | 7 |
 | GET /api/v1/communities/{id}/invitations | 3 |
@@ -104,15 +104,16 @@ Bu doküman, Community Service'in tüm endpoint'lerini ve her endpoint için tes
 
 ---
 
-## 🏠 COMMUNITY: Topluluk Ara
+## 🏠 COMMUNITY: Topluluk Keşfet
 
-### `GET /api/v1/communities/search?query=test`
+### `GET /api/v1/communities/discover`
 
-| # | Test Case | Query | Beklenen Sonuç |
-|---|-----------|-------|----------------|
-| 1 | ✅ Eşleşen sonuçlar | `?query=test` | 200, eşleşen topluluklar |
-| 2 | ✅ Eşleşen yok | `?query=zzzzz` | 200, `content: []` |
-| 3 | ❌ Query boş | `?query=` | 400 veya boş sonuç |
+Kullanıcının üye olmadığı (APPROVED + PENDING dışındaki) tüm toplulukları döner.
+
+| # | Test Case | Beklenen Sonuç |
+|---|-----------|----------------|
+| 1 | ✅ Üye olunmamış topluluklar var | 200, content dolu |
+| 2 | ✅ Hepsine üye | 200, `content: []` |
 
 ---
 

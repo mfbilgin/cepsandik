@@ -29,7 +29,7 @@ CepSandık platformu için Topluluk Yönetimi mikroservisi.
 - `GET /api/v1/communities/{id}` - Topluluk detayları
 - `PUT /api/v1/communities/{id}` - Topluluk güncelle
 - `DELETE /api/v1/communities/{id}` - Topluluk sil
-- `GET /api/v1/communities/search?query=...` - Topluluk ara
+- `GET /api/v1/communities/discover` - Üye olunmayan toplulukları keşfet
 
 ### Davetler
 - `POST /api/v1/communities/{id}/invitations` - Davet oluştur

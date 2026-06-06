@@ -102,12 +102,8 @@ public class CommunityService {
         Community community = communityRepository.findByIdAndIsDeletedFalse(communityId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Topluluk bulunamadı"));
 
-        // Üyelik kontrolü
-        boolean isMember = memberRepository.existsByCommunityIdAndUserId(communityId, userId);
-        if (!isMember && community.getVisibility() == com.cepsandik.communityservice.enums.CommunityVisibility.PRIVATE) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Bu gizli topluluğun üyesi değilsiniz");
-        }
-
+        // Topluluk detayı herkese açıktır; PRIVATE'in tek farkı katılımın
+        // onaya tabi olmasıdır (bkz MemberService.joinCommunity).
         return buildCommunityResponse(community, userId);
     }
 
@@ -162,14 +158,26 @@ public class CommunityService {
         log.info("Topluluk silindi: id={}, name={}", communityId, community.getName());
     }
 
-    public PageResponse<CommunityResponse> searchCommunities(String query, int page, int size) {
+    /**
+     * Keşfet — kullanıcının henüz üye olmadığı (PUBLIC + PRIVATE) tüm topluluklar.
+     * PRIVATE'in tek farkı katılımın onaya tabi olması; listede gizli kalmaz.
+     */
+    public PageResponse<CommunityResponse> discoverCommunities(String userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Community> communities = communityRepository.searchCommunities(query, pageable);
+
+        // Kullanıcının halihazırda üye olduğu (PENDING dahil) topluluk id'leri hariç tut
+        List<Long> excludeIds = memberRepository.findByUserIdAndStatus(userId, MemberStatus.APPROVED)
+                .stream().map(CommunityMember::getCommunityId).collect(Collectors.toList());
+        List<CommunityMember> pendings = memberRepository.findByUserIdAndStatus(userId, MemberStatus.PENDING);
+        for (CommunityMember p : pendings) excludeIds.add(p.getCommunityId());
+
+        // JPQL'in boş IN listesinde DB-specific davranmaması için sentinel
+        if (excludeIds.isEmpty()) excludeIds = List.of(-1L);
+
+        Page<Community> communities = communityRepository.discoverExcluding(excludeIds, pageable);
 
         List<CommunityResponse> responses = communities.stream()
-                .map(c -> communityMapper.toResponse(c,
-                        memberRepository.countByCommunityIdAndStatus(c.getId(), MemberStatus.APPROVED),
-                        (MemberRole) null))
+                .map(c -> buildCommunityResponse(c, userId))
                 .collect(Collectors.toList());
 
         return PageResponse.of(responses, page, size, communities.getTotalElements());
