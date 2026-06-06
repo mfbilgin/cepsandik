@@ -17,7 +17,7 @@ else
     exit 1
 fi
 
-COMPOSE_FILES="${COMPOSE_FILES:--f docker-compose.prod.yaml -f docker-compose.demo.yaml}"
+COMPOSE_FILES="${COMPOSE_FILES:--f docker-compose.prod.yaml}"
 
 echo "=========================================="
 echo "CepSandık SSL Certificate Setup"
