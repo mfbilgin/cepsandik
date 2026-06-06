@@ -297,13 +297,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/bulletindb
-      - SPRING_DATASOURCE_USERNAME=${DATABASE_USERNAME}
-      - SPRING_DATASOURCE_PASSWORD=${DATABASE_PASSWORD}
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
-      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/bulletindb
     depends_on:
-      postgres:
+      mongo:
         condition: service_healthy
     networks:
       - app-network
@@ -387,6 +383,24 @@ services:
       - app-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # MongoDB (Bulletin Board append-only ledger)
+  # ============================================
+  mongo:
+    image: mongo:6
+    container_name: cepsandik-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -543,6 +557,8 @@ networks:
 volumes:
   postgres_data:
     name: cepsandik-postgres-data
+  mongo_data:
+    name: cepsandik-mongo-data
   redis_data:
     name: cepsandik-redis-data
   rabbitmq_data:
