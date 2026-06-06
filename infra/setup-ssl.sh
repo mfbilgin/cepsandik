@@ -8,6 +8,17 @@
 
 set -e
 
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE="docker-compose"
+else
+    echo "ERROR: Docker Compose is not installed."
+    exit 1
+fi
+
+COMPOSE_FILES="${COMPOSE_FILES:--f docker-compose.prod.yaml -f docker-compose.demo.yaml}"
+
 echo "=========================================="
 echo "CepSandık SSL Certificate Setup"
 echo "=========================================="
@@ -61,17 +72,29 @@ echo "📁 Creating certificate directories..."
 mkdir -p certbot/conf certbot/www
 chmod -R 755 certbot
 
+cleanup_selfsigned_lineage() {
+  domain="$1"
+  if [ -f "certbot/conf/live/$domain/fullchain.pem" ] && \
+     ! openssl x509 -in "certbot/conf/live/$domain/fullchain.pem" -issuer -noout 2>/dev/null | grep -qi "Let's Encrypt"; then
+    echo "Removing temporary self-signed certificate for $domain..."
+    rm -rf "certbot/conf/live/$domain" "certbot/conf/archive/$domain" "certbot/conf/renewal/$domain.conf"
+  fi
+}
+
+cleanup_selfsigned_lineage "api.cepsandik.com"
+cleanup_selfsigned_lineage "cepsandik.com"
+
 # Start gateway for ACME challenge
 echo ""
 echo "🚀 Starting gateway for ACME challenge..."
-docker compose up -d gateway
+$COMPOSE $COMPOSE_FILES up -d gateway
 
 sleep 5
 
 # Obtain certificate for API domain
 echo ""
 echo "🔐 Obtaining SSL certificate for api.cepsandik.com..."
-docker compose run --rm certbot certonly --webroot \
+$COMPOSE $COMPOSE_FILES run --rm certbot certonly --webroot \
   --webroot-path=/var/www/certbot \
   --email "$LETSENCRYPT_EMAIL" \
   --agree-tos \
@@ -89,7 +112,7 @@ fi
 # Obtain certificate for frontend domain
 echo ""
 echo "🔐 Obtaining SSL certificate for cepsandik.com..."
-docker compose run --rm certbot certonly --webroot \
+$COMPOSE $COMPOSE_FILES run --rm certbot certonly --webroot \
   --webroot-path=/var/www/certbot \
   --email "$LETSENCRYPT_EMAIL" \
   --agree-tos \
@@ -107,7 +130,7 @@ fi
 # Restart gateway to load certificates
 echo ""
 echo "🔄 Restarting gateway to load SSL certificates..."
-docker compose restart gateway
+$COMPOSE $COMPOSE_FILES restart gateway
 
 sleep 5
 
