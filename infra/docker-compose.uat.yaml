@@ -25,7 +25,6 @@ services:
     environment:
       - APP_GUARDIAN_COUNT=3
       - APP_GUARDIAN_QUORUM=2
-      - APP_GUARDIAN_DEV_BYPASS=false
       - APP_GUARDIAN_CEREMONY_HOURS=4
       # Faz 4.15b — dağıtık manuel tally insan-hızında (3 cihaz elle
       # partial+challenge gönderir, pilotta 10-30dk). Default 5dk stuck-grace
