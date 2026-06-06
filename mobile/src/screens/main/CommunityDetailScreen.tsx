@@ -42,37 +42,20 @@ export const CommunityDetailScreen = () => {
 
     const fetchData = async () => {
         try {
-            const commRes = await api.get(`/communities/${id}`);
+            // 5 endpoint paralel — sıralı bekleme yerine en yavaş çağrı kadar bekler.
+            const [commRes, electionsRes, archRes, draftRes, memRes] = await Promise.all([
+                api.get(`/communities/${id}`),
+                api.get(`/elections/community/${id}?size=50`).catch(() => null),
+                api.get(`/elections/communities/${id}/archived?size=50`).catch(() => null),
+                api.get(`/elections/communities/${id}/drafts`).catch(() => null),
+                api.get(`/communities/${id}/members?size=10`).catch(() => null),
+            ]);
+
             setCommunity(commRes.data?.data || null);
-
-            try {
-                const electionsRes = await api.get(`/elections/community/${id}?size=50`);
-                setElections(electionsRes.data?.data?.content || electionsRes.data?.data || []);
-            } catch {
-                setElections([]);
-            }
-
-            try {
-                const archRes = await api.get(`/elections/communities/${id}/archived?size=50`);
-                setArchivedElections(archRes.data?.data?.content || []);
-            } catch {
-                setArchivedElections([]);
-            }
-
-            try {
-                const draftRes = await api.get(`/elections/communities/${id}/drafts`);
-                setDraftElections(draftRes.data?.data || []);
-            } catch {
-                setDraftElections([]);
-            }
-
-            try {
-                const memRes = await api.get(`/communities/${id}/members?size=10`);
-                setMembers(memRes.data?.data?.content || []);
-            } catch {
-                setMembers([]);
-            }
-
+            setElections(electionsRes?.data?.data?.content || electionsRes?.data?.data || []);
+            setArchivedElections(archRes?.data?.data?.content || []);
+            setDraftElections(draftRes?.data?.data || []);
+            setMembers(memRes?.data?.data?.content || []);
         } catch (error) {
             setCommunity(null);
         } finally {
@@ -92,9 +75,7 @@ export const CommunityDetailScreen = () => {
         setIsFetchingPhotos(true);
         try {
             const res = await api.get(`/communities/unsplash?query=${query}`);
-            console.log("Unsplash Backend Yanıtı (Ham Veri):", JSON.stringify(res.data, null, 2));
             const data = res.data?.data;
-            console.log("Unsplash Data Icerigi:", data);
             setUnsplashPhotos(data?.results || []);
         } catch (error) {
             console.error("Failed to fetch Unsplash photos from backend", error);
@@ -121,9 +102,10 @@ export const CommunityDetailScreen = () => {
     const handleShareCommunity = async () => {
         if (!community) return;
         try {
-            const shareUrl = `https://cepsandik.com/c/${community.id}`;
-            const message = `Cepsandık'ta '${community.name}' topluluğunu keşfettim! Sen de katıl: \n\n${shareUrl}`;
-            await Share.share({ message, url: shareUrl });
+            const shareUrl = `https://cepsandik.com/topluluk/${community.id}`;
+            // Android Share.share `url` prop'unu yok sayar — bağlantıyı mesaja gömüyoruz.
+            const message = `CepSandık'ta "${community.name}" topluluğuna seni davet ediyorum:\n\n${shareUrl}`;
+            await Share.share({ message, url: shareUrl, title: community.name });
         } catch (error: any) {
             console.log("Failed to share", error);
         }
@@ -176,7 +158,8 @@ export const CommunityDetailScreen = () => {
     const isOwner = community?.ownerId === user?.id;
     const isAuthorized = isOwner || community?.userRole === 'ADMIN' || community?.userRole === 'OWNER';
     const isPending = community?.userStatus === 'PENDING';
-    const isApprovedMember = !!community?.userRole && community?.userStatus === 'APPROVED';
+    // Sahip her zaman üye sayılır — backend userStatus alanını owner için doldurmuyor.
+    const isApprovedMember = isOwner || (!!community?.userRole && community?.userStatus === 'APPROVED');
 
     const roleLabel = (role: string) => {
         if (role === 'OWNER') return t('communityDetail.role.owner') || 'Owner';
@@ -314,10 +297,21 @@ export const CommunityDetailScreen = () => {
                                     <Text style={tw`text-textDefault font-bold text-sm`}>{t('communityDetail.requestPending') || 'İstek Beklemede'}</Text>
                                 </View>
                             ) : isApprovedMember ? (
-                                <View style={tw`flex-1 bg-surface border border-borderDefault shadow-sm rounded-lg flex-row items-center justify-center py-2 h-11 gap-2`}>
-                                    <MaterialIcons name="check-circle" size={18} color={tw.color('success') || '#10b981'} />
-                                    <Text style={tw`text-textDefault font-bold text-sm`}>{roleLabel(community.userRole)}</Text>
-                                </View>
+                                isOwner ? (
+                                    <View style={tw`flex-1 bg-surface border border-borderDefault shadow-sm rounded-lg flex-row items-center justify-center py-2 h-11 gap-2`}>
+                                        <MaterialIcons name="check-circle" size={18} color={tw.color('success') || '#10b981'} />
+                                        <Text style={tw`text-textDefault font-bold text-sm`}>{roleLabel(community.userRole)}</Text>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        onPress={handleLeaveCommunity}
+                                        activeOpacity={0.7}
+                                        style={tw`flex-1 bg-surface border border-borderDefault shadow-sm rounded-lg flex-row items-center justify-center py-2 h-11 gap-2`}
+                                    >
+                                        <MaterialIcons name="check-circle" size={18} color={tw.color('success') || '#10b981'} />
+                                        <Text style={tw`text-textDefault font-bold text-sm`}>{roleLabel(community.userRole)}</Text>
+                                    </TouchableOpacity>
+                                )
                             ) : (
                                 <TouchableOpacity onPress={handleJoinCommunity} style={tw`flex-1 bg-primary rounded-lg flex-row items-center justify-center py-2 h-11 shadow-sm gap-2`}>
                                     <MaterialIcons name="group-add" size={18} color="white" />
@@ -336,16 +330,6 @@ export const CommunityDetailScreen = () => {
                             )}
                         </View>
 
-                        {/* Leave button — APPROVED member ve owner değilse */}
-                        {isApprovedMember && !isOwner && (
-                            <TouchableOpacity
-                                onPress={handleLeaveCommunity}
-                                style={tw`flex-row items-center justify-center py-2 h-10 gap-2 rounded-lg border border-dangerTint`}
-                            >
-                                <MaterialIcons name="logout" size={16} color={tw.color('danger') || '#ef4444'} />
-                                <Text style={tw`text-danger font-semibold text-sm`}>{t('communityDetail.leave') || 'Topluluktan Ayrıl'}</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
 
