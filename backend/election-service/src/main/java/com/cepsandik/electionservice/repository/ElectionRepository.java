@@ -42,8 +42,8 @@ public interface ElectionRepository extends JpaRepository<Election, Long> {
 
        /**
         * Bitmesi gereken seçimleri bul (ACTIVE → CLOSED).
-        * `tallyProof IS NULL` filter'ı autoTally idempotency için: aynı seçim
-        * için autoTally bir kere yazdıktan sonra bu sorgu onu döndürmez.
+        * `tallyProof IS NULL` filter'ı tally idempotency için: aynı seçim
+        * için tally bir kere yazıldıktan sonra bu sorgu onu döndürmez.
         */
        @Query("SELECT e FROM Election e WHERE e.status = :active " +
                      "AND e.endTime <= :now AND e.isDeleted = false " +

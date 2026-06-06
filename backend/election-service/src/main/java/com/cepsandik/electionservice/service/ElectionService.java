@@ -73,15 +73,6 @@ public class ElectionService {
     @Value("${app.guardian.quorum:3}")
     private int guardianQuorum;
 
-    /**
-     * Dev/test bayrağı: Eğer aktif gönüllü emanetçi bulunamazsa publish hata
-     * fırlatmasın, distributed ceremony'yi atlasın. SCHEDULED→ACTIVE geçişinde
-     * ElectionLifecycleService.setupElectionGuard() (auto SetupElection RPC) yine
-     * sahte guardian'ları + joint key'i üretir. Production'da false olmalı.
-     */
-    @Value("${app.guardian.dev-bypass:false}")
-    private boolean guardianDevBypass;
-
     /** Key ceremony süresi (saat) — publish'ten itibaren setup_deadline. */
     @Value("${app.guardian.ceremony-hours:4}")
     private int ceremonyHours;
@@ -220,12 +211,6 @@ public class ElectionService {
         }
 
         if (eligibleUserIds.size() < guardianQuorum) {
-            if (guardianDevBypass) {
-                log.warn("[DEV-BYPASS] Yeterli gönüllü emanetçi yok ({}/{}), distributed ceremony atlandı; " +
-                        "scheduler ACTIVE'e çekerken auto-ceremony (SetupElection RPC) tetiklenecek.",
-                        eligibleUserIds.size(), guardianQuorum);
-                return;
-            }
             throw ApiException.badRequest("Seçim başlatmak için yeterli (en az " + guardianQuorum +
                     ") gönüllü emanetçi bulunamadı. Mevcut uygun üye: " + eligibleUserIds.size());
         }

@@ -7,9 +7,7 @@ import electionguard.cli.ManifestBuilder
 /**
  * Proto `ContestInfo` listesinden KMP `Manifest` inşa eder.
  *
- * Tek geopolitical unit + tek ballot style varsayımı — distributed key ceremony
- * (CreateJointKey) ve auto-bypass (SetupElection) servisleri aynı kuralı
- * kullansın diye burada paylaşıyoruz.
+ * Tek geopolitical unit + tek ballot style varsayımı.
  */
 object ManifestBuildHelper {
 

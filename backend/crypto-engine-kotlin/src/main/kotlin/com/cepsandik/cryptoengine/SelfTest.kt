@@ -508,7 +508,7 @@ class SelfTest(
     /**
      * Sprint 5.C.3 — Distributed threshold roundtrip.
      *
-     * Bu test "auto-bypass" değil; mevcut ElectionSetupService/TallyDecryptionService'lere
+     * Bu test mevcut ElectionSetupService/TallyDecryptionService'lere
      * GİRMEDEN, KMP'nin distributed key ceremony + threshold decrypt güzergahını manuel
      * olarak yürütür. Asıl kanıt: N=3 trustee key ceremony tamamlandıktan sonra sadece
      * Q=2 trustee ile decryption başarılı oluyor mu (gerçek Lagrange interpolation)?
