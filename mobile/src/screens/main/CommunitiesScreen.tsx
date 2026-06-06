@@ -8,12 +8,15 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
 import { Card, EmptyState } from '../../components/ui';
 
+type TabId = 'memberships' | 'managed' | 'discover';
+
 export const CommunitiesScreen = () => {
     const [communities, setCommunities] = useState<any[]>([]);
+    const [discoverCommunities, setDiscoverCommunities] = useState<any[]>([]);
     const [filteredCommunities, setFilteredCommunities] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'memberships' | 'managed'>('memberships');
+    const [activeTab, setActiveTab] = useState<TabId>('memberships');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const navigation = useNavigation<any>();
@@ -26,10 +29,14 @@ export const CommunitiesScreen = () => {
 
     const fetchCommunities = async () => {
         try {
-            const res = await api.get('/communities');
-            const data = res.data?.data?.content || res.data?.data || [];
-            setCommunities(data);
-            setFilteredCommunities(data);
+            const [myRes, discRes] = await Promise.all([
+                api.get('/communities'),
+                api.get('/communities/discover?size=50').catch(() => null),
+            ]);
+            const my = myRes.data?.data?.content || myRes.data?.data || [];
+            const disc = discRes?.data?.data?.content || discRes?.data?.data || [];
+            setCommunities(my);
+            setDiscoverCommunities(disc);
         } catch (e) {
             console.error(e);
         }
@@ -52,17 +59,16 @@ export const CommunitiesScreen = () => {
     useEffect(() => { initialFetch(); }, []);
 
     useEffect(() => {
-        let filtered = communities;
+        let filtered: any[];
 
-        // Filter by tab - managed tab should only show communities where user is OWNER or ADMIN
         if (activeTab === 'managed') {
             filtered = communities.filter((x) => x.userRole === 'OWNER' || x.userRole === 'ADMIN');
+        } else if (activeTab === 'discover') {
+            filtered = discoverCommunities;
         } else {
-            // memberships tab shows all communities where user is a member (any role including MEMBER)
-            filtered = communities.filter((x) => x.userRole); // Has any role
+            filtered = communities.filter((x) => x.userRole);
         }
 
-        // Apply search filter
         if (!searchQuery) {
             setFilteredCommunities(filtered);
         } else {
@@ -72,7 +78,7 @@ export const CommunitiesScreen = () => {
                     x.name?.toLowerCase().includes(q) || x.description?.toLowerCase().includes(q)),
             );
         }
-    }, [searchQuery, communities, activeTab]);
+    }, [searchQuery, communities, discoverCommunities, activeTab]);
 
     const IconBtn = ({ name, onPress }: { name: any; onPress: () => void }) => (
         <TouchableOpacity
@@ -87,7 +93,7 @@ export const CommunitiesScreen = () => {
         </TouchableOpacity>
     );
 
-    const Tab = ({ id, label }: { id: 'memberships' | 'managed'; label: string }) => {
+    const Tab = ({ id, label }: { id: TabId; label: string }) => {
         const active = activeTab === id;
         return (
             <TouchableOpacity
@@ -152,6 +158,7 @@ export const CommunitiesScreen = () => {
                 >
                     <Tab id="memberships" label={t('communities.tab.memberships')} />
                     <Tab id="managed" label={t('communities.tab.managed')} />
+                    <Tab id="discover" label={t('communities.tab.discover')} />
                 </View>
             </View>
 
@@ -167,7 +174,7 @@ export const CommunitiesScreen = () => {
                     <Card>
                         <EmptyState
                             icon="people-outline"
-                            title={searchQuery ? t('communities.searchEmpty') : t('communities.empty')}
+                            title={searchQuery ? t('communities.searchEmpty') : activeTab === 'discover' ? t('communities.discoverEmpty') : t('communities.empty')}
                         />
                     </Card>
                 ) : (
@@ -215,7 +222,9 @@ export const CommunitiesScreen = () => {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <Ionicons name="people-outline" size={16} color={c.textSecondary} />
                                         <Text style={{ fontSize: 13, fontWeight: '600', color: c.textSecondary }}>
-                                            {t('communities.member')}
+                                            {activeTab === 'discover'
+                                                ? `${comm.memberCount ?? 0} ${t('communities.memberCountSuffix')}`
+                                                : t('communities.member')}
                                         </Text>
                                     </View>
                                     <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
