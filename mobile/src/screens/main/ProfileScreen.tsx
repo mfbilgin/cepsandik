@@ -19,7 +19,6 @@ export const ProfileScreen = () => {
     const { t, language, setLanguage } = useI18n();
     const { showDialog } = useUI();
     const c = theme.colors;
-    const isDemoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
     useLayoutEffect(() => {
         navigation.setOptions({ headerShown: false });
@@ -66,7 +65,7 @@ export const ProfileScreen = () => {
                 Toast.show({ type: 'success', text1: t('profile.uploadSuccessTitle'), text2: t('profile.uploadSuccessBody') });
             }
         } catch (error) {
-            console.log(error);
+            console.error('Profile image upload failed:', error);
             Toast.show({ type: 'error', text1: t('profile.uploadErrorTitle'), text2: t('profile.uploadErrorBody') });
         }
     };
@@ -202,25 +201,21 @@ export const ProfileScreen = () => {
                             onPress={() => navigation.navigate('NotificationSettings')}
                         />
                         <Divider />
-                        {!isDemoMode && (
-                            <>
-                                <ListItem
-                                    icon="shield-outline"
-                                    iconTone="success"
-                                    title={t('profile.guardianRole')}
-                                    subtitle={t('profile.guardianRoleDesc')}
-                                    right={
-                                        <Switch
-                                            value={(user as any)?.isGuardianEligible || false}
-                                            onValueChange={toggleGuardianRole}
-                                            trackColor={{ false: c.borderStrong, true: c.success }}
-                                            thumbColor="#fff"
-                                        />
-                                    }
+                        <ListItem
+                            icon="shield-outline"
+                            iconTone="success"
+                            title={t('profile.guardianRole')}
+                            subtitle={t('profile.guardianRoleDesc')}
+                            right={
+                                <Switch
+                                    value={(user as any)?.isGuardianEligible || false}
+                                    onValueChange={toggleGuardianRole}
+                                    trackColor={{ false: c.borderStrong, true: c.success }}
+                                    thumbColor="#fff"
                                 />
-                                <Divider />
-                            </>
-                        )}
+                            }
+                        />
+                        <Divider />
                         <ListItem
                             icon="language-outline"
                             title={t('profile.language')}
