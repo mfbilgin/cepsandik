@@ -29,8 +29,8 @@ export const LoginScreen = () => {
             setIsBiometricSupported(compatible && enrolled);
 
             const savedEmail = await SecureStore.getItemAsync('saved_email');
-            const savedPassword = await SecureStore.getItemAsync('saved_password');
-            if (savedEmail && savedPassword) {
+            const refreshToken = await SecureStore.getItemAsync('refresh_token');
+            if (savedEmail && refreshToken) {
                 setIsBiometricReady(true);
             }
         })();
@@ -43,7 +43,6 @@ export const LoginScreen = () => {
             const response = await AuthService.login(mail, pass);
             if (response.accessToken) {
                 await SecureStore.setItemAsync('saved_email', mail);
-                await SecureStore.setItemAsync('saved_password', pass);
                 setIsBiometricReady(true);
 
                 const userData = await AuthService.getProfile();
@@ -64,7 +63,7 @@ export const LoginScreen = () => {
             );
 
             if (isVerificationError) {
-                navigation.navigate('VerificationPending', { email, password });
+                navigation.navigate('VerificationPending', { email });
             } else {
                 Toast.show({
                     type: 'error',
@@ -89,15 +88,39 @@ export const LoginScreen = () => {
         if (!isBiometricReady) return;
         try {
             const savedEmail = await SecureStore.getItemAsync('saved_email');
-            const savedPassword = await SecureStore.getItemAsync('saved_password');
-            if (!savedEmail || !savedPassword) return;
+            const refreshToken = await SecureStore.getItemAsync('refresh_token');
+            if (!savedEmail || !refreshToken) {
+                setIsBiometricReady(false);
+                return;
+            }
 
             const biometricAuth = await LocalAuthentication.authenticateAsync({
                 promptMessage: t('auth.login.biometricPrompt'),
                 disableDeviceFallback: false,
             });
-            if (biometricAuth.success) {
-                performSignIn(savedEmail, savedPassword);
+            if (!biometricAuth.success) return;
+
+            setIsLoading(true);
+            try {
+                const authData = await AuthService.refreshWithToken(refreshToken);
+                if (authData?.accessToken) {
+                    const userData = await AuthService.getProfile();
+                    await signIn(authData.accessToken, authData.refreshToken || refreshToken, userData);
+                    Toast.show({ type: 'success', text1: t('auth.login.successTitle'), text2: t('auth.login.successBody') });
+                } else {
+                    throw new Error('No access token in refresh response');
+                }
+            } catch (refreshErr) {
+                // Refresh token süresi doldu / geçersiz → biyometrik durumu temizle, klasik girişe yönlendir.
+                await SecureStore.deleteItemAsync('refresh_token');
+                setIsBiometricReady(false);
+                Toast.show({
+                    type: 'error',
+                    text1: t('auth.login.biometricErrorTitle'),
+                    text2: t('auth.login.errorInvalidCredentials')
+                });
+            } finally {
+                setIsLoading(false);
             }
         } catch (error) {
             Toast.show({ type: 'error', text1: t('auth.login.biometricErrorTitle'), text2: t('auth.login.biometricErrorBody') });

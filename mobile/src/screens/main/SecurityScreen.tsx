@@ -80,7 +80,6 @@ export const SecurityScreen = () => {
                 newPassword,
                 confirmPassword
             });
-            await SecureStore.deleteItemAsync('saved_password');
             Toast.show({ type: 'success', text1: t('security.successTitle'), text2: t('security.successBody') });
             setTimeout(() => {
                 navigation.goBack();

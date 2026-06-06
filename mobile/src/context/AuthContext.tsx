@@ -18,6 +18,7 @@ interface AuthContextData {
     isLoading: boolean;
     signIn: (accessToken: string, refreshToken: string | null, userData: User) => Promise<void>;
     signOut: () => Promise<void>;
+    forgetDevice: () => Promise<void>;
     updateUser: (userData: User) => void;
     refreshUser: () => Promise<void>;
 }
@@ -31,9 +32,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         loadStorageData();
 
+        // Refresh token sunucu tarafından reddedildi (geçersiz/süresi dolmuş) → biyometriği de devre dışı bırak.
         const subscription = DeviceEventEmitter.addListener('auth_error_logout', () => {
-            console.log('[AuthContext] Received auth_error_logout event, signing out...');
-            signOut();
+            console.log('[AuthContext] Received auth_error_logout event, forgetting device...');
+            forgetDevice();
         });
 
         return () => {
@@ -66,9 +68,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(userData);
     }
 
+    // Oturumu bitir — refresh_token + saved_email cihazda kalır (biyometrik girişi mümkün kılar).
     async function signOut() {
         await SecureStore.deleteItemAsync('access_token');
+        setUser(null);
+    }
+
+    // Cihazı unut — tüm oturum + biyometrik verilerini sil.
+    async function forgetDevice() {
+        await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('saved_email');
         setUser(null);
     }
 
@@ -81,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, signIn, signOut, updateUser, refreshUser }}>
+        <AuthContext.Provider value={{ user, isLoading, signIn, signOut, forgetDevice, updateUser, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

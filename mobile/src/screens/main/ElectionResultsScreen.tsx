@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -149,7 +149,14 @@ export const ElectionResultsScreen = () => {
         }
     };
 
-    const maxVotes = result ? Math.max(...result.candidateResults.map(c => c.voteCount), 1) : 1;
+    const maxVotes = useMemo(
+        () => (result ? Math.max(...result.candidateResults.map(c => c.voteCount), 1) : 1),
+        [result?.candidateResults]
+    );
+    const sortedCandidates = useMemo(
+        () => (result?.candidateResults ? [...result.candidateResults].sort((a, b) => a.rank - b.rank) : []),
+        [result?.candidateResults]
+    );
 
     if (isLoading) {
         return (
@@ -256,9 +263,7 @@ export const ElectionResultsScreen = () => {
                             <Text style={tw`text-base font-bold text-slate-900`}>{t('results.candidateResults')}</Text>
                         </View>
 
-                        {result.candidateResults
-                            ?.sort((a, b) => a.rank - b.rank)
-                            .map((candidate, index) => (
+                        {sortedCandidates.map((candidate, index) => (
                             <View key={candidate.selectionId || candidate.optionId} style={tw`px-5 pb-4`}>
                                 <View style={tw`flex-row items-center gap-3 mb-2`}>
                                     <View style={[

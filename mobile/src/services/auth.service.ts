@@ -1,9 +1,24 @@
-import { api } from './api';
+import axios from 'axios';
+import { api, API_URL } from './api';
 import * as SecureStore from 'expo-secure-store';
 
 export const AuthService = {
     login: async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
+        const authData = response.data?.data;
+        if (authData?.accessToken) {
+            await SecureStore.setItemAsync('access_token', authData.accessToken);
+        }
+        if (authData?.refreshToken) {
+            await SecureStore.setItemAsync('refresh_token', authData.refreshToken);
+        }
+        return authData;
+    },
+
+    // Biyometrik giriş için: kayıtlı refresh token ile yeni access token al.
+    // Interceptor'ı bypass etmek için doğrudan axios kullanılır (sonsuz refresh döngüsünü önler).
+    refreshWithToken: async (refreshToken: string) => {
+        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
         const authData = response.data?.data;
         if (authData?.accessToken) {
             await SecureStore.setItemAsync('access_token', authData.accessToken);
@@ -31,9 +46,17 @@ export const AuthService = {
         return response.data?.data;
     },
 
+    // "Oturumu bitir" — access token silinir, refresh_token + saved_email biyometrik için kalır.
+    // Tam unutma için forgetDevice() çağrılmalı (Security ekranı aksiyonu).
     logout: async () => {
         await SecureStore.deleteItemAsync('access_token');
+    },
+
+    // Cihazdan tamamen çıkış: tüm oturum bilgileri silinir, biyometrik bir daha kullanılamaz.
+    forgetDevice: async () => {
+        await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('saved_email');
     },
 
     forgotPassword: async (email: string) => {

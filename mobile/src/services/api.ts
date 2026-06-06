@@ -33,7 +33,7 @@ api.interceptors.request.use(
             const token = await SecureStore.getItemAsync('access_token');
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
-            } else {
+            } else if (__DEV__) {
                 console.log(`[API WARNING] No access token for ${config.url}`);
             }
         } catch (e) {
@@ -56,8 +56,10 @@ api.interceptors.request.use(
             config.headers['X-Device-ID'] = 'unknown';
         }
 
-        const fullUrl = `${config.baseURL}${config.url}`;
-        console.log(`[API REQUEST] [CID: ${config.headers['X-Correlation-ID']}] ${config.method?.toUpperCase()} ${fullUrl}`);
+        if (__DEV__) {
+            const fullUrl = `${config.baseURL}${config.url}`;
+            console.log(`[API REQUEST] [CID: ${config.headers['X-Correlation-ID']}] ${config.method?.toUpperCase()} ${fullUrl}`);
+        }
         return config;
     },
     (error) => Promise.reject(error)
@@ -79,13 +81,17 @@ const processQueue = (error: any, token: string | null = null) => {
 
 api.interceptors.response.use(
     (response) => {
-        const fullUrl = `${response.config.baseURL}${response.config.url}`;
-        console.log(`[API SUCCESS] ${response.status} from ${fullUrl}`);
+        if (__DEV__) {
+            const fullUrl = `${response.config.baseURL}${response.config.url}`;
+            console.log(`[API SUCCESS] ${response.status} from ${fullUrl}`);
+        }
         return response;
     },
     async (error) => {
-        const fullUrl = `${error.config?.baseURL}${error.config?.url}`;
-        console.log(`[API ERROR] ${error.response?.status} for ${fullUrl}: ${JSON.stringify(error.response?.data || error.message)}`);
+        if (__DEV__) {
+            const fullUrl = `${error.config?.baseURL}${error.config?.url}`;
+            console.log(`[API ERROR] ${error.response?.status} for ${fullUrl}: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
 
         const originalRequest = error.config;
 

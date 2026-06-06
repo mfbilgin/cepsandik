@@ -7,25 +7,31 @@ import { AuthService } from '../../services/auth.service';
 import Toast from 'react-native-toast-message';
 import { useI18n } from '../../i18n/LanguageContext';
 import { theme } from '../../utils/theme';
-import { Button } from '../../components/ui';
+import { Button, Input } from '../../components/ui';
 
 export const VerificationPendingScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
+    const [resendPassword, setResendPassword] = useState('');
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { t } = useI18n();
-    const { email, password } = route.params || {};
+    const { email } = route.params || {};
     const c = theme.colors;
 
     const handleResendEmail = async () => {
-        if (!email || !password) {
+        if (!email) {
             Toast.show({ type: 'error', text1: 'Hata', text2: 'Kullanıcı bilgileri bulunamadı, lütfen tekrar giriş yapın.' });
             navigation.navigate('Login');
             return;
         }
+        if (!resendPassword) {
+            Toast.show({ type: 'error', text1: 'Hata', text2: 'Doğrulama e-postasını yeniden göndermek için parolanızı girin.' });
+            return;
+        }
         setIsLoading(true);
         try {
-            await AuthService.resendVerification(email, password);
+            await AuthService.resendVerification(email, resendPassword);
+            setResendPassword('');
             Toast.show({ type: 'success', text1: 'Başarılı', text2: 'Doğrulama e-postası tekrar gönderildi. Lütfen gelen kutunuzu kontrol edin.' });
         } catch (error: any) {
             Toast.show({ type: 'error', text1: 'Hata', text2: error.response?.data?.message || 'E-posta gönderilemedi.' });
@@ -56,6 +62,14 @@ export const VerificationPendingScreen = () => {
                 </Text>
 
                 <View style={{ width: '100%', gap: 12 }}>
+                    <Input
+                        icon="lock-closed-outline"
+                        placeholder="Parolanız"
+                        password
+                        value={resendPassword}
+                        onChangeText={setResendPassword}
+                        containerStyle={{ marginBottom: 0 }}
+                    />
                     <Button
                         title="Yeniden Gönder"
                         icon="send-outline"
