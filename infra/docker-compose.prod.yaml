@@ -3,7 +3,7 @@ services:
     build:
       context: ./openresty
       dockerfile: Dockerfile
-    image: cepsandik-gateway:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-gateway:latest
     container_name: gateway
     restart: unless-stopped
     ports:
@@ -40,7 +40,7 @@ services:
     build:
       context: ../backend/user-service
       dockerfile: Dockerfile
-    image: cepsandik-user-service:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-user-service:latest
     container_name: user-service
     restart: unless-stopped
     mem_limit: 450m
@@ -95,7 +95,7 @@ services:
     build:
       context: ../backend/community-service
       dockerfile: Dockerfile
-    image: cepsandik-community-service:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-community-service:latest
     container_name: community-service
     restart: unless-stopped
     mem_limit: 400m
@@ -131,7 +131,7 @@ services:
     build:
       context: ../backend/election-service
       dockerfile: Dockerfile
-    image: cepsandik-election-service:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-election-service:latest
     container_name: election-service
     restart: unless-stopped
     mem_limit: 400m
@@ -173,7 +173,7 @@ services:
     build:
       context: ../backend/bulletin-board-service
       dockerfile: Dockerfile
-    image: cepsandik-bulletin-board-service:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-bulletin-board-service:latest
     container_name: bulletin-board-service
     restart: unless-stopped
     mem_limit: 300m
@@ -190,7 +190,7 @@ services:
     build:
       context: ../backend/notification-service
       dockerfile: Dockerfile
-    image: cepsandik-notification-service:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-notification-service:latest
     container_name: notification-service
     restart: unless-stopped
     mem_limit: 400m
@@ -221,7 +221,7 @@ services:
     build:
       context: ../backend/crypto-engine-kotlin
       dockerfile: Dockerfile
-    image: cepsandik-crypto-engine-kotlin:local
+    image: ghcr.io/${GITHUB_OWNER}/cepsandik-crypto-engine-kotlin:latest
     container_name: crypto-engine-kotlin
     restart: unless-stopped
     mem_limit: 768m
