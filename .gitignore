@@ -38,6 +38,7 @@ backend/election-service/cepsandik.db
 
 # Build outputs (Gradle, Expo, etc.)
 **/build/
+**/.gradle/
 mobile/android/.gradle/
 mobile/android/app/build/
 mobile/android/build/
