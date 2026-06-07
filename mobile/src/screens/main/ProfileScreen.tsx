@@ -75,20 +75,20 @@ export const ProfileScreen = () => {
         const currentEligible = (user as any).isGuardianEligible;
         if (!currentEligible) {
             const token = await registerForPushNotificationsAsync();
-            if (token) {
-                try {
-                    await api.put('/users/me/push-token', { pushToken: token, guardianEligible: true });
-                    await refreshUser();
-                    Toast.show({ type: 'success', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleSuccess') });
-                } catch (error) {
-                    Toast.show({ type: 'error', text1: t('security.loadError'), text2: t('auth.forgot.failedBody') });
-                }
-            } else {
-                Toast.show({ type: 'error', text1: t('profile.notificationPermissionRequired'), text2: t('profile.notificationSettings') });
+            try {
+                await api.put('/users/me/push-token', { pushToken: token ?? '', guardianEligible: true });
+                await refreshUser();
+                Toast.show({
+                    type: 'success',
+                    text1: t('profile.guardianRole'),
+                    text2: token ? t('profile.guardianEligibleSuccess') : t('profile.guardianEligibleSuccessNoPush'),
+                });
+            } catch (error) {
+                Toast.show({ type: 'error', text1: t('security.loadError'), text2: t('auth.forgot.failedBody') });
             }
         } else {
             try {
-                await api.put('/users/me/push-token', { pushToken: (user as any).pushToken, guardianEligible: false });
+                await api.put('/users/me/push-token', { pushToken: (user as any).pushToken ?? '', guardianEligible: false });
                 await refreshUser();
                 Toast.show({ type: 'info', text1: t('profile.guardianRole'), text2: t('profile.guardianEligibleDisabled') });
             } catch (error) {
