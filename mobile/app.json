@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.cepsandik.mobile",
-      "usesCleartextTraffic": true,
+      "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/new_icon.png",
         "backgroundColor": "#ffffff"
