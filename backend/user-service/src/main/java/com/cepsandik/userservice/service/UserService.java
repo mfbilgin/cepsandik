@@ -38,8 +38,10 @@ public class UserService {
     public void updatePushToken(String email, com.cepsandik.userservice.dtos.requests.UpdatePushTokenRequest req) {
         var user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
-        
-        user.setPushToken(req.getPushToken());
+
+        if (req.getPushToken() != null && !req.getPushToken().isBlank()) {
+            user.setPushToken(req.getPushToken());
+        }
         user.setGuardianEligible(req.isGuardianEligible());
         userRepo.save(user);
     }
