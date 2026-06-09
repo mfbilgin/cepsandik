@@ -6,6 +6,7 @@
 # Cron job ile çalıştırılır
 
 set -e
+set -o pipefail
 
 # Konfigürasyon
 BACKUP_DIR="/backups"
@@ -30,13 +31,12 @@ for DB in "${DATABASES[@]}"; do
     
     log "📦 $DB yedekleniyor..."
     
-    pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$DB" | gzip > "$BACKUP_FILE"
-    
-    if [ $? -eq 0 ]; then
+    if pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$DB" | gzip > "$BACKUP_FILE"; then
         SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
         log "✅ $DB yedeklendi: $BACKUP_FILE ($SIZE)"
     else
-        log "❌ $DB yedekleme hatası!"
+        log "❌ $DB yedekleme hatası! ($BACKUP_FILE silindi)"
+        rm -f "$BACKUP_FILE"
         exit 1
     fi
 done
