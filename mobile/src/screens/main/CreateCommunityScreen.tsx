@@ -22,12 +22,8 @@ export const CreateCommunityScreen = () => {
 
     const pickLogo = async () => {
         try {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permission.granted) {
-                Toast.show({ type: 'error', text1: t('profile.permissionDeniedTitle') || 'İzin Gerekli', text2: 'Galeriye erişim izni gerekli' });
-                return;
-            }
-
+            // Sistem fotoğraf seçicisi izin gerektirmez; Play'in fotoğraf/video
+            // izin politikası gereği galeri izni istenmez.
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,

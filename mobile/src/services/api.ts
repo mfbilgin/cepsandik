@@ -17,8 +17,11 @@ const generateCorrelationId = () => {
 // Emülatör loopback'i (10.0.2.2) sadece AVD'den çalışır. Çok-cihaz UAT için
 // EXPO_PUBLIC_API_URL ile host LAN IP'si verilir (emülatör + gerçek cihaz
 // aynı ağda erişir). Tanımsızsa emülatör varsayılanına düşer.
-export const API_URL =
-    process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8088/v1';
+// Yayın (release) build'de değişken unutulursa uygulama emülatör adresine
+// bağlanmasın diye canlı API'ye düşer.
+const DEFAULT_API_URL = __DEV__ ? 'http://10.0.2.2:8088/v1' : 'https://api.cepsandik.com/v1';
+
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URL;
 
 export const api = axios.create({
     baseURL: API_URL,

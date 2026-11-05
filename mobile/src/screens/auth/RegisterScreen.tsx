@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import { useNavigation } from '@react-navigation/native';
@@ -276,9 +276,13 @@ export const RegisterScreen = () => {
                         {kvkkAccepted && <Ionicons name="checkmark" size={15} color="#fff" />}
                     </View>
                     <Text style={{ flex: 1, fontSize: 13, color: c.textSecondary, lineHeight: 19 }}>
-                        <Text style={{ fontWeight: '600', color: c.primary }}>Gizlilik Politikası</Text> ve{' '}
-                        <Text style={{ fontWeight: '600', color: c.primary }}>KVKK Metnini</Text>
-                        {' '}okudum, onaylıyorum.
+                        <Text
+                            style={{ fontWeight: '600', color: c.primary, textDecorationLine: 'underline' }}
+                            onPress={() => Linking.openURL('https://cepsandik.com/gizlilik/')}
+                        >
+                            Gizlilik Politikası ve KVKK Aydınlatma Metni
+                        </Text>
+                        'ni okudum; verilerimin metinde belirtilen yurt dışındaki hizmet sağlayıcılara aktarılmasına açık rıza veriyorum.
                     </Text>
                 </TouchableOpacity>
 

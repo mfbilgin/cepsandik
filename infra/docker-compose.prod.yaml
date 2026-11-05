@@ -84,6 +84,11 @@ services:
 
       # Application Logic
       - APP_FRONTEND_URL=${FRONTEND_URL}
+
+      # Google Play Integrity (cihaz bütünlüğü)
+      - PLAY_INTEGRITY_ENABLED=${PLAY_INTEGRITY_ENABLED:-false}
+      - PLAY_INTEGRITY_REQUIRE_PLAY_RECOGNIZED=${PLAY_INTEGRITY_REQUIRE_PLAY_RECOGNIZED:-true}
+      - PLAY_INTEGRITY_SA_JSON_BASE64=${PLAY_INTEGRITY_SA_JSON_BASE64:-}
     depends_on:
       - db
       - redis

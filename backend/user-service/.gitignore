@@ -35,3 +35,12 @@ build/
 *.properties
 *.yml
 *.yaml
+
+# Prod profili yalnızca ${ENV} yer tutucuları içerir; CI imajı için gerekli.
+!src/main/resources/application-prod.properties
+# Maven wrapper ayarı (mvnw bunsuz çalışmaz)
+!.mvn/wrapper/maven-wrapper.properties
+
+# Yerel test yardımcıları
+run-tests.bat
+test-output.txt

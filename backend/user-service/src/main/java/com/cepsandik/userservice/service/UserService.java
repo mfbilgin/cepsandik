@@ -32,6 +32,7 @@ public class UserService {
     private final EmailService emailService;
     private final FileUploadService fileUploadService;
     private final com.cepsandik.userservice.repositories.NotificationPreferenceRepository notificationPreferenceRepo;
+    private final com.cepsandik.userservice.repositories.TwoFactorAuthRepository twoFactorAuthRepository;
 
     @LogAudit(action = "PUSH TOKEN UPDATE")
     @Transactional
@@ -124,16 +125,54 @@ public class UserService {
         userRepo.save(user);
     }
 
+    /**
+     * Hesabı siler (KVKK md. 7 / Google Play veri silme politikası).
+     *
+     * Kişisel veriler (ad, soyad, e-posta, parola özeti, profil fotoğrafı,
+     * push token, 2FA sırrı, bekleyen token'lar, bildirim tercihleri) kalıcı
+     * olarak silinir ya da geri döndürülemez biçimde anonimleştirilir.
+     *
+     * Satırın kendisi anonim olarak kalır (soft delete): topluluk üyeliği,
+     * guardian kaydı ve "oy kullandı" kaydı diğer servislerde yalnızca UUID ile
+     * tutulur; seçim sonuçlarının ve doğrulanabilirliğin bozulmaması için bu
+     * referanslar silinmez. Oyların içeriği hiçbir zaman kullanıcıya bağlı değildir.
+     */
+    @Transactional
     @LogAudit(action = "DELETE ACCOUNT")
     public void deleteMe(String email) {
         var user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, MessageConstants.USER_NOT_FOUND));
-        var userTokens = refreshTokenRepository.findByUserId(user.getId());
-        if (!userTokens.isEmpty()) {
+        UUID userId = user.getId();
+
+        var userTokens = refreshTokenRepository.findByUserId(userId);
+        if (userTokens != null && !userTokens.isEmpty()) {
             refreshTokenRepository.deleteAll(userTokens);
         }
-        userRepo.delete(user);
+        emailChangeTokenRepository.deleteByUserId(userId);
+        twoFactorAuthRepository.deleteByUserId(userId);
+        fileUploadService.deleteProfileImage(user.getProfileImage()); // S3 hatası silmeyi engellemez
+
+        if (user.getPasswordResetTokens() != null) {
+            user.getPasswordResetTokens().clear(); // orphanRemoval
+        }
+        if (user.getNotificationPreferences() != null) {
+            user.getNotificationPreferences().clear(); // orphanRemoval
+        }
+
+        user.setFirstName(DELETED_FIRST_NAME);
+        user.setLastName(DELETED_LAST_NAME);
+        user.setEmail("deleted-" + userId + "@deleted.invalid");
+        user.setPasswordHash(encoder.encode(UUID.randomUUID().toString()));
+        user.setProfileImage(null);
+        user.setPushToken(null);
+        user.setVerificationToken(null);
+        userRepo.saveAndFlush(user);
+
+        userRepo.delete(user); // @SQLDelete → is_active=false, deleted_at=now
     }
+
+    static final String DELETED_FIRST_NAME = "Silinmiş";
+    static final String DELETED_LAST_NAME = "Kullanıcı";
 
     /**
      * Kullanıcının tüm cihazlardan çıkış yapmasını sağlar.

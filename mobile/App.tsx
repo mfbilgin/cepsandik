@@ -8,17 +8,20 @@ import { LanguageProvider } from './src/i18n/LanguageContext';
 
 import { UIProvider } from './src/context/UIContext';
 import { ModernDialog } from './src/components/ModernDialog';
+import { IntegrityGate } from './src/components/IntegrityGate';
 
 export default function App() {
   return (
     <SafeAreaProvider>
             <LanguageProvider>
-                <UIProvider>
-                    <AuthProvider>
-                        <AppNavigator />
-                        <ModernDialog />
-                    </AuthProvider>
-                </UIProvider>
+                <IntegrityGate>
+                    <UIProvider>
+                        <AuthProvider>
+                            <AppNavigator />
+                            <ModernDialog />
+                        </AuthProvider>
+                    </UIProvider>
+                </IntegrityGate>
             </LanguageProvider>
             <Toast />
             <StatusBar style="dark" />

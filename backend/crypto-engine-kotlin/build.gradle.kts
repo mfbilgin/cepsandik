@@ -112,3 +112,42 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// ===== Standalone Audit Verifier =====
+// Cep Sandık üretiminden bağımsız, sadece audit-record JSON girdisi alan
+// CLI doğrulayıcı. Üçüncü taraf gözlemciler bu fat-jar'ı indirip
+// `java -jar audit-verifier.jar --url <...>` ile çalıştırabilir.
+
+tasks.register<JavaExec>("runVerifier") {
+    group = "verification"
+    description = "Run the standalone Cep Sandık audit-record verifier (use -Pargs=\"--url ...\")"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.cepsandik.cryptoengine.verifier.AuditVerifierKt")
+    val cliArgs = (project.findProperty("args") as String?)?.split(" ") ?: emptyList()
+    args = cliArgs
+}
+
+tasks.register<Jar>("auditVerifierJar") {
+    group = "verification"
+    description = "Standalone fat-jar containing AuditVerifier + EGK runtime"
+    archiveBaseName.set("audit-verifier")
+    archiveVersion.set(project.version.toString())
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+            "Main-Class" to "com.cepsandik.cryptoengine.verifier.AuditVerifierKt",
+            "Implementation-Title" to "Cep Sandık Audit Verifier",
+            "Implementation-Version" to project.version.toString(),
+        )
+    }
+    from(sourceSets["main"].output)
+    dependsOn(configurations["runtimeClasspath"])
+    from({
+        configurations["runtimeClasspath"].filter { it.exists() }.map {
+            if (it.isDirectory) it else zipTree(it)
+        }
+    }) {
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA",
+                "META-INF/MANIFEST.MF", "module-info.class")
+    }
+}

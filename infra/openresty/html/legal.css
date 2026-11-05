@@ -1,0 +1,16 @@
+/* Gizlilik ve hesap silme sayfaları — styles.css değişkenlerini kullanır */
+.legal { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; color: var(--text-primary); line-height: 1.7; }
+.legal a.back { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); text-decoration: none; font-weight: 600; margin-bottom: 24px; }
+.legal h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 8px; }
+.legal .updated { color: var(--text-secondary); margin: 0 0 32px; }
+.legal h2 { font-size: 1.25rem; margin: 40px 0 12px; }
+.legal p, .legal li { color: var(--text-secondary); }
+.legal strong { color: var(--text-primary); }
+.legal ul, .legal ol { padding-left: 1.25rem; }
+.legal li { margin-bottom: 6px; }
+.legal table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95rem; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.legal th { color: var(--text-primary); background: var(--white); }
+.legal .table-wrap { overflow-x: auto; }
+.legal .note { background: var(--primary-light); border-radius: var(--radius-sm); padding: 16px 20px; margin: 20px 0; }
+.legal .note p { margin: 0; color: var(--text-primary); }

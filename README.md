@@ -60,12 +60,22 @@ docker compose down -v
 ```bash
 cd mobile
 npm install
-npx expo run:android       # debug build on an emulator
-# or, to produce a release APK pointing to prod backend:
-eas build --platform android --profile production
+npx expo run:android       # debug build on an emulator (API: http://10.0.2.2:8088/v1)
 ```
 
-The mobile app reads its backend base URL from `mobile/app.config.ts`; switch between `local`, `uat`, and `prod` via the `EXPO_PUBLIC_API_ENV` environment variable.
+Production builds are produced with **EAS Build** (cloud) and distributed **only through Google Play**:
+
+```bash
+npm install -g eas-cli
+eas login
+eas init                                          # once: links the project, writes extra.eas.projectId
+eas build --platform android --profile production # signed .aab, EAS-managed upload key
+eas submit --platform android --profile production # uploads to the Play "internal" track
+```
+
+- The backend URL comes from `EXPO_PUBLIC_API_URL` (set per profile in `mobile/eas.json`). Release builds fall back to `https://api.cepsandik.com/v1` if it is missing.
+- `mobile/.easignore` replaces `.gitignore` for EAS uploads so that `modules/electionguard/android/libs/egklib-all.jar` (not in git) is included.
+- Device integrity (Google Play Integrity) is enabled by setting `EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER` in the production profile and `PLAY_INTEGRITY_ENABLED=true` on the server (see `infra/.env.example`).
 
 ## Running an end-to-end acceptance test
 
@@ -77,6 +87,31 @@ The thesis describes an end-to-end acceptance test using three independent emula
 4. Publish the election, complete the three-round key ceremony, cast ballots from each device, close the election, and run the distributed tally.
 
 Logs in `bulletin-board-service` and `election-service` are tagged with `X-Request-Id` so individual ballot flows can be followed end-to-end.
+
+## Independent verification (standalone verifier)
+
+Cep Sandık ships a **standalone audit-record verifier** that any third party can run to confirm an election's results without trusting the production system. It re-runs every cryptographic check from scratch using the public audit record:
+
+1. Re-builds the ElectionGuard context (manifest, joint public key, extended base hash) from `cryptoContext`.
+2. Re-verifies every encrypted ballot's Chaum-Pedersen ZKP and confirmation code with EGK's `VerifyEncryptedBallots`.
+3. Parses the `DecryptedTallyOrBallot` tally proof and checks that every contest selection carries a non-empty Chaum-Pedersen decryption proof.
+4. Recomputes the entire bulletin board SHA-256 hash chain locally and rejects any tamper.
+
+Build and run from a clean checkout:
+
+```bash
+cd backend/crypto-engine-kotlin
+# Build the fat-jar (~7 MB, contains EGK runtime)
+gradle auditVerifierJar
+# Verify a live election directly from the gateway
+java -jar build/libs/audit-verifier-*.jar \
+    --url http://localhost/api/v1/elections/18/audit-record
+# Or verify an offline copy
+curl -s http://localhost/api/v1/elections/18/audit-record > audit-18.json
+java -jar build/libs/audit-verifier-*.jar --file audit-18.json
+```
+
+Exit code is `0` when every check passes and `1` otherwise, so the verifier can be wired into CI or election-observation tooling. The verifier never contacts the system except (optionally) to fetch the audit record — every cryptographic check happens locally.
 
 ## Database backups
 

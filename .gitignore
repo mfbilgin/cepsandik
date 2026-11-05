@@ -1,4 +1,4 @@
-﻿# Maven
+# Maven
 target/
 *.jar
 *.war
@@ -47,3 +47,8 @@ mobile/ios/Pods/
 mobile/modules/*/android/build/
 mobile/modules/*/ios/build/
 mobile/screen_shoots/
+
+# Google servis hesabı anahtarları (FCM V1, Play Integrity) — ASLA commit etme
+*firebase-adminsdk*.json
+*service-account*.json
+*-sa-key*.json

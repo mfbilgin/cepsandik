@@ -24,7 +24,7 @@ services:
       - ./logs/nginx:/usr/local/openresty/nginx/logs
       # Nginx Configuration
       - ./openresty/conf/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      # Static HTML + downloads (APK güncellemeleri image rebuild gerektirmesin)
+      # Static HTML (landing page)
       - ./openresty/html:/usr/share/nginx/html:ro
     depends_on:
       - user-service

@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Switch, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +14,7 @@ import { Card, ListItem } from '../../components/ui';
 
 export const ProfileScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
-    const { user, signOut, refreshUser } = useAuth();
+    const { user, signOut, forgetDevice, refreshUser } = useAuth();
     const navigation = useNavigation<any>();
     const { t, language, setLanguage } = useI18n();
     const { showDialog } = useUI();
@@ -37,6 +37,27 @@ export const ProfileScreen = () => {
             type: 'confirm',
             confirmText: t('profile.logout'),
             onConfirm: signOut,
+        });
+    };
+
+    // Google Play + KVKK: uygulama içinden hesap silme. Sunucu kişisel verileri
+    // siler/anonimleştirir (UserService.deleteMe); cihazdaki oturum ve
+    // biyometrik giriş bilgileri de temizlenir.
+    const handleDeleteAccount = () => {
+        showDialog({
+            title: t('profile.deleteAccountTitle'),
+            message: t('profile.deleteAccountBody'),
+            type: 'confirm',
+            confirmText: t('profile.deleteAccountConfirm'),
+            onConfirm: async () => {
+                try {
+                    await api.delete('/users/me');
+                    await forgetDevice();
+                    Toast.show({ type: 'success', text1: t('profile.deleteAccountSuccess') });
+                } catch (error) {
+                    Toast.show({ type: 'error', text1: t('common.error'), text2: t('profile.deleteAccountFail') });
+                }
+            },
         });
     };
 
@@ -252,6 +273,12 @@ export const ProfileScreen = () => {
                             title={t('profile.helpCenter')}
                             onPress={() => navigation.navigate('Help')}
                         />
+                        <Divider />
+                        <ListItem
+                            icon="shield-checkmark-outline"
+                            title={t('profile.privacy')}
+                            onPress={() => Linking.openURL('https://cepsandik.com/gizlilik/')}
+                        />
                     </View>
                 </Card>
 
@@ -267,6 +294,15 @@ export const ProfileScreen = () => {
                 >
                     <Ionicons name="log-out-outline" size={22} color={c.danger} />
                     <Text style={{ color: c.danger, fontWeight: '700', fontSize: 15 }}>{t('profile.logout')}</Text>
+                </TouchableOpacity>
+
+                {/* Hesabı sil */}
+                <TouchableOpacity
+                    onPress={handleDeleteAccount}
+                    activeOpacity={0.7}
+                    style={{ alignItems: 'center', padding: 12, marginTop: theme.spacing.sm }}
+                >
+                    <Text style={{ color: c.danger, fontSize: 14, fontWeight: '600' }}>{t('profile.deleteAccount')}</Text>
                 </TouchableOpacity>
 
                 <Text style={{ textAlign: 'center', fontSize: 12, color: c.textTertiary, marginTop: 14 }}>

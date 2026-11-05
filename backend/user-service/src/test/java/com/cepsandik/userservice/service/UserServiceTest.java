@@ -47,6 +47,15 @@ class UserServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private FileUploadService fileUploadService;
+
+    @Mock
+    private com.cepsandik.userservice.repositories.TwoFactorAuthRepository twoFactorAuthRepository;
+
+    @Mock
+    private com.cepsandik.userservice.repositories.NotificationPreferenceRepository notificationPreferenceRepo;
+
     @InjectMocks
     private UserService userService;
 
@@ -119,15 +128,18 @@ class UserServiceTest {
     @DisplayName("Password Change Tests")
     class PasswordChangeTests {
 
+        // PasswordPolicyService: >=12 karakter, >=3 karakter grubu, yaygın kelime/desen yok
+        private static final String STRONG_NEW_PASSWORD = "Kx7#mQ2!vR9pLw4z";
+
         @Test
         @DisplayName("Should change password successfully")
         void shouldChangePasswordSuccessfully() {
             // Given
             when(userRepo.findByEmail("john@example.com")).thenReturn(Optional.of(testUser));
             when(encoder.matches("oldPassword", "hashedPassword")).thenReturn(true);
-            when(encoder.encode("newPassword")).thenReturn("newHashedPassword");
+            when(encoder.encode(STRONG_NEW_PASSWORD)).thenReturn("newHashedPassword");
 
-            PasswordChangeRequest request = new PasswordChangeRequest("oldPassword", "newPassword");
+            PasswordChangeRequest request = new PasswordChangeRequest("oldPassword", STRONG_NEW_PASSWORD);
 
             // When
             userService.changePassword("john@example.com", request);
@@ -144,7 +156,7 @@ class UserServiceTest {
             when(userRepo.findByEmail("john@example.com")).thenReturn(Optional.of(testUser));
             when(encoder.matches("wrongPassword", "hashedPassword")).thenReturn(false);
 
-            PasswordChangeRequest request = new PasswordChangeRequest("wrongPassword", "newPassword");
+            PasswordChangeRequest request = new PasswordChangeRequest("wrongPassword", STRONG_NEW_PASSWORD);
 
             // When/Then
             assertThatThrownBy(() -> userService.changePassword("john@example.com", request))
@@ -158,18 +170,30 @@ class UserServiceTest {
     class AccountDeletionTests {
 
         @Test
-        @DisplayName("Should delete account (soft delete)")
+        @DisplayName("Should erase personal data and soft delete account")
         void shouldDeleteAccountSuccessfully() {
             // Given
+            testUser.setProfileImage("https://bucket.s3.eu-north-1.amazonaws.com/profile-images/x.png");
+            testUser.setPushToken("ExponentPushToken[abc]");
             when(userRepo.findByEmail("john@example.com")).thenReturn(Optional.of(testUser));
+            when(refreshTokenRepository.findByUserId(testUser.getId())).thenReturn(java.util.List.of());
+            when(encoder.encode(anyString())).thenReturn("random-hash");
 
             // When
             userService.deleteMe("john@example.com");
 
             // Then
-            verify(userRepo).save(testUser);
-            assertThat(testUser.isActive()).isFalse();
-            assertThat(testUser.getDeletedAt()).isNotNull();
+            assertThat(testUser.getFirstName()).isEqualTo("Silinmiş");
+            assertThat(testUser.getLastName()).isEqualTo("Kullanıcı");
+            assertThat(testUser.getEmail()).isEqualTo("deleted-" + testUser.getId() + "@deleted.invalid");
+            assertThat(testUser.getPasswordHash()).isEqualTo("random-hash");
+            assertThat(testUser.getProfileImage()).isNull();
+            assertThat(testUser.getPushToken()).isNull();
+            verify(fileUploadService).deleteProfileImage("https://bucket.s3.eu-north-1.amazonaws.com/profile-images/x.png");
+            verify(emailChangeTokenRepository).deleteByUserId(testUser.getId());
+            verify(twoFactorAuthRepository).deleteByUserId(testUser.getId());
+            verify(userRepo).saveAndFlush(testUser);
+            verify(userRepo).delete(testUser);
         }
     }
 
@@ -218,13 +242,15 @@ class UserServiceTest {
         @DisplayName("Should logout from all devices")
         void shouldLogoutFromAllDevices() {
             // Given
+            var tokens = java.util.List.of(new com.cepsandik.userservice.models.RefreshToken());
             when(userRepo.findByEmail("john@example.com")).thenReturn(Optional.of(testUser));
+            when(refreshTokenRepository.findByUserId(testUser.getId())).thenReturn(tokens);
 
             // When
             userService.logoutAllDevices("john@example.com");
 
             // Then
-            verify(refreshTokenRepository).deleteByUserId(testUser.getId());
+            verify(refreshTokenRepository).deleteAll(tokens);
         }
     }
 }

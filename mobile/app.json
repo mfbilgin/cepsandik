@@ -43,7 +43,16 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/new_icon.png"
@@ -53,7 +62,28 @@
       "expo-localization",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": false,
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2563EB"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bfaef930-f351-4c3f-9d60-219a09fdf101"
+      }
+    },
+    "owner": "mfbilgin"
   }
 }

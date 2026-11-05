@@ -42,3 +42,7 @@ yarn-error.*
 
 # KMP fat JAR — Docker'dan extract edilir, repo'da tutulmaz (~6.4MB binary)
 modules/electionguard/android/libs/egklib-all.jar
+
+# Google servis hesabı anahtarları — repoya ve EAS yüklemesine girmez
+*firebase-adminsdk*.json
+*service-account*.json

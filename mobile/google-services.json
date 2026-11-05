@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "514313794344",
+    "project_id": "cepsandik",
+    "storage_bucket": "cepsandik.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514313794344:android:25ca91e9a4edae4424561d",
+        "android_client_info": {
+          "package_name": "com.cepsandik.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcxdUN6ZiB7NSypwE9OwiXsAq8VAiZJc8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

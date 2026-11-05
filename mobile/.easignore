@@ -1,0 +1,49 @@
+# EAS Build yükleme kuralları. Bu dosya varsa EAS .gitignore yerine bunu kullanır.
+# Fark: KMP şifreleme kütüphanesi (modules/electionguard/android/libs/egklib-all.jar)
+# git'te tutulmuyor ama cihazda oy şifrelemek için build'e GİRMEK ZORUNDA.
+
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Google servis hesabı anahtarları — repoya ve EAS yüklemesine girmez
+*firebase-adminsdk*.json
+*service-account*.json
